@@ -43,6 +43,7 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'HR_STAFF', label: 'HR / Staff Admin', school: 'Faculty & Leave Registry' },
     { id: 'ACCOUNTS', label: 'Accounts Staff', school: 'Fee Ledger & Invoicing' },
     { id: 'PUBLIC', label: 'Public School Website', school: `${branding.shortName} Portal` },
+    { id: 'VERIFY_CARD', label: 'Public ID Card Verification', school: 'Anti-Tamper QR Gateway' },
   ];
 
   const currentRoleObj = roles.find((r) => r.id === currentRole) || roles[1];

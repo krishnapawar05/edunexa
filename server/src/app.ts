@@ -8,6 +8,7 @@ import healthRouter from './routes/health.routes.js';
 import authRouter from './modules/auth/auth.routes.js';
 import superAdminRouter from './modules/superadmin/tenant.routes.js';
 import securityTestRouter from './modules/test-fixtures/security-test.routes.js';
+import coreRouter from './modules/core/core.routes.js';
 
 export function createApp(): express.Application {
   const app = express();
@@ -38,6 +39,7 @@ export function createApp(): express.Application {
   // Modular API Endpoints (v1)
   app.use('/api/v1/auth', authRouter);
   app.use('/api/v1/superadmin', superAdminRouter);
+  app.use('/api/v1/core', coreRouter);
   app.use('/api/v1/security-test', securityTestRouter);
 
   // Catch-all for undefined endpoints

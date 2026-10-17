@@ -99,6 +99,14 @@ enum CardStatus {
   LOST
 }
 
+enum ApplicationStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  WAITLISTED
+}
+
 // -------------------------------------------------------------
 // CORE TENANCY & AUTHENTICATION
 // -------------------------------------------------------------
@@ -134,6 +142,7 @@ model School {
   feeStructures     FeeStructure[]
   subscriptions     Subscription[]
   auditLogs         AuditLog[]
+  admissionApplications AdmissionApplication[]
 
   @@index([slug])
   @@index([status])
@@ -327,6 +336,35 @@ model ParentStudentLink {
   @@unique([parentMembershipId, studentProfileId])
   @@index([parentMembershipId])
   @@index([studentProfileId])
+}
+
+model AdmissionApplication {
+  id                      String            @id @default(uuid())
+  schoolId                String
+  applicationNumber       String            @unique
+  studentFirstName        String
+  studentLastName         String
+  dateOfBirth             DateTime
+  gender                  String
+  bloodGroup              String?
+  applyingClass           String
+  guardianName            String
+  guardianRelationship    String
+  guardianEmail           String
+  guardianPhone           String
+  residentialAddress      String
+  previousSchool          String?
+  previousMarksPercentage Float?
+  status                  ApplicationStatus @default(SUBMITTED)
+  reviewedByUserId        String?
+  reviewNotes             String?
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
+
+  school                  School            @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, status])
+  @@index([applicationNumber])
 }
 
 model StudentEnrollment {

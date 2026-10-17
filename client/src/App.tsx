@@ -12,11 +12,12 @@ import { ParentDashboard } from './modules/parent/ParentDashboard.js';
 import { ExaminationWorkflow } from './modules/examinations/ExaminationWorkflow.js';
 import { HrStaffDashboard } from './modules/hr/HrStaffDashboard.js';
 import { AccountsDashboard } from './modules/accounts/AccountsDashboard.js';
+import { PublicIdCardVerification } from './modules/public/PublicIdCardVerification.js';
 import { fetchServerHealth } from './services/api.js';
 import { HealthCheckData } from '@edunexa/shared';
 
 export const App: React.FC = () => {
-  // Navigation State across 8 PRD roles + PUBLIC + LOGIN
+  // Navigation State across 8 PRD roles + PUBLIC + LOGIN + VERIFY_CARD
   const [currentView, setCurrentView] = useState<string>('SCHOOL_ADMIN');
   const [activeTab, setActiveTab] = useState<string>('overview');
   const [serverHealth, setServerHealth] = useState<HealthCheckData | null>(null);
@@ -44,7 +45,22 @@ export const App: React.FC = () => {
   if (currentView === 'PUBLIC') {
     return (
       <>
-        <PublicSchoolWebsite onGoToLogin={() => setCurrentView('LOGIN')} />
+        <PublicSchoolWebsite
+          onGoToLogin={() => setCurrentView('LOGIN')}
+          onGoToVerify={() => setCurrentView('VERIFY_CARD')}
+        />
+        <SchoolIdentityModal />
+      </>
+    );
+  }
+
+  // If in ID Card Verification mode, render the anti-tamper QR gateway
+  if (currentView === 'VERIFY_CARD') {
+    return (
+      <>
+        <PublicIdCardVerification
+          onBackToPublic={() => setCurrentView('PUBLIC')}
+        />
         <SchoolIdentityModal />
       </>
     );

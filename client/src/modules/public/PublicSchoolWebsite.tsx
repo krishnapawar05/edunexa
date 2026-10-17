@@ -21,9 +21,10 @@ import { useSchoolBranding } from '../../context/SchoolBrandingContext.js';
 
 interface PublicSchoolWebsiteProps {
   onGoToLogin: () => void;
+  onGoToVerify?: () => void;
 }
 
-export const PublicSchoolWebsite: React.FC<PublicSchoolWebsiteProps> = ({ onGoToLogin }) => {
+export const PublicSchoolWebsite: React.FC<PublicSchoolWebsiteProps> = ({ onGoToLogin, onGoToVerify }) => {
   const { branding, setIsCustomizing } = useSchoolBranding();
   const [activeSection, setActiveSection] = useState<'home' | 'about' | 'academics' | 'admissions' | 'faculty' | 'contact'>('home');
   const [showAdmissionModal, setShowAdmissionModal] = useState(false);
@@ -90,6 +91,26 @@ export const PublicSchoolWebsite: React.FC<PublicSchoolWebsiteProps> = ({ onGoTo
           >
             <Sliders size={11} /> Customize School Identity
           </button>
+          {onGoToVerify && (
+            <button
+              onClick={onGoToVerify}
+              style={{
+                background: 'rgba(16, 185, 129, 0.15)',
+                border: '1px solid rgba(16, 185, 129, 0.35)',
+                color: '#34d399',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                cursor: 'pointer',
+                fontWeight: 600,
+                padding: '2px 8px',
+                borderRadius: 'var(--radius-xs)',
+                fontSize: '0.74rem',
+              }}
+            >
+              <CheckCircle size={11} /> Verify ID Card
+            </button>
+          )}
           <span style={{ color: '#93c5fd' }}>Admissions Open for Academic Year 2026–2027</span>
           <button
             onClick={onGoToLogin}
