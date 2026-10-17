@@ -234,7 +234,71 @@ erDiagram
     FeeInvoice ||--o{ FeePayment : "settled by"
 ```
 
-The schema defines all 20+ entities with primary keys, foreign keys, unique composite constraints, deletion cascade rules, and audit logging.
+### Relational Entity Design & Constraint Strategy
+
+| Entity Name | Primary Key | Foreign Keys & Relationships | Unique Constraints | Performance Indexes | Deletion & Cascade Rules |
+|---|---|---|---|---|---|
+| **School** | `id` (UUID) | Has many Memberships, Sessions, Classes, Notices, Fees | `slug`, `code` | `[slug]`, `[status]` | Root tenant entity; deletion cascades to all owned entities. |
+| **User** | `id` (UUID) | Has many Memberships, AuditLogs | `email` | `[email]` | Cascade delete to memberships on account removal. |
+| **UserMembership** | `id` (UUID) | `userId` -> User, `schoolId` -> School | `[userId, schoolId, role]` | `[schoolId, role]`, `[userId]` | Cascade delete if User or School is deleted. |
+| **AcademicSession** | `id` (UUID) | `schoolId` -> School | `[schoolId, name]` | `[schoolId, isCurrent]` | Cascade delete on School deletion. |
+| **Class** | `id` (UUID) | `schoolId` -> School | `[schoolId, code]` | `[schoolId]` | Cascade delete on School deletion. |
+| **Section** | `id` (UUID) | `classId` -> Class | `[classId, name]` | `[classId]` | Cascade delete on Class deletion. |
+| **Subject** | `id` (UUID) | `classId` -> Class | `[classId, code]` | `[classId]` | Cascade delete on Class deletion. |
+| **StudentProfile** | `id` (UUID) | `membershipId` -> UserMembership | `membershipId`, `admissionNumber` | `[admissionNumber]`, `[status]` | Cascade delete on Membership deletion. |
+| **ParentStudentLink**| `id` (UUID) | `parentMembershipId` -> UserMembership, `studentProfileId` -> StudentProfile | `[parentMembershipId, studentProfileId]` | `[parentMembershipId]`, `[studentProfileId]` | Cascade delete on either link removal. |
+| **StudentEnrollment**| `id` (UUID) | `studentProfileId`, `academicSessionId`, `classId`, `sectionId` | `[studentProfileId, academicSessionId]` | `[classId, sectionId, academicSessionId]` | Cascade delete on student or session removal. |
+| **StaffProfile** | `id` (UUID) | `membershipId` -> UserMembership, `departmentId` -> Department | `membershipId`, `employeeId` | `[employeeId]` | Cascade delete on Membership deletion; SetNull on Department. |
+| **TeacherAssignment**| `id` (UUID) | `staffProfileId` -> StaffProfile, `subjectId` -> Subject | `[staffProfileId, subjectId]` | `[staffProfileId]`, `[subjectId]` | Cascade delete on staff or subject removal. |
+| **VirtualIdCard** | `id` (UUID) | `studentProfileId` -> StudentProfile, `staffProfileId` -> StaffProfile | `cardNumber`, `verificationToken` | `[verificationToken]`, `[cardNumber]`, `[status]` | Cascade delete on profile deletion. |
+| **AttendanceRecord**| `id` (UUID) | `studentProfileId` -> StudentProfile, `sectionId` -> Section | `[studentProfileId, date]` | `[sectionId, date]` | Cascade delete on Student deletion; audit history preserved in JSON. |
+| **Quiz** | `id` (UUID) | `schoolId` -> School, `subjectId` -> Subject, `sectionId` -> Section | — | `[schoolId, status]`, `[opensAt, closesAt]` | Cascade delete on School/Subject deletion. |
+| **QuizQuestion** | `id` (UUID) | `quizId` -> Quiz | — | `[quizId, orderIndex]` | Cascade delete on Quiz deletion. |
+| **QuizQuestionChoice**|`id` (UUID) | `questionId` -> QuizQuestion | — | `[questionId]` | Cascade delete on Question deletion. |
+| **QuizAttempt** | `id` (UUID) | `quizId` -> Quiz, `studentProfileId` -> StudentProfile | `[quizId, studentProfileId, attemptNumber]` | `[quizId, studentProfileId]` | Cascade delete on student or quiz removal. |
+| **ExamSchedule** | `id` (UUID) | `academicSessionId` -> AcademicSession, `subjectId` -> Subject | — | `[academicSessionId, subjectId]` | Cascade delete on session removal. |
+| **ExamMark** | `id` (UUID) | `examScheduleId` -> ExamSchedule, `studentProfileId` -> StudentProfile | `[examScheduleId, studentProfileId]` | `[studentProfileId]` | Cascade delete on exam schedule removal. |
+| **FeeInvoice** | `id` (UUID) | `feeStructureId` -> FeeStructure, `studentProfileId` -> StudentProfile | `invoiceNumber` | `[studentProfileId, status]`, `[invoiceNumber]` | Cascade delete on student removal. |
+| **FeePayment** | `id` (UUID) | `feeInvoiceId` -> FeeInvoice | `receiptNumber` | `[receiptNumber]` | Cascade delete on invoice removal; simulated payments logged. |
+| **AuditLog** | `id` (UUID) | `schoolId` -> School (nullable), `userId` -> User (nullable) | — | `[schoolId, createdAt]`, `[action]` | `ON DELETE SET NULL` to preserve forensic audit integrity. |
+
+### Critical Multi-Entity Database Transactions (`$transaction`)
+
+To maintain relational integrity across complex educational and financial workflows, the following operations are wrapped strictly in ACID database transactions:
+
+1. **Student Onboarding & Admission Transaction**:
+   - Creates `User` account with hashed temporary password.
+   - Creates `UserMembership` with role `STUDENT` linked to `School`.
+   - Creates `StudentProfile` with unique auto-generated `admissionNumber` (`ADM-YYYY-XXXX`).
+   - Creates `StudentEnrollment` into target `AcademicSession`, `Class`, and `Section`.
+   - Issues initial `VirtualIdCard` with a unique cryptographic verification token.
+   - *Rollback guarantee:* Any collision in admission number or validation failure aborts the entire user creation.
+
+2. **Fee Payment & Receipt Settlement Transaction**:
+   - Queries `FeeInvoice` with row-level lock (`FOR UPDATE`).
+   - Increments `amountPaid` by the transaction amount.
+   - Evaluates remaining balance: transitions status to `PAID` (if balance is 0) or `PARTIALLY_PAID`.
+   - Inserts new `FeePayment` record with unique `receiptNumber` (`REC-YYYY-XXXX`).
+   - *Rollback guarantee:* Prevents double-payment anomalies or ledger mismatches.
+
+3. **Examination Marks Sheet Submission & Audit Transaction**:
+   - Receives student mark batch for an `ExamSchedule`.
+   - Upserts `ExamMark` for each student with score, grade, absent/exempt flags.
+   - Appends prior mark values to `ExamMark.auditTrail` JSON array for change traceability.
+   - Updates `ExamSchedule.status` to `MARKS_SUBMITTED`.
+   - Inserts `AuditLog` entry documenting submitting teacher and timestamp.
+
+4. **ID Card Revocation & Re-issuance Transaction**:
+   - Updates existing `VirtualIdCard` to status `REVOKED` or `LOST` with revocation reason.
+   - Generates new `VirtualIdCard` record with fresh card number and new random verification token.
+   - Records administrative audit entry.
+
+5. **Quiz Submission & Automated Grading Transaction**:
+   - Updates `QuizAttempt` with `submittedAt` timestamp and computed `timeTakenSeconds`.
+   - Validates that server elapsed time does not exceed `Quiz.durationMinutes + buffer`.
+   - Compares student answers against `QuizQuestionChoice.isCorrect`.
+   - Scores objective questions, sets `isCorrect` and `marksAwarded` per answer, calculates total `scoreObtained` and `percentage`.
+   - Sets `isGraded` to true for purely objective assessments.
 
 ---
 
