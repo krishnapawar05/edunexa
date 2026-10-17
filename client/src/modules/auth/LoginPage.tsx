@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Shield, Lock, Mail, ArrowRight, CheckCircle2, School } from 'lucide-react';
+import { useSchoolBranding } from '../../context/SchoolBrandingContext.js';
 
 interface LoginPageProps {
   onLoginSuccess: (role: string) => void;
@@ -7,16 +8,21 @@ interface LoginPageProps {
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGoToPublic }) => {
+  const { branding } = useSchoolBranding();
   const [email, setEmail] = useState('admin@apexacademy.edu');
   const [password, setPassword] = useState('••••••••••••');
   const [selectedRole, setSelectedRole] = useState('SCHOOL_ADMIN');
   const [isLoading, setIsLoading] = useState(false);
 
   const demoAccounts = [
-    { role: 'SUPER_ADMIN', label: 'Platform Super Admin', email: 'superadmin@edunexa.org', badge: 'Multi-Tenant' },
-    { role: 'SCHOOL_ADMIN', label: 'School Admin / Principal', email: 'admin@apexacademy.edu', badge: 'Apex Academy' },
-    { role: 'TEACHER', label: 'Physics Teacher', email: 'dr.thorne@apexacademy.edu', badge: 'Grade 10' },
+    { role: 'SUPER_ADMIN', label: 'Super Admin', email: 'superadmin@edunexa.org', badge: 'Multi-Tenant' },
+    { role: 'SCHOOL_ADMIN', label: 'School Admin', email: 'admin@apexacademy.edu', badge: 'Apex Academy' },
+    { role: 'TEACHER', label: 'Faculty / Teacher', email: 'dr.thorne@apexacademy.edu', badge: 'Grade 10' },
     { role: 'STUDENT', label: 'Student Profile', email: 'aarav.sharma@student.apex.edu', badge: 'Grade 10-A' },
+    { role: 'PARENT', label: 'Parent / Guardian', email: 'sunil.sharma@parent.apex.edu', badge: '2 Children' },
+    { role: 'EXAM_COORDINATOR', label: 'Exam Coordinator', email: 'exam.coordinator@apexacademy.edu', badge: 'Assessments' },
+    { role: 'HR_STAFF', label: 'HR / Staff Admin', email: 'hr.admin@apexacademy.edu', badge: 'Workforce' },
+    { role: 'ACCOUNTS', label: 'Accounts Staff', email: 'accounts@apexacademy.edu', badge: 'Finance' },
   ];
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -77,7 +83,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGoToPubl
             style={{
               width: '44px',
               height: '44px',
-              backgroundColor: 'var(--primary-700)',
+              backgroundColor: branding.primaryAccent,
               borderRadius: 'var(--radius-sm)',
               display: 'inline-flex',
               alignItems: 'center',
@@ -89,11 +95,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGoToPubl
               boxShadow: 'var(--shadow-md)',
             }}
           >
-            E
+            {branding.monogram}
           </div>
-          <h1 style={{ fontSize: '1.6rem', color: 'var(--text-primary)' }}>EduNexa Institutional Portal</h1>
+          <h1 style={{ fontSize: '1.6rem', color: 'var(--text-primary)' }}>{branding.shortName} Portal</h1>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-            Unified Academic & Administrative ERP Access
+            Unified Academic & Administrative ERP Access • Powered by EduNexa
           </p>
         </div>
 

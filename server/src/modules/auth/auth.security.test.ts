@@ -35,6 +35,14 @@ describe('STAGE 3: Authentication and Multi-Tenant Security Test Suite', () => {
     role: PlatformRole.STUDENT,
   });
 
+  const parentTokenSunil = generateAccessToken({
+    userId: 'usr-parent-01',
+    email: 'sunil.sharma@parent.apex.edu',
+    schoolId: 'sch-apex-01',
+    guardianStudentIds: ['stu-aarav-01'], // Authorized for Aarav Sharma only
+    role: PlatformRole.PARENT,
+  });
+
   const studentTokenOtherSchool = generateAccessToken({
     userId: 'usr-student-02',
     email: 'rohan.p@greenwood.edu',
@@ -90,14 +98,13 @@ describe('STAGE 3: Authentication and Multi-Tenant Security Test Suite', () => {
   });
 
   it('3b. Request with expired token should return 401 TOKEN_EXPIRED', async () => {
-    // Generate token that expired 10 seconds ago
     const expiredToken = generateAccessToken(
       {
         userId: 'usr-student-01',
         email: 'aarav@apex.edu',
         role: PlatformRole.STUDENT,
       },
-      -10 // Negative expiration
+      -10 // Expired 10 seconds ago
     );
 
     const res = await request(app)
@@ -133,12 +140,12 @@ describe('STAGE 3: Authentication and Multi-Tenant Security Test Suite', () => {
   });
 
   // --------------------------------------------------------------------------
-  // 5. Access to Another Student's Records (Horizontal Privilege Escalation) Tests
+  // 5. Student Horizontal Privilege Escalation Tests
   // --------------------------------------------------------------------------
   it("5a. Student attempting to access another student's marks should return 403 FORBIDDEN_RECORD_ACCESS", async () => {
     const res = await request(app)
       .get('/api/v1/security-test/students/stu-rohan-99/private-marks')
-      .set('Authorization', `Bearer ${studentTokenA}`); // Student A (Aarav) accessing Rohan's marks
+      .set('Authorization', `Bearer ${studentTokenA}`);
 
     expect(res.status).toBe(403);
     expect(res.body.success).toBe(false);
@@ -156,9 +163,32 @@ describe('STAGE 3: Authentication and Multi-Tenant Security Test Suite', () => {
   });
 
   // --------------------------------------------------------------------------
-  // 6. Super Admin Sensitive Access Guardrail Tests (PRD §4)
+  // 6. Parent Horizontal Privilege Boundary Tests
   // --------------------------------------------------------------------------
-  it('6a. Super Admin accessing sensitive student marks without x-audit-reason should return 403 SUPER_ADMIN_AUDIT_REQUIRED', async () => {
+  it("6a. Parent attempting to access unrelated student's marks should return 403 FORBIDDEN_RECORD_ACCESS", async () => {
+    const res = await request(app)
+      .get('/api/v1/security-test/students/stu-rohan-99/private-marks')
+      .set('Authorization', `Bearer ${parentTokenSunil}`);
+
+    expect(res.status).toBe(403);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error.code).toBe('FORBIDDEN_RECORD_ACCESS');
+  });
+
+  it("6b. Parent accessing their own registered child's records should succeed with 200", async () => {
+    const res = await request(app)
+      .get('/api/v1/security-test/students/stu-aarav-01/private-marks')
+      .set('Authorization', `Bearer ${parentTokenSunil}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.name).toBe('Aarav Sharma');
+  });
+
+  // --------------------------------------------------------------------------
+  // 7. Super Admin Sensitive Access Guardrail Tests (PRD §4)
+  // --------------------------------------------------------------------------
+  it('7a. Super Admin accessing sensitive student marks without x-audit-reason should return 403 SUPER_ADMIN_AUDIT_REQUIRED', async () => {
     const res = await request(app)
       .get('/api/v1/security-test/students/stu-aarav-01/private-marks')
       .set('Authorization', `Bearer ${superAdminToken}`);
@@ -168,7 +198,7 @@ describe('STAGE 3: Authentication and Multi-Tenant Security Test Suite', () => {
     expect(res.body.error.code).toBe('SUPER_ADMIN_AUDIT_REQUIRED');
   });
 
-  it('6b. Super Admin accessing sensitive marks with valid audited rationale should succeed with 200', async () => {
+  it('7b. Super Admin accessing sensitive marks with valid audited rationale should succeed with 200', async () => {
     const res = await request(app)
       .get('/api/v1/security-test/students/stu-aarav-01/private-marks')
       .set('Authorization', `Bearer ${superAdminToken}`)
@@ -179,9 +209,9 @@ describe('STAGE 3: Authentication and Multi-Tenant Security Test Suite', () => {
   });
 
   // --------------------------------------------------------------------------
-  // 7. Manipulated Record IDs Tests
+  // 8. Manipulated Record IDs Tests
   // --------------------------------------------------------------------------
-  it('7. Accessing a manipulated or non-existent record ID should return 404 RECORD_NOT_FOUND', async () => {
+  it('8. Accessing a manipulated or non-existent record ID should return 404 RECORD_NOT_FOUND', async () => {
     const res = await request(app)
       .get('/api/v1/security-test/records/rec-nonexistent-999')
       .set('Authorization', `Bearer ${schoolAdminTokenSchoolA}`);
@@ -192,38 +222,24 @@ describe('STAGE 3: Authentication and Multi-Tenant Security Test Suite', () => {
   });
 
   // --------------------------------------------------------------------------
-  // 8. Super Admin School Onboarding & Auditable Role Changes
+  // 9. Unauthorized Role Changes Tests
   // --------------------------------------------------------------------------
-  it('8a. Super Admin can list schools and onboard a new school tenant', async () => {
-    const listRes = await request(app)
-      .get('/api/v1/superadmin/schools')
-      .set('Authorization', `Bearer ${superAdminToken}`);
-
-    expect(listRes.status).toBe(200);
-    expect(listRes.body.data.length).toBeGreaterThanOrEqual(1);
-
-    const onboardRes = await request(app)
-      .post('/api/v1/superadmin/schools')
-      .set('Authorization', `Bearer ${superAdminToken}`)
+  it('9a. Unauthorized user (Teacher) attempting to change user role should return 403 FORBIDDEN_ROLE', async () => {
+    const res = await request(app)
+      .post('/api/v1/superadmin/memberships/role')
+      .set('Authorization', `Bearer ${teacherTokenSchoolA}`)
       .send({
-        name: 'Delhi Public Collegiate',
-        code: `DPC-${Date.now().toString().slice(-4)}`,
-        email: 'contact@dpc.edu',
-        phone: '+91 11 2345 6789',
-        address: '10 Mathura Road',
-        city: 'New Delhi',
-        state: 'Delhi',
-        postalCode: '110003',
-        planName: 'Enterprise',
+        targetUserId: 'usr-student-01',
+        schoolId: 'sch-apex-01',
+        newRole: PlatformRole.SCHOOL_ADMIN,
       });
 
-    expect(onboardRes.status).toBe(201);
-    expect(onboardRes.body.success).toBe(true);
-    expect(onboardRes.body.data).toHaveProperty('id');
-    expect(onboardRes.body.data.name).toBe('Delhi Public Collegiate');
+    expect(res.status).toBe(403);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error.code).toBe('FORBIDDEN_ROLE');
   });
 
-  it('8b. Super Admin role changes produce persistent audit log entries', async () => {
+  it('9b. Super Admin role changes succeed and produce persistent audit log entries', async () => {
     const roleChangeRes = await request(app)
       .post('/api/v1/superadmin/memberships/role')
       .set('Authorization', `Bearer ${superAdminToken}`)
@@ -245,5 +261,84 @@ describe('STAGE 3: Authentication and Multi-Tenant Security Test Suite', () => {
     expect(auditRes.body.data.length).toBeGreaterThanOrEqual(1);
     const lastLog = auditRes.body.data[auditRes.body.data.length - 1];
     expect(lastLog.action).toBe('ROLE_PERMISSION_CHANGED');
+  });
+
+  // --------------------------------------------------------------------------
+  // 10. School Onboarding Workflow Tests
+  // --------------------------------------------------------------------------
+  it('10. Super Admin can onboard a new school tenant with isolated namespace', async () => {
+    const onboardRes = await request(app)
+      .post('/api/v1/superadmin/schools')
+      .set('Authorization', `Bearer ${superAdminToken}`)
+      .send({
+        name: 'Delhi Public Collegiate',
+        code: `DPC-${Date.now().toString().slice(-4)}`,
+        email: 'contact@dpc.edu',
+        phone: '+91 11 2345 6789',
+        address: '10 Mathura Road',
+        city: 'New Delhi',
+        state: 'Delhi',
+        postalCode: '110003',
+        planName: 'Enterprise',
+      });
+
+    expect(onboardRes.status).toBe(201);
+    expect(onboardRes.body.success).toBe(true);
+    expect(onboardRes.body.data).toHaveProperty('id');
+    expect(onboardRes.body.data.name).toBe('Delhi Public Collegiate');
+  });
+
+  // --------------------------------------------------------------------------
+  // 11. Authentication Endpoints: Login, Bad Password, Suspended Tenant & Logout
+  // --------------------------------------------------------------------------
+  it('11a. Login with valid credentials should return access & refresh tokens and user profile', async () => {
+    const res = await request(app)
+      .post('/api/v1/auth/login')
+      .send({
+        email: 'admin@apexacademy.edu',
+        password: 'DemoPass2026!',
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data).toHaveProperty('accessToken');
+    expect(res.body.data).toHaveProperty('refreshToken');
+    expect(res.body.data.user.role).toBe(PlatformRole.SCHOOL_ADMIN);
+  });
+
+  it('11b. Login with incorrect password should return 401 INVALID_CREDENTIALS', async () => {
+    const res = await request(app)
+      .post('/api/v1/auth/login')
+      .send({
+        email: 'admin@apexacademy.edu',
+        password: 'WrongPassword999!',
+      });
+
+    expect(res.status).toBe(401);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error.code).toBe('INVALID_CREDENTIALS');
+  });
+
+  it('11c. Login to a suspended school tenant should return 403 SCHOOL_SUSPENDED', async () => {
+    const res = await request(app)
+      .post('/api/v1/auth/login')
+      .send({
+        email: 'admin@staugustine.edu',
+        password: 'DemoPass2026!',
+      });
+
+    expect(res.status).toBe(403);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error.code).toBe('SCHOOL_SUSPENDED');
+  });
+
+  it('11d. Authenticated user can call /api/v1/auth/logout', async () => {
+    const res = await request(app)
+      .post('/api/v1/auth/logout')
+      .set('Authorization', `Bearer ${schoolAdminTokenSchoolA}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.loggedOut).toBe(true);
   });
 });

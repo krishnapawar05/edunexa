@@ -126,6 +126,18 @@ export function enforceStudentIsolation(req: Request, res: Response, next: NextF
     }
   }
 
+  // If the user is a parent, target studentId must belong to one of their registered children
+  if (req.user.role === PlatformRole.PARENT) {
+    const targetStudentId = req.params.studentId || req.query.studentId || req.body.studentId;
+    if (targetStudentId && (!req.user.guardianStudentIds || !req.user.guardianStudentIds.includes(targetStudentId))) {
+      throw new AppError(
+        'Horizontal privilege violation: Parents may only access academic records of their registered children.',
+        403,
+        'FORBIDDEN_RECORD_ACCESS'
+      );
+    }
+  }
+
   next();
 }
 
