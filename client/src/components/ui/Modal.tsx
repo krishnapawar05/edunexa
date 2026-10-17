@@ -38,8 +38,8 @@ export const Modal: React.FC<ModalProps> = ({
       style={{
         position: 'fixed',
         inset: 0,
-        backgroundColor: 'rgba(15, 23, 42, 0.65)',
-        backdropFilter: 'blur(3px)',
+        backgroundColor: 'rgba(15, 23, 42, 0.72)',
+        backdropFilter: 'blur(4px)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -51,17 +51,19 @@ export const Modal: React.FC<ModalProps> = ({
       aria-modal="true"
     >
       <div
+        className="ed-modal-container"
         style={{
-          backgroundColor: 'var(--bg-surface)',
+          backgroundColor: '#ffffff',
           borderRadius: 'var(--radius-lg)',
-          boxShadow: 'var(--shadow-lg)',
-          border: '1px solid var(--border-default)',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(0, 0, 0, 0.05)',
+          border: '1px solid #cbd5e1',
           width: '100%',
           maxWidth,
           maxHeight: '90vh',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
+          zIndex: 1001,
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -69,11 +71,11 @@ export const Modal: React.FC<ModalProps> = ({
         <div
           style={{
             padding: 'var(--space-4) var(--space-6)',
-            borderBottom: '1px solid var(--border-default)',
+            borderBottom: '1px solid #e2e8f0',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            backgroundColor: 'var(--bg-subtle)',
+            backgroundColor: '#f8fafc',
           }}
         >
           <div>
@@ -95,7 +97,7 @@ export const Modal: React.FC<ModalProps> = ({
         </div>
 
         {/* Body */}
-        <div style={{ padding: 'var(--space-6)', overflowY: 'auto', flex: 1 }}>
+        <div style={{ padding: 'var(--space-6)', overflowY: 'auto', flex: 1, backgroundColor: '#ffffff' }}>
           {children}
         </div>
 
@@ -104,8 +106,8 @@ export const Modal: React.FC<ModalProps> = ({
           <div
             style={{
               padding: 'var(--space-3) var(--space-6)',
-              borderTop: '1px solid var(--border-default)',
-              backgroundColor: 'var(--bg-subtle)',
+              borderTop: '1px solid #e2e8f0',
+              backgroundColor: '#f8fafc',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'flex-end',

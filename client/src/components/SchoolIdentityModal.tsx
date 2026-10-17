@@ -67,8 +67,8 @@ export const SchoolIdentityModal: React.FC = () => {
       style={{
         position: 'fixed',
         inset: 0,
-        backgroundColor: 'rgba(15, 23, 42, 0.65)',
-        backdropFilter: 'blur(3px)',
+        backgroundColor: 'rgba(15, 23, 42, 0.72)',
+        backdropFilter: 'blur(4px)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -78,17 +78,19 @@ export const SchoolIdentityModal: React.FC = () => {
       onClick={() => setIsCustomizing(false)}
     >
       <div
+        className="ed-modal-container"
         style={{
-          backgroundColor: 'var(--bg-surface)',
+          backgroundColor: '#ffffff',
           borderRadius: 'var(--radius-lg)',
-          boxShadow: 'var(--shadow-lg)',
-          border: '1px solid var(--border-default)',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(0, 0, 0, 0.05)',
+          border: '1px solid #cbd5e1',
           width: '100%',
           maxWidth: '580px',
           maxHeight: '90vh',
           overflowY: 'auto',
           display: 'flex',
           flexDirection: 'column',
+          zIndex: 1001,
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -96,11 +98,11 @@ export const SchoolIdentityModal: React.FC = () => {
         <div
           style={{
             padding: 'var(--space-4) var(--space-6)',
-            borderBottom: '1px solid var(--border-default)',
+            borderBottom: '1px solid #e2e8f0',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            backgroundColor: 'var(--bg-subtle)',
+            backgroundColor: '#f8fafc',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
@@ -122,7 +124,7 @@ export const SchoolIdentityModal: React.FC = () => {
         </div>
 
         {/* Content Form */}
-        <form onSubmit={handleSave} style={{ padding: 'var(--space-6)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+        <form onSubmit={handleSave} style={{ padding: 'var(--space-6)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', backgroundColor: '#ffffff' }}>
           {/* Quick Presets */}
           <div>
             <label className="ed-label" style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '6px' }}>
@@ -138,8 +140,8 @@ export const SchoolIdentityModal: React.FC = () => {
                     padding: '5px 10px',
                     fontSize: '0.78rem',
                     borderRadius: 'var(--radius-sm)',
-                    border: '1px solid var(--border-default)',
-                    backgroundColor: form.code === p.code ? 'var(--primary-50)' : 'var(--bg-surface)',
+                    border: '1px solid #cbd5e1',
+                    backgroundColor: form.code === p.code ? '#eff6ff' : '#ffffff',
                     color: form.code === p.code ? 'var(--primary-700)' : 'var(--text-secondary)',
                     fontWeight: form.code === p.code ? 600 : 500,
                     cursor: 'pointer',

@@ -66,8 +66,8 @@ a:hover {
 
 /* Surface Cards & Panels */
 .ed-card {
-  background-color: var(--bg-surface);
-  border: 1px solid var(--border-default);
+  background-color: var(--bg-surface, #ffffff);
+  border: 1px solid var(--border-default, #e2e8f0);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-xs);
   transition: box-shadow 0.15s ease, border-color 0.15s ease;
@@ -263,10 +263,15 @@ a:hover {
   font-family: var(--font-sans);
   font-size: 0.9rem;
   color: var(--text-primary);
-  background-color: var(--bg-surface);
-  border: 1px solid var(--border-default);
+  background-color: var(--bg-surface, #ffffff);
+  border: 1px solid var(--border-default, #e2e8f0);
   border-radius: var(--radius-sm);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ed-select option {
+  background-color: #ffffff;
+  color: #0f172a;
 }
 
 .ed-input:focus, .ed-select:focus, .ed-textarea:focus {
@@ -359,5 +364,17 @@ a:hover {
 
 @media (max-width: 640px) {
   .ed-grid-4, .ed-grid-2 { grid-template-columns: 1fr; }
+}
+
+/* Modal and Dropdown Solid Backing Enforcement */
+.ed-modal-container {
+  background-color: #ffffff !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+}
+
+.ed-dropdown-menu {
+  background-color: #ffffff !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+  border: 1px solid #e2e8f0 !important;
 }
 

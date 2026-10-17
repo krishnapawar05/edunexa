@@ -186,14 +186,14 @@ export const Header: React.FC<HeaderProps> = ({
               style={{
                 position: 'absolute',
                 right: 0,
-                top: '110%',
+                top: 'calc(100% + 6px)',
                 width: '320px',
-                backgroundColor: 'var(--bg-surface)',
-                border: '1px solid var(--border-default)',
+                backgroundColor: '#ffffff',
+                border: '1px solid #cbd5e1',
                 borderRadius: 'var(--radius-md)',
-                boxShadow: 'var(--shadow-lg)',
+                boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
                 padding: 'var(--space-4)',
-                zIndex: 50,
+                zIndex: 100,
               }}
             >
               <div
@@ -280,15 +280,15 @@ export const Header: React.FC<HeaderProps> = ({
               style={{
                 position: 'absolute',
                 right: 0,
-                top: '110%',
-                width: '270px',
-                backgroundColor: 'var(--bg-surface)',
-                border: '1px solid var(--border-default)',
+                top: 'calc(100% + 6px)',
+                width: '280px',
+                backgroundColor: '#ffffff',
+                border: '1px solid #cbd5e1',
                 borderRadius: 'var(--radius-md)',
-                boxShadow: 'var(--shadow-lg)',
-                padding: '6px',
-                zIndex: 50,
-                maxHeight: '420px',
+                boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+                padding: '8px',
+                zIndex: 100,
+                maxHeight: '440px',
                 overflowY: 'auto',
               }}
             >
