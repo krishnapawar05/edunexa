@@ -19,19 +19,43 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGoToPubl
     { role: 'STUDENT', label: 'Student Profile', email: 'aarav.sharma@student.apex.edu', badge: 'Grade 10-A' },
   ];
 
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
   const handleSelectDemo = (acc: typeof demoAccounts[0]) => {
     setSelectedRole(acc.role);
     setEmail(acc.email);
     setPassword('DemoPass2026!');
+    setErrorMessage(null);
   };
 
-  const handleFormSubmit = (e: React.FormEvent) => {
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    setTimeout(() => {
+    setErrorMessage(null);
+
+    try {
+      const res = await fetch('/api/v1/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error?.message || 'Authentication failed. Please check credentials.');
+      }
+
+      // Store verified token and session
+      localStorage.setItem('edunexa_access_token', data.data.accessToken);
+      localStorage.setItem('edunexa_user', JSON.stringify(data.data.user));
+
+      onLoginSuccess(data.data.user.role);
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Unable to connect to authentication server.');
+    } finally {
       setIsLoading(false);
-      onLoginSuccess(selectedRole);
-    }, 400);
+    }
   };
 
   return (
@@ -179,6 +203,22 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGoToPubl
                 Forgot Password?
               </a>
             </div>
+
+            {errorMessage && (
+              <div
+                style={{
+                  marginBottom: 'var(--space-4)',
+                  padding: '8px 12px',
+                  backgroundColor: 'var(--danger-bg)',
+                  border: '1px solid var(--danger-border)',
+                  borderRadius: 'var(--radius-sm)',
+                  color: 'var(--danger-text)',
+                  fontSize: '0.82rem',
+                }}
+              >
+                {errorMessage}
+              </div>
+            )}
 
             <button
               type="submit"
