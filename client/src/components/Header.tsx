@@ -1,12 +1,25 @@
 import React, { useState } from 'react';
-import { Search, Bell, Shield, ChevronDown, CheckCircle2, AlertTriangle, RefreshCw } from 'lucide-react';
+import {
+  Search,
+  Bell,
+  Shield,
+  ChevronDown,
+  CheckCircle2,
+  AlertTriangle,
+  RefreshCw,
+  Sliders,
+  Menu,
+  Building2,
+} from 'lucide-react';
 import { HealthCheckData } from '@edunexa/shared';
+import { useSchoolBranding } from '../context/SchoolBrandingContext.js';
 
 interface HeaderProps {
   currentRole: string;
   onRoleChange: (role: string) => void;
   serverHealth: HealthCheckData | null;
   onRefreshHealth: () => void;
+  onToggleMobileMenu?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -14,16 +27,22 @@ export const Header: React.FC<HeaderProps> = ({
   onRoleChange,
   serverHealth,
   onRefreshHealth,
+  onToggleMobileMenu,
 }) => {
+  const { branding, setIsCustomizing } = useSchoolBranding();
   const [showRoleMenu, setShowRoleMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
 
   const roles = [
-    { id: 'SUPER_ADMIN', label: 'Platform Super Admin', school: 'System-Wide' },
-    { id: 'SCHOOL_ADMIN', label: 'School Admin', school: 'Apex Academy' },
+    { id: 'SUPER_ADMIN', label: 'Platform Super Admin', school: 'Multi-Tenant Authority' },
+    { id: 'SCHOOL_ADMIN', label: 'School Admin / Principal', school: branding.shortName },
     { id: 'TEACHER', label: 'Teacher (Dr. Thorne)', school: 'Grade 10 Physics' },
-    { id: 'STUDENT', label: 'Student (Aarav Sharma)', school: 'Grade 10-A (#ADM-2026-042)' },
-    { id: 'PUBLIC', label: 'Public School Website', school: 'Apex Academy Portal' },
+    { id: 'STUDENT', label: 'Student (Aarav Sharma)', school: `Grade 10-A (#ADM-2026-042)` },
+    { id: 'PARENT', label: 'Parent / Guardian', school: 'Children: Aarav & Maya' },
+    { id: 'EXAM_COORDINATOR', label: 'Examination Coordinator', school: 'Exam Workspace & Audit' },
+    { id: 'HR_STAFF', label: 'HR / Staff Admin', school: 'Faculty & Leave Registry' },
+    { id: 'ACCOUNTS', label: 'Accounts Staff', school: 'Fee Ledger & Invoicing' },
+    { id: 'PUBLIC', label: 'Public School Website', school: `${branding.shortName} Portal` },
   ];
 
   const currentRoleObj = roles.find((r) => r.id === currentRole) || roles[1];
@@ -43,8 +62,19 @@ export const Header: React.FC<HeaderProps> = ({
         zIndex: 40,
       }}
     >
-      {/* Contextual Search */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', width: '380px' }}>
+      {/* Left Area: Mobile Menu Toggle + Contextual Search */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flex: 1, maxWidth: '440px' }}>
+        {onToggleMobileMenu && (
+          <button
+            onClick={onToggleMobileMenu}
+            className="ed-btn-icon ed-mobile-toggle"
+            aria-label="Toggle navigation menu"
+            style={{ display: 'none' }}
+          >
+            <Menu size={20} />
+          </button>
+        )}
+
         <div
           style={{
             position: 'relative',
@@ -77,8 +107,26 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* Right Controls: Backend Connectivity, Role Switcher, Alerts, Profile */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
+      {/* Right Controls: Brand Customizer, Health Badge, Role Switcher, Alerts, Profile */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+        {/* School Identity Customizer Button */}
+        <button
+          onClick={() => setIsCustomizing(true)}
+          className="ed-btn ed-btn-secondary"
+          title="Configure School Name, Theme & Identity (PRD Stage 1 Requirement)"
+          style={{
+            padding: '4px 10px',
+            fontSize: '0.78rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            borderColor: 'var(--border-default)',
+          }}
+        >
+          <Sliders size={13} style={{ color: 'var(--primary-700)' }} />
+          <span>Branding: <strong>{branding.shortName}</strong></span>
+        </button>
+
         {/* Backend Status Live Badge */}
         <div
           onClick={onRefreshHealth}
@@ -106,7 +154,7 @@ export const Header: React.FC<HeaderProps> = ({
           ) : (
             <AlertTriangle size={13} style={{ color: 'var(--warning-solid)' }} />
           )}
-          <span>{serverHealth ? `Core API: Online (${serverHealth.status})` : 'Core API: Connecting...'}</span>
+          <span>{serverHealth ? `Core API: Online` : 'Core API: Connecting...'}</span>
           <RefreshCw size={11} style={{ opacity: 0.7 }} />
         </div>
 
@@ -143,38 +191,49 @@ export const Header: React.FC<HeaderProps> = ({
                 border: '1px solid var(--border-default)',
                 borderRadius: 'var(--radius-md)',
                 boxShadow: 'var(--shadow-lg)',
-                padding: 'var(--space-3)',
+                padding: 'var(--space-4)',
                 zIndex: 50,
               }}
             >
               <div
                 style={{
                   display: 'flex',
-                  justifyContent: 'space-between',
                   alignItems: 'center',
-                  marginBottom: 'var(--space-2)',
-                  borderBottom: '1px solid var(--border-light)',
-                  paddingBottom: 'var(--space-2)',
+                  justifyContent: 'space-between',
+                  marginBottom: 'var(--space-3)',
                 }}
               >
-                <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>System Alerts</span>
-                <span className="ed-badge ed-badge-info">3 New</span>
+                <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>System Alerts</span>
+                <span
+                  style={{
+                    fontSize: '0.74rem',
+                    color: 'var(--primary-700)',
+                    cursor: 'pointer',
+                  }}
+                  onClick={() => setShowNotifications(false)}
+                >
+                  Mark all read
+                </span>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.8rem' }}>
-                <div style={{ padding: '6px', backgroundColor: 'var(--bg-subtle)', borderRadius: '4px' }}>
-                  <p style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Unit Test Marks Submitted</p>
-                  <p style={{ color: 'var(--text-muted)', fontSize: '0.74rem' }}>Grade 10 Physics marks entered by Dr. Thorne</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                <div style={{ fontSize: '0.80rem', padding: '6px', backgroundColor: 'var(--bg-subtle)', borderRadius: 'var(--radius-xs)' }}>
+                  <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Term 2 Report Cards Ready</div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.74rem' }}>
+                    Marks lock completed for Grade 10 Physics.
+                  </div>
                 </div>
-                <div style={{ padding: '6px', backgroundColor: 'var(--bg-subtle)', borderRadius: '4px' }}>
-                  <p style={{ fontWeight: 600, color: 'var(--text-primary)' }}>New Admission Application</p>
-                  <p style={{ color: 'var(--text-muted)', fontSize: '0.74rem' }}>Student Rohan Verma applied for Grade 11 Science</p>
+                <div style={{ fontSize: '0.80rem', padding: '6px', backgroundColor: 'var(--bg-subtle)', borderRadius: 'var(--radius-xs)' }}>
+                  <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>New Admission Application</div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.74rem' }}>
+                    Application #ADM-2026-0091 submitted via public portal.
+                  </div>
                 </div>
               </div>
             </div>
           )}
         </div>
 
-        {/* Role Switcher Pill */}
+        {/* Role Fast-Switcher Menu */}
         <div style={{ position: 'relative' }}>
           <button
             onClick={() => setShowRoleMenu(!showRoleMenu)}
@@ -182,7 +241,7 @@ export const Header: React.FC<HeaderProps> = ({
               display: 'flex',
               alignItems: 'center',
               gap: 'var(--space-2)',
-              padding: '6px 12px',
+              padding: '4px 10px',
               backgroundColor: 'var(--bg-subtle)',
               border: '1px solid var(--border-default)',
               borderRadius: 'var(--radius-sm)',
@@ -190,12 +249,27 @@ export const Header: React.FC<HeaderProps> = ({
               textAlign: 'left',
             }}
           >
-            <Shield size={15} style={{ color: 'var(--primary-600)' }} />
+            <div
+              style={{
+                width: '26px',
+                height: '26px',
+                borderRadius: '50%',
+                backgroundColor: 'var(--primary-50)',
+                color: 'var(--primary-700)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 700,
+                fontSize: '0.80rem',
+              }}
+            >
+              {currentRoleObj.label[0]}
+            </div>
             <div>
               <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.1 }}>
                 {currentRoleObj.label}
               </div>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{currentRoleObj.school}</div>
+              <div style={{ fontSize: '0.70rem', color: 'var(--text-muted)' }}>{currentRoleObj.school}</div>
             </div>
             <ChevronDown size={14} style={{ color: 'var(--text-muted)', marginLeft: '4px' }} />
           </button>
@@ -206,25 +280,27 @@ export const Header: React.FC<HeaderProps> = ({
                 position: 'absolute',
                 right: 0,
                 top: '110%',
-                width: '260px',
+                width: '270px',
                 backgroundColor: 'var(--bg-surface)',
                 border: '1px solid var(--border-default)',
                 borderRadius: 'var(--radius-md)',
                 boxShadow: 'var(--shadow-lg)',
                 padding: '6px',
                 zIndex: 50,
+                maxHeight: '420px',
+                overflowY: 'auto',
               }}
             >
               <div
                 style={{
-                  fontSize: '0.74rem',
+                  fontSize: '0.72rem',
                   fontWeight: 600,
                   textTransform: 'uppercase',
                   color: 'var(--text-muted)',
                   padding: '6px 8px',
                 }}
               >
-                Switch Demonstration Role
+                Switch User Role (8 PRD Roles)
               </div>
               {roles.map((r) => (
                 <button
@@ -248,14 +324,14 @@ export const Header: React.FC<HeaderProps> = ({
                 >
                   <span
                     style={{
-                      fontSize: '0.84rem',
+                      fontSize: '0.82rem',
                       fontWeight: r.id === currentRole ? 700 : 500,
                       color: r.id === currentRole ? 'var(--primary-700)' : 'var(--text-primary)',
                     }}
                   >
                     {r.label}
                   </span>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{r.school}</span>
+                  <span style={{ fontSize: '0.70rem', color: 'var(--text-muted)' }}>{r.school}</span>
                 </button>
               ))}
             </div>

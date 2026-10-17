@@ -15,13 +15,16 @@ import {
   FileText,
   X,
   LogIn,
+  Sliders,
 } from 'lucide-react';
+import { useSchoolBranding } from '../../context/SchoolBrandingContext.js';
 
 interface PublicSchoolWebsiteProps {
   onGoToLogin: () => void;
 }
 
 export const PublicSchoolWebsite: React.FC<PublicSchoolWebsiteProps> = ({ onGoToLogin }) => {
+  const { branding, setIsCustomizing } = useSchoolBranding();
   const [activeSection, setActiveSection] = useState<'home' | 'about' | 'academics' | 'admissions' | 'faculty' | 'contact'>('home');
   const [showAdmissionModal, setShowAdmissionModal] = useState(false);
   const [admissionSubmitted, setAdmissionSubmitted] = useState(false);
@@ -50,7 +53,7 @@ export const PublicSchoolWebsite: React.FC<PublicSchoolWebsiteProps> = ({ onGoTo
       {/* Top Notification Bar */}
       <div
         style={{
-          backgroundColor: 'var(--bg-dark-sidebar)',
+          backgroundColor: 'var(--ink-900)',
           color: '#cbd5e1',
           padding: '8px var(--space-8)',
           fontSize: '0.78rem',
@@ -62,13 +65,31 @@ export const PublicSchoolWebsite: React.FC<PublicSchoolWebsiteProps> = ({ onGoTo
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
           <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <MapPin size={12} style={{ color: 'var(--primary-500)' }} /> Institutional Campus: 42 Knowledge Way, Bangalore
+            <MapPin size={12} style={{ color: 'var(--primary-500)' }} /> {branding.address}
           </span>
           <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <Phone size={12} style={{ color: 'var(--primary-500)' }} /> +91 (80) 4123-9000
+            <Phone size={12} style={{ color: 'var(--primary-500)' }} /> {branding.contactPhone}
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
+          <button
+            onClick={() => setIsCustomizing(true)}
+            style={{
+              background: 'rgba(255, 255, 255, 0.1)',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              color: '#38bdf8',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              cursor: 'pointer',
+              fontWeight: 600,
+              padding: '2px 8px',
+              borderRadius: 'var(--radius-xs)',
+              fontSize: '0.74rem',
+            }}
+          >
+            <Sliders size={11} /> Customize School Identity
+          </button>
           <span style={{ color: '#93c5fd' }}>Admissions Open for Academic Year 2026–2027</span>
           <button
             onClick={onGoToLogin}
@@ -107,7 +128,7 @@ export const PublicSchoolWebsite: React.FC<PublicSchoolWebsiteProps> = ({ onGoTo
             style={{
               width: '42px',
               height: '42px',
-              backgroundColor: 'var(--primary-700)',
+              backgroundColor: branding.primaryAccent,
               borderRadius: 'var(--radius-sm)',
               display: 'flex',
               alignItems: 'center',
@@ -117,14 +138,14 @@ export const PublicSchoolWebsite: React.FC<PublicSchoolWebsiteProps> = ({ onGoTo
               fontSize: '1.4rem',
             }}
           >
-            A
+            {branding.monogram}
           </div>
           <div>
             <div style={{ fontSize: '1.25rem', fontWeight: 800, letterSpacing: '-0.02em', lineHeight: 1.1 }}>
-              Apex Academy of Sciences & Arts
+              {branding.schoolName}
             </div>
             <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-              Affiliated to CBSE & Global Baccalaureate • Code: APX-01
+              {branding.affiliation} • Code: {branding.code}
             </div>
           </div>
         </div>
