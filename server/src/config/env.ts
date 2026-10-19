@@ -29,7 +29,7 @@ const envSchema = z.object({
       process.env.DATABASE_URL ||
       process.env.POSTGRES_URL ||
       process.env.DATABASE_PUBLIC_URL ||
-      'postgresql://postgres:postgres@localhost:5432/edunexa_dev?schema=public'
+      'postgresql://postgres:root@localhost:5432/edunexa_dev?schema=public'
     );
   }),
   JWT_ACCESS_SECRET: z.string().optional().transform((val) => {
