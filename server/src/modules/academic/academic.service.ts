@@ -537,14 +537,16 @@ export class AcademicService {
           },
         },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { startDate: 'desc' },
     });
 
-    return leaves.map((l) => ({
+    return leaves.map((l: any) => ({
       id: l.id,
       staffId: l.staffProfileId,
-      staffName: `${l.staff.membership.user.firstName} ${l.staff.membership.user.lastName}`.trim(),
-      employeeId: l.staff.employeeId,
+      staffName: l.staff?.membership?.user
+        ? `${l.staff.membership.user.firstName} ${l.staff.membership.user.lastName}`.trim()
+        : 'Staff Member',
+      employeeId: l.staff?.employeeId || '',
       type: l.leaveType,
       startDate: l.startDate.toISOString().split('T')[0],
       endDate: l.endDate.toISOString().split('T')[0],
@@ -553,7 +555,7 @@ export class AcademicService {
       status: l.status,
       approvedBy: l.approvedBy,
       approvedAt: l.approvedAt?.toISOString(),
-      createdAt: l.createdAt.toISOString(),
+      createdAt: l.startDate.toISOString(),
     }));
   }
 

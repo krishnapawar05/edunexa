@@ -29,7 +29,7 @@ export const PublicIdCardVerification: React.FC<PublicIdCardVerificationProps> =
   const routeParams = useParams<{ token?: string }>();
   const navigate = useNavigate();
 
-  const effectiveToken = routeParams.token || initialToken || 'v-tok-8f2c-49a1-9b7e-e214';
+  const effectiveToken = routeParams.token || initialToken || '';
   const [tokenInput, setTokenInput] = useState(effectiveToken);
   const [loading, setLoading] = useState(false);
   const [verificationResult, setVerificationResult] = useState<PublicIdCardVerificationResponse | null>(null);
@@ -58,10 +58,12 @@ export const PublicIdCardVerification: React.FC<PublicIdCardVerificationProps> =
   };
 
   useEffect(() => {
-    if (initialToken) {
-      fetchVerification(initialToken);
+    const targetToken = routeParams.token || initialToken;
+    if (targetToken) {
+      setTokenInput(targetToken);
+      fetchVerification(targetToken);
     }
-  }, [initialToken]);
+  }, [routeParams.token, initialToken]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();

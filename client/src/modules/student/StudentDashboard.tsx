@@ -176,16 +176,16 @@ export const StudentDashboard: React.FC = () => {
 
   const studentFullName = student
     ? `${student.firstName} ${student.lastName}`
-    : 'Aarav Sharma';
-  const admissionNumber = student?.admissionNumber || 'ADM-2026-0042';
-  const className = student?.enrollments?.[0]?.class?.name || 'Grade 10';
-  const sectionName = student?.enrollments?.[0]?.section?.name || 'A';
-  const rollNumber = student?.rollNumber || student?.enrollments?.[0]?.rollNumber || 1;
-  const bloodGroup = student?.bloodGroup || 'O+';
-  const verificationToken = student?.idCard?.verificationToken || 'v-tok-8f2c-49a1-9b7e-e214';
+    : (loadingDashboard ? 'Loading...' : 'Student Portal');
+  const admissionNumber = student?.admissionNumber || '—';
+  const className = student?.enrollments?.[0]?.class?.name || '—';
+  const sectionName = student?.enrollments?.[0]?.section?.name || '—';
+  const rollNumber = student?.rollNumber || student?.enrollments?.[0]?.rollNumber || '—';
+  const bloodGroup = student?.bloodGroup || '—';
+  const verificationToken = student?.idCard?.verificationToken || '';
   const attendancePct = attendanceSummary
     ? `${attendanceSummary.attendancePercentage}%`
-    : '96.4%';
+    : '—';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>

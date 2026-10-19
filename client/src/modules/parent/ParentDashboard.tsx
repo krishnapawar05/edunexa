@@ -169,11 +169,11 @@ export const ParentDashboard: React.FC = () => {
     ? `${attendanceSummary.attendancePercentage}%`
     : reportCard?.attendancePercentage
     ? `${reportCard.attendancePercentage}%`
-    : '96.4%';
+    : '—';
 
   const termScore = reportCard
     ? `${reportCard.overallPercentage}% (Grade ${reportCard.overallGrade})`
-    : '89.0% (Grade A1)';
+    : '—';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>

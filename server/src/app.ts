@@ -70,7 +70,9 @@ export function createApp(): express.Application {
   app.use('/api/v1/academic', academicRouter);
   app.use('/api/v1/operations', operationsRouter);
   app.use('/api/v1/ai', aiRouter);
-  app.use('/api/v1/security-test', securityTestRouter);
+  if (env.nodeEnv !== 'production') {
+    app.use('/api/v1/security-test', securityTestRouter);
+  }
 
   // Full-Stack Monolith Serving: Serve compiled frontend SPA if client/dist exists
   const clientDistPath = path.resolve(process.cwd(), 'client/dist');
