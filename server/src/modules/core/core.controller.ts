@@ -12,6 +12,42 @@ export class CoreSchoolController {
     }
   }
 
+  async createAcademicSession(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const session = await coreSchoolService.createAcademicSession(req.schoolId!, req.body);
+      res.status(201).json({ success: true, data: session });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async createClass(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const cls = await coreSchoolService.createClass(req.schoolId!, req.body);
+      res.status(201).json({ success: true, data: cls });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async createSection(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const sec = await coreSchoolService.createSection(req.schoolId!, req.params.classId, req.body);
+      res.status(201).json({ success: true, data: sec });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async createSubject(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const sub = await coreSchoolService.createSubject(req.schoolId!, req.params.classId, req.body);
+      res.status(201).json({ success: true, data: sub });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   async listStudents(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { query, className, page, limit } = req.query;

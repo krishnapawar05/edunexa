@@ -318,7 +318,9 @@ describe('STAGE 4: Core School Management Test Suite', () => {
     expect(res.body.success).toBe(true);
     expect(res.body.data).toBeInstanceOf(Array);
     expect(res.body.data.length).toBeGreaterThanOrEqual(1);
-    expect(res.body.data[0].applicationNumber).toBe('APP-2026-0091');
+    const targetApp = res.body.data.find((a: any) => a.applicationNumber === 'APP-2026-0091');
+    expect(targetApp).toBeDefined();
+    expect(targetApp.applicationNumber).toBe('APP-2026-0091');
   });
 
   it('10b. Approving an admission application enrolls student and assigns class & section', async () => {

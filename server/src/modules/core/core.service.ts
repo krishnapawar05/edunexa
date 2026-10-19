@@ -145,6 +145,128 @@ export class CoreSchoolService {
     };
   }
 
+  async createAcademicSession(schoolIdOrIdentifier: string, data: { name: string; startDate: string; endDate: string; isCurrent?: boolean }) {
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    const targetSchoolId = school ? school.id : schoolIdOrIdentifier;
+
+    if (data.isCurrent) {
+      await prisma.academicSession.updateMany({
+        where: { schoolId: targetSchoolId },
+        data: { isCurrent: false },
+      });
+    }
+
+    const session = await prisma.academicSession.create({
+      data: {
+        schoolId: targetSchoolId,
+        name: data.name,
+        startDate: new Date(data.startDate),
+        endDate: new Date(data.endDate),
+        isCurrent: !!data.isCurrent,
+      },
+    });
+
+    return {
+      id: session.id,
+      name: session.name,
+      isCurrent: session.isCurrent,
+      startDate: session.startDate.toISOString().split('T')[0],
+      endDate: session.endDate.toISOString().split('T')[0],
+    };
+  }
+
+  async createClass(schoolIdOrIdentifier: string, data: { name: string; code?: string }) {
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    const targetSchoolId = school ? school.id : schoolIdOrIdentifier;
+
+    const existing = await prisma.class.findFirst({
+      where: {
+        schoolId: targetSchoolId,
+        name: { equals: data.name, mode: 'insensitive' },
+      },
+    });
+
+    if (existing) {
+      throw new AppError(`Class '${data.name}' already exists in this school.`, 409, 'DUPLICATE_CLASS');
+    }
+
+    const cls = await prisma.class.create({
+      data: {
+        schoolId: targetSchoolId,
+        name: data.name,
+        code: data.code || data.name.toUpperCase().replace(/\s+/g, '-'),
+      },
+    });
+
+    return {
+      id: cls.id,
+      name: cls.name,
+      code: cls.code,
+    };
+  }
+
+  async createSection(schoolIdOrIdentifier: string, classId: string, data: { name: string; capacity?: number }) {
+    const cls = await prisma.class.findUnique({ where: { id: classId } });
+    if (!cls) throw new AppError('Class not found.', 404, 'RECORD_NOT_FOUND');
+
+    const existing = await prisma.section.findFirst({
+      where: {
+        classId,
+        name: { equals: data.name, mode: 'insensitive' },
+      },
+    });
+
+    if (existing) {
+      throw new AppError(`Section '${data.name}' already exists in class '${cls.name}'.`, 409, 'DUPLICATE_SECTION');
+    }
+
+    const sec = await prisma.section.create({
+      data: {
+        classId,
+        name: data.name,
+        capacity: data.capacity || 40,
+      },
+    });
+
+    return {
+      id: sec.id,
+      classId: sec.classId,
+      name: sec.name,
+      capacity: sec.capacity,
+    };
+  }
+
+  async createSubject(schoolIdOrIdentifier: string, classId: string, data: { name: string; code: string }) {
+    const cls = await prisma.class.findUnique({ where: { id: classId } });
+    if (!cls) throw new AppError('Class not found.', 404, 'RECORD_NOT_FOUND');
+
+    const existing = await prisma.subject.findFirst({
+      where: {
+        classId,
+        code: { equals: data.code, mode: 'insensitive' },
+      },
+    });
+
+    if (existing) {
+      throw new AppError(`Subject with code '${data.code}' already exists in class '${cls.name}'.`, 409, 'DUPLICATE_SUBJECT');
+    }
+
+    const sub = await prisma.subject.create({
+      data: {
+        classId,
+        name: data.name,
+        code: data.code.toUpperCase(),
+      },
+    });
+
+    return {
+      id: sub.id,
+      classId: sub.classId,
+      name: sub.name,
+      code: sub.code,
+    };
+  }
+
   /**
    * List Students with Search, Grade Filter & Pagination (Scoped by Tenant)
    */
@@ -1024,6 +1146,7 @@ export class CoreSchoolService {
         gender: data.gender || 'Unknown',
         applyingClass: data.applyingClass,
         guardianName: data.guardianName,
+        guardianRelationship: (data as any).guardianRelationship || 'Parent',
         guardianEmail: data.guardianEmail,
         guardianPhone: data.guardianPhone,
         residentialAddress: data.residentialAddress || 'Campus Applicant',
@@ -1097,6 +1220,14 @@ export class CoreSchoolService {
 
     if (!app) {
       throw new AppError(`Admission application '${applicationId}' not found.`, 404, 'RECORD_NOT_FOUND');
+    }
+
+    if (app.status === ApplicationStatus.APPROVED && review.decision === 'APPROVED') {
+      throw new AppError(
+        `Admission application '${app.applicationNumber}' has already been approved and enrolled. Duplicate enrollment is strictly forbidden.`,
+        400,
+        'APPLICATION_ALREADY_APPROVED'
+      );
     }
 
     const updatedApp = await prisma.admissionApplication.update({

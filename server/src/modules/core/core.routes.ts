@@ -61,6 +61,38 @@ router.get(
   }
 );
 
+router.post(
+  '/academic/sessions',
+  requireRole(PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.SUPER_ADMIN),
+  (req, res, next) => {
+    coreSchoolController.createAcademicSession(req, res, next);
+  }
+);
+
+router.post(
+  '/academic/classes',
+  requireRole(PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.SUPER_ADMIN),
+  (req, res, next) => {
+    coreSchoolController.createClass(req, res, next);
+  }
+);
+
+router.post(
+  '/academic/classes/:classId/sections',
+  requireRole(PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.SUPER_ADMIN),
+  (req, res, next) => {
+    coreSchoolController.createSection(req, res, next);
+  }
+);
+
+router.post(
+  '/academic/classes/:classId/subjects',
+  requireRole(PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.SUPER_ADMIN),
+  (req, res, next) => {
+    coreSchoolController.createSubject(req, res, next);
+  }
+);
+
 // Student Directory & SIS
 router.get(
   '/students',

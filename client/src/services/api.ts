@@ -193,6 +193,30 @@ export const coreApi = {
       classes: any[];
     }>('/api/v1/core/academic/structure'),
 
+  createAcademicSession: (data: { name: string; startDate: string; endDate: string; isCurrent?: boolean }) =>
+    apiRequest<any>('/api/v1/core/academic/sessions', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  createClass: (data: { name: string; code?: string }) =>
+    apiRequest<any>('/api/v1/core/academic/classes', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  createSection: (classId: string, data: { name: string; capacity?: number }) =>
+    apiRequest<any>(`/api/v1/core/academic/classes/${classId}/sections`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  createSubject: (classId: string, data: { name: string; code: string }) =>
+    apiRequest<any>(`/api/v1/core/academic/classes/${classId}/subjects`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
   listStudents: (params: { className?: string; query?: string; page?: number; limit?: number } = {}) => {
     const query = new URLSearchParams();
     if (params.className) query.set('className', params.className);
