@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Shield, Lock, Mail, ArrowRight, CheckCircle2, School } from 'lucide-react';
 import { useSchoolBranding } from '../../context/SchoolBrandingContext.js';
+import { getApiUrl } from '../../services/api.js';
 
 interface LoginPageProps {
   onLoginSuccess: (role: string) => void;
@@ -40,7 +41,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGoToPubl
     setErrorMessage(null);
 
     try {
-      const res = await fetch('/api/v1/auth/login', {
+      const res = await fetch(getApiUrl('/api/v1/auth/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),

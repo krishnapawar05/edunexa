@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { PublicIdCardVerificationResponse } from '@edunexa/shared';
 import { useSchoolBranding } from '../../context/SchoolBrandingContext.js';
+import { getApiUrl } from '../../services/api.js';
 
 interface PublicIdCardVerificationProps {
   initialToken?: string;
@@ -35,7 +36,7 @@ export const PublicIdCardVerification: React.FC<PublicIdCardVerificationProps> =
     setErrorMessage(null);
 
     try {
-      const res = await fetch(`/api/v1/core/id-cards/verify/${encodeURIComponent(tok.trim())}`);
+      const res = await fetch(getApiUrl(`/api/v1/core/id-cards/verify/${encodeURIComponent(tok.trim())}`));
       const json = await res.json();
 
       if (!res.ok || !json.success) {

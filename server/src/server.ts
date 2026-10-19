@@ -1,11 +1,13 @@
 import { app } from './app.js';
 import { env } from './config/env.js';
 
-const server = app.listen(env.port, () => {
+const HOST = '0.0.0.0';
+
+const server = app.listen(env.port, HOST, () => {
   console.log(`====================================================`);
-  console.log(`EduNexa ERP Core Engine running on port ${env.port}`);
+  console.log(`EduNexa ERP Core Engine running on http://${HOST}:${env.port}`);
   console.log(`Environment: ${env.nodeEnv}`);
-  console.log(`Health endpoint: http://localhost:${env.port}/api/health`);
+  console.log(`Health endpoint: http://${HOST}:${env.port}/api/health`);
   console.log(`Allowed client origin: ${env.clientOrigin}`);
   console.log(`====================================================`);
 });
