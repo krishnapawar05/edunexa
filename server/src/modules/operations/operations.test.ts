@@ -1,10 +1,31 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import request from 'supertest';
 import { app } from '../../app.js';
+import { prisma } from '../../config/db.js';
 import { generateAccessToken } from '../../utils/crypto.js';
 import { PlatformRole } from '@edunexa/shared';
 
 describe('STAGE 6: School Operations and Reporting Test Suite', () => {
+  beforeAll(async () => {
+    // Clean up test timetable slots from prior runs
+    await prisma.timetableSlot.deleteMany({
+      where: { roomNumber: 'Science Lab 2' },
+    });
+    // Reset test invoice inv-ananya-02
+    await prisma.feePayment.deleteMany({
+      where: { invoice: { invoiceNumber: 'INV-2026-0413' } },
+    });
+    await prisma.feeInvoice.updateMany({
+      where: { invoiceNumber: 'INV-2026-0413' },
+      data: {
+        amountPaid: 20000,
+        discountApplied: 0,
+        status: 'PARTIALLY_PAID',
+        auditTrail: [],
+      },
+    });
+  });
+
   // Tokens
   const schoolAdminToken = generateAccessToken({
     userId: 'usr-schooladmin-01',

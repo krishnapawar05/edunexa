@@ -1,15 +1,19 @@
 import React, { useState } from 'react';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { Shield, Lock, Mail, ArrowRight, CheckCircle2, School } from 'lucide-react';
 import { useSchoolBranding } from '../../context/SchoolBrandingContext.js';
 import { getApiUrl } from '../../services/api.js';
 
 interface LoginPageProps {
-  onLoginSuccess: (role: string) => void;
-  onGoToPublic: () => void;
+  onLoginSuccess?: (role: string) => void;
+  onGoToPublic?: () => void;
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGoToPublic }) => {
   const { branding } = useSchoolBranding();
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const [email, setEmail] = useState('admin@apexacademy.edu');
   const [password, setPassword] = useState('••••••••••••');
   const [selectedRole, setSelectedRole] = useState('SCHOOL_ADMIN');
@@ -27,6 +31,17 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGoToPubl
   ];
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const roleToRouteMap: Record<string, string> = {
+    SUPER_ADMIN: '/superadmin',
+    SCHOOL_ADMIN: '/admin',
+    TEACHER: '/teacher',
+    STUDENT: '/student',
+    PARENT: '/parent',
+    EXAM_COORDINATOR: '/examinations',
+    HR_STAFF: '/hr',
+    ACCOUNTS: '/accounts',
+  };
 
   const handleSelectDemo = (acc: typeof demoAccounts[0]) => {
     setSelectedRole(acc.role);
@@ -57,7 +72,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGoToPubl
       localStorage.setItem('edunexa_access_token', data.data.accessToken);
       localStorage.setItem('edunexa_user', JSON.stringify(data.data.user));
 
-      onLoginSuccess(data.data.user.role);
+      const userRole = data.data.user.role;
+      if (onLoginSuccess) {
+        onLoginSuccess(userRole);
+      } else {
+        const from = (location.state as any)?.from?.pathname || roleToRouteMap[userRole] || '/admin';
+        navigate(from, { replace: true });
+      }
     } catch (err: any) {
       setErrorMessage(err.message || 'Unable to connect to authentication server.');
     } finally {
@@ -239,23 +260,48 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGoToPubl
           </form>
         </div>
 
-        {/* Public Website Backlink */}
-        <div style={{ textAlign: 'center', marginTop: 'var(--space-4)' }}>
-          <button
-            onClick={onGoToPublic}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: 'var(--text-muted)',
-              fontSize: '0.82rem',
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '4px',
-            }}
-          >
-            ← Return to Public School Website
-          </button>
+        {/* Public Website and Registration Links */}
+        <div style={{ textAlign: 'center', marginTop: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {onGoToPublic ? (
+            <button
+              onClick={onGoToPublic}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--text-muted)',
+                fontSize: '0.82rem',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '4px',
+              }}
+            >
+              ← Return to Public School Website
+            </button>
+          ) : (
+            <Link
+              to="/"
+              style={{
+                color: 'var(--text-muted)',
+                fontSize: '0.82rem',
+                textDecoration: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '4px',
+              }}
+            >
+              ← Return to Public School Website
+            </Link>
+          )}
+
+          <div style={{ fontSize: '0.80rem', color: 'var(--text-muted)' }}>
+            Need to register a new school tenant?{' '}
+            <Link to="/register" style={{ color: 'var(--primary-600)', fontWeight: 600, textDecoration: 'none' }}>
+              Register Here
+            </Link>
+          </div>
         </div>
       </div>
     </div>

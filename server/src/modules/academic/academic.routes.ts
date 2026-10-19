@@ -52,6 +52,12 @@ router.post(
   academicController.submitStaffLeaveRequest
 );
 
+router.get(
+  '/attendance/staff/leave',
+  requireRole(PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.HR_STAFF, PlatformRole.TEACHER),
+  academicController.listStaffLeaveRequests
+);
+
 router.patch(
   '/attendance/staff/leave/:id/review',
   requireRole(PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.HR_STAFF),

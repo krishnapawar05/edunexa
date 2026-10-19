@@ -18,6 +18,7 @@ import {
   Sliders,
 } from 'lucide-react';
 import { useSchoolBranding } from '../../context/SchoolBrandingContext.js';
+import { coreApi } from '../../services/api.js';
 
 interface PublicSchoolWebsiteProps {
   onGoToLogin: () => void;
@@ -29,6 +30,9 @@ export const PublicSchoolWebsite: React.FC<PublicSchoolWebsiteProps> = ({ onGoTo
   const [activeSection, setActiveSection] = useState<'home' | 'about' | 'academics' | 'admissions' | 'faculty' | 'contact'>('home');
   const [showAdmissionModal, setShowAdmissionModal] = useState(false);
   const [admissionSubmitted, setAdmissionSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submittedAppNo, setSubmittedAppNo] = useState<string>('APP-2026-0842');
+  const [admissionError, setAdmissionError] = useState<string | null>(null);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -41,12 +45,36 @@ export const PublicSchoolWebsite: React.FC<PublicSchoolWebsiteProps> = ({ onGoTo
     prevSchool: '',
   });
 
-  const handleAdmissionSubmit = (e: React.FormEvent) => {
+  const handleAdmissionSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setAdmissionSubmitted(true);
-    setTimeout(() => {
-      // simulate receipt
-    }, 1500);
+    if (!formData.studentName.trim() || !formData.email.trim()) return;
+
+    try {
+      setIsSubmitting(true);
+      setAdmissionError(null);
+
+      const parts = formData.studentName.trim().split(' ');
+      const firstName = parts[0];
+      const lastName = parts.slice(1).join(' ') || 'Applicant';
+
+      const res = await coreApi.submitPublicAdmission({
+        schoolIdentifier: 'apex-academy',
+        firstName,
+        lastName,
+        applyingGrade: formData.applyingGrade,
+        guardianName: formData.parentName || 'Guardian',
+        guardianEmail: formData.email,
+        guardianPhone: formData.phone || undefined,
+        previousSchool: formData.prevSchool || undefined,
+      });
+
+      setSubmittedAppNo(res.applicationNumber || `APP-2026-${Math.floor(1000 + Math.random() * 9000)}`);
+      setAdmissionSubmitted(true);
+    } catch (err: any) {
+      setAdmissionError(err.message || 'Failed to submit application to admissions desk.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -388,15 +416,21 @@ export const PublicSchoolWebsite: React.FC<PublicSchoolWebsiteProps> = ({ onGoTo
             </div>
 
             <div className="ed-card-body">
+              {admissionError && (
+                <div style={{ padding: '8px 12px', marginBottom: '12px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--radius-sm)', color: '#dc2626', fontSize: '0.80rem' }}>
+                  {admissionError}
+                </div>
+              )}
+
               {admissionSubmitted ? (
                 <div style={{ textAlign: 'center', padding: 'var(--space-6) 0' }}>
                   <CheckCircle size={48} style={{ color: 'var(--success-solid)', margin: '0 auto var(--space-3)' }} />
                   <h3>Application Submitted Successfully!</h3>
                   <p style={{ marginTop: '8px', fontSize: '0.88rem' }}>
-                    Reference Number: <strong style={{ color: 'var(--primary-700)' }}>APP-2026-0842</strong>
+                    Reference Number: <strong style={{ color: 'var(--primary-700)' }}>{submittedAppNo}</strong>
                   </p>
                   <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '6px' }}>
-                    An automated acknowledgment has been dispatched to {formData.email || 'your email'}. Our admissions committee will review credentials within 3 business days.
+                    An automated acknowledgment has been dispatched to {formData.email || 'your email'}. Our admissions committee will review credentials within 3 business days. Application saved directly to database.
                   </p>
                   <button
                     className="ed-btn ed-btn-primary"
@@ -491,8 +525,12 @@ export const PublicSchoolWebsite: React.FC<PublicSchoolWebsiteProps> = ({ onGoTo
                     >
                       Cancel
                     </button>
-                    <button type="submit" className="ed-btn ed-btn-primary">
-                      Submit Official Application
+                    <button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="ed-btn ed-btn-primary"
+                    >
+                      {isSubmitting ? 'Submitting to Admissions...' : 'Submit Official Application'}
                     </button>
                   </div>
                 </form>

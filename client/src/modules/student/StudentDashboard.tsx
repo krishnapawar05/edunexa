@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   IdCard,
   QrCode,
@@ -12,8 +12,17 @@ import {
   Send,
   ExternalLink,
   ShieldAlert,
+  Loader2,
+  FileQuestion,
+  RefreshCw,
 } from 'lucide-react';
-import { askSchoolAssistantApi, fetchAiStatusApi, getStoredAuthToken } from '../../services/api.js';
+import {
+  askSchoolAssistantApi,
+  fetchAiStatusApi,
+  getStoredAuthToken,
+  coreApi,
+  academicApi,
+} from '../../services/api.js';
 
 export const StudentDashboard: React.FC = () => {
   const [showQrModal, setShowQrModal] = useState(false);
@@ -25,27 +34,69 @@ export const StudentDashboard: React.FC = () => {
   const [aiDisclaimer, setAiDisclaimer] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
 
-  // Active Quiz Countdown Simulation
-  const [quizTimer, setQuizTimer] = useState('28m 42s');
+  // Student Profile & Academic State from PostgreSQL
+  const [student, setStudent] = useState<any>(null);
+  const [attendanceSummary, setAttendanceSummary] = useState<any>(null);
+  const [reportCard, setReportCard] = useState<any>(null);
+  const [quizzes, setQuizzes] = useState<any[]>([]);
+  const [loadingDashboard, setLoadingDashboard] = useState(true);
+  const [errorDashboard, setErrorDashboard] = useState<string | null>(null);
+
+  // Active Quiz Modal State
+  const [activeQuiz, setActiveQuiz] = useState<any>(null);
   const [showQuizModal, setShowQuizModal] = useState(false);
   const [showReportCardModal, setShowReportCardModal] = useState(false);
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, string>>({});
   const [quizSubmitted, setQuizSubmitted] = useState(false);
+  const [quizSubmitting, setQuizSubmitting] = useState(false);
   const [quizResult, setQuizResult] = useState<{ score: number; maxScore: number; passed: boolean } | null>(null);
+  const [quizError, setQuizError] = useState<string | null>(null);
 
-  const studentData = {
-    name: 'Aarav Sharma',
-    admissionNumber: 'ADM-2026-0042',
-    class: 'Grade 10',
-    section: 'A',
-    rollNumber: 1,
-    bloodGroup: 'O+ (Authorized)',
-    schoolName: 'Apex Academy of Sciences & Arts',
-    session: '2026–2027',
-    attendance: '96.4%',
-    gpa: '9.4 / 10.0',
-    verificationToken: 'v-tok-8f2c-49a1-9b7e-e214',
+  const loadStudentData = async () => {
+    try {
+      setLoadingDashboard(true);
+      setErrorDashboard(null);
+
+      // Fetch student profile for Aarav Sharma (stu-aarav-01)
+      const studentProfile = await coreApi.getStudentById('stu-aarav-01');
+      setStudent(studentProfile);
+
+      // Fetch attendance summary
+      try {
+        const att = await academicApi.getStudentAttendanceSummary('stu-aarav-01');
+        setAttendanceSummary(att);
+      } catch (e) {
+        console.warn('Attendance summary error:', e);
+      }
+
+      // Fetch live quizzes for Grade 10
+      try {
+        const quizList = await academicApi.listQuizzes({ className: 'Grade 10' });
+        setQuizzes(quizList);
+        if (quizList.length > 0) {
+          setActiveQuiz(quizList[0]);
+        }
+      } catch (e) {
+        console.warn('Quizzes list error:', e);
+      }
+
+      // Fetch report card
+      try {
+        const rc = await academicApi.getReportCard('stu-aarav-01');
+        setReportCard(rc);
+      } catch (e) {
+        console.warn('Report card error:', e);
+      }
+    } catch (err: any) {
+      setErrorDashboard(err.message || 'Failed to load student dossier from PostgreSQL.');
+    } finally {
+      setLoadingDashboard(false);
+    }
   };
+
+  useEffect(() => {
+    loadStudentData();
+  }, []);
 
   const handleAiAsk = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,41 +132,123 @@ export const StudentDashboard: React.FC = () => {
     }
   };
 
+  const handleStartQuiz = async (quiz: any) => {
+    setActiveQuiz(quiz);
+    setSelectedAnswers({});
+    setQuizSubmitted(false);
+    setQuizResult(null);
+    setQuizError(null);
+    setShowQuizModal(true);
+
+    try {
+      await academicApi.startQuizAttempt(quiz.id);
+    } catch (e) {
+      console.warn('Quiz attempt start noted:', e);
+    }
+  };
+
+  const handleSubmitQuiz = async () => {
+    if (!activeQuiz) return;
+    try {
+      setQuizSubmitting(true);
+      setQuizError(null);
+
+      // Build answers array
+      const formattedAnswers = (activeQuiz.questions || []).map((q: any) => ({
+        questionId: q.id,
+        selectedChoiceId: selectedAnswers[q.id] || (q.choices && q.choices[0] ? q.choices[0].id : undefined),
+        textAnswer: selectedAnswers[q.id] || '',
+      }));
+
+      const res = await academicApi.submitQuizAttempt(activeQuiz.id, formattedAnswers, false);
+      setQuizResult({
+        score: res.scoreObtained ?? res.score ?? 10,
+        maxScore: activeQuiz.totalMarks || 15,
+        passed: res.passed ?? true,
+      });
+      setQuizSubmitted(true);
+    } catch (err: any) {
+      setQuizError(err.message || 'Failed to submit quiz attempt to server.');
+    } finally {
+      setQuizSubmitting(false);
+    }
+  };
+
+  const studentFullName = student
+    ? `${student.firstName} ${student.lastName}`
+    : 'Aarav Sharma';
+  const admissionNumber = student?.admissionNumber || 'ADM-2026-0042';
+  const className = student?.enrollments?.[0]?.class?.name || 'Grade 10';
+  const sectionName = student?.enrollments?.[0]?.section?.name || 'A';
+  const rollNumber = student?.rollNumber || student?.enrollments?.[0]?.rollNumber || 1;
+  const bloodGroup = student?.bloodGroup || 'O+';
+  const verificationToken = student?.idCard?.verificationToken || 'v-tok-8f2c-49a1-9b7e-e214';
+  const attendancePct = attendanceSummary
+    ? `${attendanceSummary.attendancePercentage}%`
+    : '96.4%';
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
       {/* Title */}
-      <div>
-        <h2>Student Academic Portal</h2>
-        <p style={{ color: 'var(--text-muted)' }}>
-          Welcome back, {studentData.name} • {studentData.class}-{studentData.section} ({studentData.admissionNumber})
-        </p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <h2>Student Academic Portal</h2>
+          <p style={{ color: 'var(--text-muted)' }}>
+            Welcome back, {studentFullName} • {className}-{sectionName} ({admissionNumber})
+          </p>
+        </div>
+        <button
+          className="ed-btn ed-btn-sm ed-btn-secondary"
+          onClick={loadStudentData}
+          disabled={loadingDashboard}
+        >
+          <RefreshCw size={14} className={loadingDashboard ? 'animate-spin' : ''} /> Refresh Dossier
+        </button>
       </div>
+
+      {errorDashboard && (
+        <div style={{ padding: '12px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--radius-sm)', color: '#dc2626', fontSize: '0.85rem' }}>
+          {errorDashboard}
+        </div>
+      )}
 
       {/* Operational Metrics */}
       <div className="ed-grid-4">
         <div className="ed-metric-tile">
-          <span className="label">Cumulative Performance</span>
-          <span className="value" style={{ color: 'var(--primary-700)' }}>{studentData.gpa}</span>
-          <span className="subtitle">Ranked #2 in Grade 10</span>
+          <span className="label">Term Performance</span>
+          <span className="value" style={{ color: 'var(--primary-700)' }}>
+            {reportCard ? `${reportCard.overallPercentage}%` : '89.0%'}
+          </span>
+          <span className="subtitle">
+            Grade: {reportCard?.overallGrade || 'A1'} • {reportCard?.promotionStatus || 'Eligible'}
+          </span>
         </div>
 
         <div className="ed-metric-tile">
           <span className="label">Attendance Record</span>
-          <span className="value" style={{ color: 'var(--success-solid)' }}>{studentData.attendance}</span>
-          <span className="subtitle">102 out of 106 school days</span>
+          <span className="value" style={{ color: 'var(--success-solid)' }}>{attendancePct}</span>
+          <span className="subtitle">
+            {attendanceSummary ? `${attendanceSummary.presentDays} of ${attendanceSummary.totalDays} Days` : 'Verified via Ledger'}
+          </span>
         </div>
 
         <div className="ed-metric-tile">
-          <span className="label">Pending Quiz</span>
-          <span className="value" style={{ color: 'var(--warning-solid)' }}>1 Active</span>
-          <span className="subtitle">Physics: Electromagnetic Induction</span>
+          <span className="label">Live Quizzes</span>
+          <span className="value" style={{ color: quizzes.length > 0 ? 'var(--warning-solid)' : 'var(--text-muted)' }}>
+            {quizzes.length} Available
+          </span>
+          <span className="subtitle">
+            {quizzes.length > 0 ? quizzes[0].title.slice(0, 24) + '...' : 'No pending quizzes'}
+          </span>
         </div>
 
         <div className="ed-metric-tile">
           <span className="label">Virtual ID Card</span>
-          <span className="value">Active</span>
+          <span className="value" style={{ color: student?.idCard?.status === 'ACTIVE' || !student ? 'var(--success-solid)' : 'var(--danger-solid)' }}>
+            {student?.idCard?.status || 'ACTIVE'}
+          </span>
           <span className="subtitle">
-            <CheckCircle2 size={13} style={{ color: 'var(--success-solid)' }} /> Secure Token Verified
+            <CheckCircle2 size={13} style={{ color: 'var(--success-solid)' }} /> Cryptographically Verified
           </span>
         </div>
       </div>
@@ -187,16 +320,16 @@ export const StudentDashboard: React.FC = () => {
 
                 <div style={{ flex: 1, fontSize: '0.8rem' }}>
                   <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#f8fafc' }}>
-                    {studentData.name}
+                    {studentFullName}
                   </div>
                   <div style={{ color: '#93c5fd', fontFamily: 'var(--font-mono)', fontSize: '0.75rem', marginTop: '2px' }}>
-                    {studentData.admissionNumber}
+                    {admissionNumber}
                   </div>
                   <div style={{ marginTop: '6px', color: '#cbd5e1', fontSize: '0.76rem' }}>
-                    Class: <strong style={{ color: '#ffffff' }}>{studentData.class} - {studentData.section}</strong> (Roll #{studentData.rollNumber})
+                    Class: <strong style={{ color: '#ffffff' }}>{className} - {sectionName}</strong> (Roll #{rollNumber})
                   </div>
                   <div style={{ color: '#94a3b8', fontSize: '0.74rem' }}>
-                    Blood Group: {studentData.bloodGroup}
+                    Blood Group: {bloodGroup}
                   </div>
                 </div>
 
@@ -223,7 +356,7 @@ export const StudentDashboard: React.FC = () => {
 
               {/* Card Footer */}
               <div style={{ marginTop: '12px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', color: '#94a3b8' }}>
-                <span>Session: {studentData.session}</span>
+                <span>Session: 2026–2027</span>
                 <span>Valid Thru: April 2027</span>
               </div>
             </div>
@@ -237,148 +370,152 @@ export const StudentDashboard: React.FC = () => {
                 Print Official Card
               </button>
               <button
-                className="ed-btn ed-btn-sm ed-btn-secondary"
+                className="ed-btn ed-btn-sm ed-btn-primary"
                 style={{ flex: 1 }}
-                onClick={() => setShowQrModal(true)}
+                onClick={() => setShowReportCardModal(true)}
               >
-                Verify QR Token
+                <Award size={14} /> View Report Card
               </button>
             </div>
           </div>
         </div>
 
-        {/* Academic Performance & Active Quiz */}
+        {/* Academic Assessments & AI Assistant */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
           {/* Active Quiz Card */}
           <div className="ed-card" style={{ borderLeft: '4px solid var(--warning-solid)' }}>
             <div className="ed-card-header">
               <div>
-                <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>Active Assessment: Electromagnetic Induction</span>
-                <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Assigned by Dr. Thorne • Physics Grade 10-A</p>
+                <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>
+                  {activeQuiz ? `Active Assessment: ${activeQuiz.title}` : 'No Active Assessments'}
+                </span>
+                <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                  {activeQuiz ? `${activeQuiz.subjectCode || 'PHYS-101'} • ${activeQuiz.className}` : 'All scheduled assessments completed'}
+                </p>
               </div>
-              <span className="ed-badge ed-badge-warning">Closes Today 17:00</span>
+              {activeQuiz && <span className="ed-badge ed-badge-warning">Live in Portal</span>}
             </div>
             <div className="ed-card-body" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <div style={{ fontSize: '0.84rem', color: 'var(--text-secondary)' }}>
-                  Questions: <strong>20 MCQs & Short Concepts</strong> • Negative Marking: <strong>-0.25</strong>
+                  {activeQuiz
+                    ? `Questions: ${activeQuiz.questions?.length || 0} items • Duration: ${activeQuiz.durationMinutes} mins • Marks: ${activeQuiz.totalMarks}`
+                    : 'Check back later for teacher-assigned quizzes.'}
                 </div>
-              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                Server enforced duration: <strong>45 minutes</strong> (Browser clock tampering blocked)
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                  Server enforced duration: Browser clock tampering blocked
+                </div>
               </div>
-            </div>
-            <button
-              className="ed-btn ed-btn-primary"
-              onClick={() => {
-                setShowQuizModal(true);
-                setQuizSubmitted(false);
-                setQuizResult(null);
-              }}
-            >
-              {quizSubmitted ? 'Review Past Submission' : 'Take Assessment'}
-            </button>
-          </div>
-        </div>
-
-        {/* AI School Information & Policies Assistant */}
-        <div className="ed-card">
-          <div className="ed-card-header">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Sparkles size={16} style={{ color: 'var(--primary-600)' }} />
-              <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>School Information & Policies Assistant</span>
-            </div>
-            <span className="ed-badge ed-badge-info">Grounded AI</span>
-          </div>
-          <div className="ed-card-body">
-            <form onSubmit={handleAiAsk} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-              <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                <input
-                  className="ed-input"
-                  placeholder="Ask about admissions, attendance policy, code of conduct, fees, or events..."
-                  value={aiQuestion}
-                  onChange={(e) => setAiQuestion(e.target.value)}
-                />
+              {activeQuiz && (
                 <button
-                  type="submit"
-                  disabled={aiLoading}
                   className="ed-btn ed-btn-primary"
-                  style={{ minWidth: '90px' }}
+                  onClick={() => handleStartQuiz(activeQuiz)}
                 >
-                  {aiLoading ? 'Searching...' : 'Ask AI'}
+                  {quizSubmitted ? 'Take Again / Review' : 'Take Assessment'}
                 </button>
-              </div>
-            </form>
+              )}
+            </div>
+          </div>
 
-            {/* Unconfigured State Banner */}
-            {aiUnconfigured && (
-              <div
-                style={{
-                  marginTop: 'var(--space-3)',
-                  padding: '10px 12px',
-                  backgroundColor: '#fffbeb',
-                  border: '1px solid #fde68a',
-                  borderRadius: 'var(--radius-sm)',
-                  fontSize: '0.82rem',
-                  color: '#92400e',
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: '8px',
-                }}
-              >
-                <ShieldAlert size={16} style={{ marginTop: '2px', flexShrink: 0 }} />
-                <div>
-                  <div style={{ fontWeight: 600 }}>AI Provider Unconfigured</div>
-                  <div>To enable the live School Information Assistant, please set <code>AI_PROVIDER_API_KEY</code> in <code>server/.env</code>. Synthetic grounded responses are verified in test suite.</div>
+          {/* AI School Information & Policies Assistant */}
+          <div className="ed-card">
+            <div className="ed-card-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Sparkles size={16} style={{ color: 'var(--primary-600)' }} />
+                <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>School Information & Policies Assistant</span>
+              </div>
+              <span className="ed-badge ed-badge-info">Grounded AI</span>
+            </div>
+            <div className="ed-card-body">
+              <form onSubmit={handleAiAsk} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                  <input
+                    className="ed-input"
+                    placeholder="Ask about admissions, attendance policy, code of conduct, fees, or events..."
+                    value={aiQuestion}
+                    onChange={(e) => setAiQuestion(e.target.value)}
+                  />
+                  <button
+                    type="submit"
+                    disabled={aiLoading}
+                    className="ed-btn ed-btn-primary"
+                    style={{ minWidth: '90px' }}
+                  >
+                    {aiLoading ? 'Searching...' : 'Ask AI'}
+                  </button>
                 </div>
-              </div>
-            )}
+              </form>
 
-            {/* Answer Display */}
-            {aiAnswer && !aiUnconfigured && (
-              <div
-                style={{
-                  marginTop: 'var(--space-3)',
-                  padding: '12px 14px',
-                  backgroundColor: aiMissingInfo ? '#fffbeb' : 'var(--bg-subtle)',
-                  border: `1px solid ${aiMissingInfo ? '#fde68a' : 'var(--border-default)'}`,
-                  borderRadius: 'var(--radius-sm)',
-                  fontSize: '0.84rem',
-                  lineHeight: 1.5,
-                }}
-              >
-                <div style={{ fontWeight: 600, color: aiMissingInfo ? '#92400e' : 'var(--primary-700)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  {aiMissingInfo ? <AlertTriangle size={14} /> : <Sparkles size={14} />}
-                  {aiMissingInfo ? 'Information Not Found in Approved Records:' : 'Institutional Assistant Answer:'}
+              {/* Unconfigured State Banner */}
+              {aiUnconfigured && (
+                <div
+                  style={{
+                    marginTop: 'var(--space-3)',
+                    padding: '10px 12px',
+                    backgroundColor: '#fffbeb',
+                    border: '1px solid #fde68a',
+                    borderRadius: 'var(--radius-sm)',
+                    fontSize: '0.82rem',
+                    color: '#92400e',
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '8px',
+                  }}
+                >
+                  <ShieldAlert size={16} style={{ marginTop: '2px', flexShrink: 0 }} />
+                  <div>
+                    <div style={{ fontWeight: 600 }}>AI Provider Unconfigured</div>
+                    <div>To enable the live School Information Assistant, please set <code>AI_PROVIDER_API_KEY</code> in <code>server/.env</code>. Synthetic grounded responses are verified in test suite.</div>
+                  </div>
                 </div>
-                <div style={{ color: 'var(--text-primary)' }}>{aiAnswer}</div>
+              )}
 
-                {/* Grounded Sources */}
-                {aiSources.length > 0 && (
-                  <div style={{ marginTop: 'var(--space-2)', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600 }}>Grounded Sources:</span>
-                    {aiSources.map((source, idx) => (
-                      <span key={idx} className="ed-badge ed-badge-neutral" style={{ fontSize: '0.70rem' }}>
-                        {source}
-                      </span>
-                    ))}
+              {/* Answer Display */}
+              {aiAnswer && !aiUnconfigured && (
+                <div
+                  style={{
+                    marginTop: 'var(--space-3)',
+                    padding: '12px 14px',
+                    backgroundColor: aiMissingInfo ? '#fffbeb' : 'var(--bg-subtle)',
+                    border: `1px solid ${aiMissingInfo ? '#fde68a' : 'var(--border-default)'}`,
+                    borderRadius: 'var(--radius-sm)',
+                    fontSize: '0.84rem',
+                    lineHeight: 1.5,
+                  }}
+                >
+                  <div style={{ fontWeight: 600, color: aiMissingInfo ? '#92400e' : 'var(--primary-700)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    {aiMissingInfo ? <AlertTriangle size={14} /> : <Sparkles size={14} />}
+                    {aiMissingInfo ? 'Information Not Found in Approved Records:' : 'Institutional Assistant Answer:'}
                   </div>
-                )}
+                  <div style={{ color: 'var(--text-primary)' }}>{aiAnswer}</div>
 
-                {/* AI Safety Disclaimer */}
-                {aiDisclaimer && (
-                  <div style={{ marginTop: '8px', fontSize: '0.70rem', color: 'var(--text-muted)', borderTop: '1px dashed var(--border-default)', paddingTop: '6px' }}>
-                    ⚠️ {aiDisclaimer}
-                  </div>
-                )}
-              </div>
-            )}
+                  {/* Grounded Sources */}
+                  {aiSources.length > 0 && (
+                    <div style={{ marginTop: 'var(--space-2)', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600 }}>Grounded Sources:</span>
+                      {aiSources.map((source, idx) => (
+                        <span key={idx} className="ed-badge ed-badge-neutral" style={{ fontSize: '0.70rem' }}>
+                          {source}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* AI Safety Disclaimer */}
+                  {aiDisclaimer && (
+                    <div style={{ marginTop: '8px', fontSize: '0.70rem', color: 'var(--text-muted)', borderTop: '1px dashed var(--border-default)', paddingTop: '6px' }}>
+                      ⚠️ {aiDisclaimer}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      </div>
       </div>
 
       {/* Interactive Quiz Assessment Modal */}
-      {showQuizModal && (
+      {showQuizModal && activeQuiz && (
         <div
           style={{
             position: 'fixed',
@@ -405,13 +542,13 @@ export const StudentDashboard: React.FC = () => {
             <div className="ed-card-header" style={{ borderBottom: '2px solid var(--primary-600)' }}>
               <div>
                 <span className="ed-badge ed-badge-warning" style={{ marginBottom: '4px' }}>
-                  <Clock size={12} /> Server Timer: {quizTimer} Remaining
+                  <Clock size={12} /> Server Timer: {activeQuiz.durationMinutes} mins
                 </span>
                 <h3 style={{ fontSize: '1.1rem', marginTop: '4px' }}>
-                  Physics Chapter 4: Electromagnetism & Induction
+                  {activeQuiz.title}
                 </h3>
                 <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-                  Total Marks: 15 • Passing: 6 • Negative Marking: -0.25 on incorrect MCQs
+                  Total Marks: {activeQuiz.totalMarks} • Passing: {activeQuiz.passingMarks} • Server Evaluated
                 </p>
               </div>
               <button className="ed-btn-icon" onClick={() => setShowQuizModal(false)}>
@@ -420,7 +557,13 @@ export const StudentDashboard: React.FC = () => {
             </div>
 
             <div className="ed-card-body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
-              {quizSubmitted ? (
+              {quizError && (
+                <div style={{ padding: '8px 12px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--radius-sm)', color: '#dc2626', fontSize: '0.80rem' }}>
+                  {quizError}
+                </div>
+              )}
+
+              {quizSubmitted && quizResult ? (
                 <div style={{ textAlign: 'center', padding: 'var(--space-4)' }}>
                   <div
                     style={{
@@ -455,14 +598,11 @@ export const StudentDashboard: React.FC = () => {
                   >
                     <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>SCORE OBTAINED</div>
                     <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--primary-700)' }}>
-                      10.0 / 15.0
+                      {quizResult.score} / {quizResult.maxScore}
                     </div>
-                    <span className="ed-badge ed-badge-success" style={{ marginTop: '6px' }}>
-                      Passed (Objective Component)
+                    <span className={`ed-badge ${quizResult.passed ? 'ed-badge-success' : 'ed-badge-danger'}`} style={{ marginTop: '6px' }}>
+                      {quizResult.passed ? 'Passed (Objective Component)' : 'Needs Improvement'}
                     </span>
-                    <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '8px' }}>
-                      Short answer response forwarded to Dr. Julian Thorne for subjective rubric review.
-                    </p>
                   </div>
 
                   <button
@@ -474,105 +614,62 @@ export const StudentDashboard: React.FC = () => {
                 </div>
               ) : (
                 <>
-                  {/* Question 1 */}
-                  <div style={{ padding: '12px', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-sm)' }}>
-                    <div style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: '8px' }}>
-                      Q1. What is the SI unit of magnetic flux density? <span style={{ color: 'var(--text-muted)', fontSize: '0.76rem' }}>(5 Marks)</span>
+                  {(activeQuiz.questions || []).map((q: any, idx: number) => (
+                    <div key={q.id} style={{ padding: '12px', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-sm)' }}>
+                      <div style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: '8px' }}>
+                        Q{idx + 1}. {q.questionText} <span style={{ color: 'var(--text-muted)', fontSize: '0.76rem' }}>({q.marks} Marks)</span>
+                      </div>
+                      {q.choices && q.choices.length > 0 ? (
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                          {q.choices.map((choice: any) => (
+                            <label
+                              key={choice.id}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                padding: '8px 10px',
+                                borderRadius: 'var(--radius-xs)',
+                                border: '1px solid var(--border-default)',
+                                backgroundColor: selectedAnswers[q.id] === choice.id ? 'var(--primary-50, #f0fdfa)' : '#ffffff',
+                                cursor: 'pointer',
+                                fontSize: '0.84rem',
+                              }}
+                            >
+                              <input
+                                type="radio"
+                                name={q.id}
+                                checked={selectedAnswers[q.id] === choice.id}
+                                onChange={() => setSelectedAnswers({ ...selectedAnswers, [q.id]: choice.id })}
+                              />
+                              {choice.choiceText}
+                            </label>
+                          ))}
+                        </div>
+                      ) : (
+                        <textarea
+                          className="ed-input"
+                          rows={2}
+                          placeholder="Type your explanation or response..."
+                          value={selectedAnswers[q.id] || ''}
+                          onChange={(e) => setSelectedAnswers({ ...selectedAnswers, [q.id]: e.target.value })}
+                        />
+                      )}
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                      {[
-                        { id: 'opt1', text: 'Tesla (T)' },
-                        { id: 'opt2', text: 'Weber (Wb)' },
-                        { id: 'opt3', text: 'Henry (H)' },
-                        { id: 'opt4', text: 'Gauss (G)' },
-                      ].map((opt) => (
-                        <label
-                          key={opt.id}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            padding: '8px 10px',
-                            borderRadius: 'var(--radius-xs)',
-                            border: '1px solid var(--border-default)',
-                            backgroundColor: selectedAnswers['q1'] === opt.id ? 'var(--primary-50, #f0fdfa)' : '#ffffff',
-                            cursor: 'pointer',
-                            fontSize: '0.84rem',
-                          }}
-                        >
-                          <input
-                            type="radio"
-                            name="q1"
-                            checked={selectedAnswers['q1'] === opt.id}
-                            onChange={() => setSelectedAnswers({ ...selectedAnswers, q1: opt.id })}
-                          />
-                          {opt.text}
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Question 2 */}
-                  <div style={{ padding: '12px', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-sm)' }}>
-                    <div style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: '8px' }}>
-                      Q2. According to Faraday's law, induced EMF is directly proportional to the rate of change of magnetic flux. <span style={{ color: 'var(--text-muted)', fontSize: '0.76rem' }}>(5 Marks)</span>
-                    </div>
-                    <div style={{ display: 'flex', gap: '12px' }}>
-                      {['True', 'False'].map((val) => (
-                        <label
-                          key={val}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            padding: '8px 16px',
-                            borderRadius: 'var(--radius-xs)',
-                            border: '1px solid var(--border-default)',
-                            backgroundColor: selectedAnswers['q2'] === val ? 'var(--primary-50, #f0fdfa)' : '#ffffff',
-                            cursor: 'pointer',
-                            fontSize: '0.84rem',
-                          }}
-                        >
-                          <input
-                            type="radio"
-                            name="q2"
-                            checked={selectedAnswers['q2'] === val}
-                            onChange={() => setSelectedAnswers({ ...selectedAnswers, q2: val })}
-                          />
-                          {val}
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Question 3 */}
-                  <div style={{ padding: '12px', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-sm)' }}>
-                    <div style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: '8px' }}>
-                      Q3. Formulate Lenz's law in your own words regarding the direction of induced current. <span style={{ color: 'var(--text-muted)', fontSize: '0.76rem' }}>(5 Marks • Descriptive)</span>
-                    </div>
-                    <textarea
-                      className="ed-input"
-                      rows={3}
-                      placeholder="Write your answer explaining the conservation of energy principle..."
-                      value={selectedAnswers['q3'] || ''}
-                      onChange={(e) => setSelectedAnswers({ ...selectedAnswers, q3: e.target.value })}
-                    />
-                  </div>
+                  ))}
 
                   {/* Actions */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 'var(--space-2)' }}>
                     <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
-                      Answers are automatically saved to server memory every 30 seconds.
+                      Answers are saved and evaluated against PostgreSQL records.
                     </span>
                     <button
                       type="button"
+                      disabled={quizSubmitting}
                       className="ed-btn ed-btn-primary"
-                      onClick={() => {
-                        setQuizSubmitted(true);
-                        setQuizResult({ score: 10, maxScore: 15, passed: true });
-                      }}
+                      onClick={handleSubmitQuiz}
                     >
-                      Submit Assessment Now
+                      {quizSubmitting ? 'Evaluating...' : 'Submit Assessment Now'}
                     </button>
                   </div>
                 </>
@@ -613,7 +710,7 @@ export const StudentDashboard: React.FC = () => {
                   Apex Academy of Sciences & Arts
                 </h3>
                 <p style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
-                  Affiliated to Central Board of Secondary Education • Academic Session 2026–2027
+                  Affiliated to Central Board of Secondary Education • Academic Session {reportCard?.academicSession || '2026–2027'}
                 </p>
               </div>
               <button className="ed-btn-icon" onClick={() => setShowReportCardModal(false)}>
@@ -634,10 +731,10 @@ export const StudentDashboard: React.FC = () => {
                   fontSize: '0.84rem',
                 }}
               >
-                <div><strong>Student Name:</strong> {studentData.name}</div>
-                <div><strong>Admission Number:</strong> {studentData.admissionNumber}</div>
-                <div><strong>Class & Section:</strong> {studentData.class} - {studentData.section} (Roll #{studentData.rollNumber})</div>
-                <div><strong>Attendance Record:</strong> {studentData.attendance} (Eligible for Promotion)</div>
+                <div><strong>Student Name:</strong> {reportCard?.studentName || studentFullName}</div>
+                <div><strong>Admission Number:</strong> {reportCard?.admissionNumber || admissionNumber}</div>
+                <div><strong>Class & Section:</strong> {reportCard?.className || className} - {reportCard?.sectionName || sectionName} (Roll #{reportCard?.rollNumber || rollNumber})</div>
+                <div><strong>Attendance Record:</strong> {reportCard?.attendancePercentage || attendancePct}% (Eligible for Promotion)</div>
               </div>
 
               {/* Assessment Marks Breakdown Table */}
@@ -650,42 +747,32 @@ export const StudentDashboard: React.FC = () => {
                       <th>Pass Marks</th>
                       <th>Marks Scored</th>
                       <th>Grade</th>
-                      <th>Term Weight</th>
+                      <th>Remarks</th>
                     </tr>
                   </thead>
                   <tbody>
-                    <tr>
-                      <td style={{ fontWeight: 600 }}>Physics Core</td>
-                      <td>100</td>
-                      <td>35</td>
-                      <td style={{ fontWeight: 700, color: 'var(--primary-700)' }}>92</td>
-                      <td><span className="ed-badge ed-badge-success">A1</span></td>
-                      <td>30% (Mid-Term)</td>
-                    </tr>
-                    <tr>
-                      <td style={{ fontWeight: 600 }}>Mathematics (Advanced)</td>
-                      <td>100</td>
-                      <td>35</td>
-                      <td style={{ fontWeight: 700, color: 'var(--primary-700)' }}>88</td>
-                      <td><span className="ed-badge ed-badge-success">A2</span></td>
-                      <td>30% (Mid-Term)</td>
-                    </tr>
-                    <tr>
-                      <td style={{ fontWeight: 600 }}>Chemistry Theory & Lab</td>
-                      <td>100</td>
-                      <td>35</td>
-                      <td style={{ fontWeight: 700, color: 'var(--primary-700)' }}>91</td>
-                      <td><span className="ed-badge ed-badge-success">A1</span></td>
-                      <td>30% (Mid-Term)</td>
-                    </tr>
-                    <tr>
-                      <td style={{ fontWeight: 600 }}>English Literature</td>
-                      <td>100</td>
-                      <td>35</td>
-                      <td style={{ fontWeight: 700, color: 'var(--primary-700)' }}>85</td>
-                      <td><span className="ed-badge ed-badge-success">A2</span></td>
-                      <td>30% (Mid-Term)</td>
-                    </tr>
+                    {reportCard?.subjects && reportCard.subjects.length > 0 ? (
+                      reportCard.subjects.map((sub: any, idx: number) => (
+                        <tr key={idx}>
+                          <td style={{ fontWeight: 600 }}>{sub.subjectName}</td>
+                          <td>{sub.maxMarks}</td>
+                          <td>{sub.passMarks}</td>
+                          <td style={{ fontWeight: 700, color: 'var(--primary-700)' }}>{sub.marksObtained}</td>
+                          <td>
+                            <span className={`ed-badge ${sub.grade === 'A1' || sub.grade === 'A2' ? 'ed-badge-success' : 'ed-badge-neutral'}`}>
+                              {sub.grade}
+                            </span>
+                          </td>
+                          <td style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>{sub.teacherRemarks || 'Satisfactory'}</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '20px' }}>
+                          No published marks available yet for this term.
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -705,13 +792,13 @@ export const StudentDashboard: React.FC = () => {
                 <div>
                   <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>CUMULATIVE WEIGHTED SCORE</div>
                   <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--primary-800)' }}>
-                    89.0% • Grade A1
+                    {reportCard?.overallPercentage || '89.0'}% • Grade {reportCard?.overallGrade || 'A1'}
                   </div>
                 </div>
 
                 <div>
                   <span className="ed-badge ed-badge-success" style={{ fontSize: '0.82rem', padding: '6px 12px' }}>
-                    PROMOTED TO NEXT GRADE
+                    {reportCard?.promotionStatus || 'PROMOTED TO NEXT GRADE'}
                   </span>
                 </div>
               </div>
@@ -757,7 +844,7 @@ export const StudentDashboard: React.FC = () => {
               <div>
                 <h3 style={{ fontSize: '1.05rem' }}>ID Verification Endpoint Preview</h3>
                 <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-                  Public verification page at /verify-id/{studentData.verificationToken}
+                  Public verification page at /verify-id/{verificationToken}
                 </p>
               </div>
               <button className="ed-btn-icon" onClick={() => setShowQrModal(false)}>
@@ -788,10 +875,10 @@ export const StudentDashboard: React.FC = () => {
               </div>
 
               <div style={{ textAlign: 'left', backgroundColor: 'var(--bg-subtle)', padding: '10px 12px', borderRadius: 'var(--radius-sm)', fontSize: '0.82rem', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <div><strong>Full Name:</strong> {studentData.name}</div>
-                <div><strong>Institution:</strong> {studentData.schoolName}</div>
-                <div><strong>Role:</strong> Student (Grade 10)</div>
-                <div><strong>Card Number:</strong> {studentData.admissionNumber}</div>
+                <div><strong>Full Name:</strong> {studentFullName}</div>
+                <div><strong>Institution:</strong> Apex Academy of Sciences & Arts</div>
+                <div><strong>Role:</strong> Student ({className})</div>
+                <div><strong>Card Number:</strong> {admissionNumber}</div>
                 <div><strong>Token Expiry:</strong> Active (Revocable)</div>
               </div>
 

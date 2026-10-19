@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { HealthCheckData } from '@edunexa/shared';
 import { useSchoolBranding } from '../context/SchoolBrandingContext.js';
+import { demoLoginForRole, operationsApi } from '../services/api.js';
 
 interface HeaderProps {
   currentRole: string;
@@ -32,6 +33,32 @@ export const Header: React.FC<HeaderProps> = ({
   const { branding, setIsCustomizing } = useSchoolBranding();
   const [showRoleMenu, setShowRoleMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [unreadCount, setUnreadCount] = useState<number>(0);
+
+  const loadNotifications = async () => {
+    try {
+      const data = await operationsApi.listNotifications();
+      setNotifications(data.notifications || []);
+      setUnreadCount(data.unreadCount || 0);
+    } catch {
+      // unauthenticated or guest mode
+    }
+  };
+
+  React.useEffect(() => {
+    loadNotifications();
+  }, [currentRole]);
+
+  const handleMarkAllRead = async () => {
+    try {
+      await operationsApi.markAllNotificationsRead();
+      setUnreadCount(0);
+      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    } catch (err) {
+      console.warn('Failed to mark read:', err);
+    }
+  };
 
   const roles = [
     { id: 'SUPER_ADMIN', label: 'Platform Super Admin', school: 'Multi-Tenant Authority' },
@@ -168,17 +195,19 @@ export const Header: React.FC<HeaderProps> = ({
             style={{ position: 'relative' }}
           >
             <Bell size={18} />
-            <span
-              style={{
-                position: 'absolute',
-                top: '4px',
-                right: '4px',
-                width: '7px',
-                height: '7px',
-                borderRadius: '50%',
-                backgroundColor: 'var(--danger-solid)',
-              }}
-            />
+            {unreadCount > 0 && (
+              <span
+                style={{
+                  position: 'absolute',
+                  top: '4px',
+                  right: '4px',
+                  width: '7px',
+                  height: '7px',
+                  borderRadius: '50%',
+                  backgroundColor: 'var(--danger-solid)',
+                }}
+              />
+            )}
           </button>
 
           {showNotifications && (
@@ -205,30 +234,43 @@ export const Header: React.FC<HeaderProps> = ({
                 }}
               >
                 <span style={{ fontWeight: 600, fontSize: '0.88rem' }}>System Alerts</span>
-                <span
-                  style={{
-                    fontSize: '0.74rem',
-                    color: 'var(--primary-700)',
-                    cursor: 'pointer',
-                  }}
-                  onClick={() => setShowNotifications(false)}
-                >
-                  Mark all read
-                </span>
+                {unreadCount > 0 && (
+                  <span
+                    style={{
+                      fontSize: '0.74rem',
+                      color: 'var(--primary-700)',
+                      cursor: 'pointer',
+                    }}
+                    onClick={handleMarkAllRead}
+                  >
+                    Mark all read
+                  </span>
+                )}
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                <div style={{ fontSize: '0.80rem', padding: '6px', backgroundColor: 'var(--bg-subtle)', borderRadius: 'var(--radius-xs)' }}>
-                  <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Term 2 Report Cards Ready</div>
-                  <div style={{ color: 'var(--text-muted)', fontSize: '0.74rem' }}>
-                    Marks lock completed for Grade 10 Physics.
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', maxHeight: '280px', overflowY: 'auto' }}>
+                {notifications.length === 0 ? (
+                  <div style={{ fontSize: '0.80rem', color: 'var(--text-muted)', textAlign: 'center', padding: '12px 0' }}>
+                    No active notifications.
                   </div>
-                </div>
-                <div style={{ fontSize: '0.80rem', padding: '6px', backgroundColor: 'var(--bg-subtle)', borderRadius: 'var(--radius-xs)' }}>
-                  <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>New Admission Application</div>
-                  <div style={{ color: 'var(--text-muted)', fontSize: '0.74rem' }}>
-                    Application #ADM-2026-0091 submitted via public portal.
-                  </div>
-                </div>
+                ) : (
+                  notifications.map((n) => (
+                    <div
+                      key={n.id}
+                      style={{
+                        fontSize: '0.80rem',
+                        padding: '8px',
+                        backgroundColor: n.isRead ? 'var(--bg-subtle)' : 'var(--primary-50)',
+                        borderLeft: n.isRead ? '3px solid transparent' : '3px solid var(--primary-600)',
+                        borderRadius: 'var(--radius-xs)',
+                      }}
+                    >
+                      <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{n.title}</div>
+                      <div style={{ color: 'var(--text-muted)', fontSize: '0.74rem', marginTop: '2px' }}>
+                        {n.message}
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           )}
@@ -306,7 +348,10 @@ export const Header: React.FC<HeaderProps> = ({
               {roles.map((r) => (
                 <button
                   key={r.id}
-                  onClick={() => {
+                  onClick={async () => {
+                    if (r.id !== 'PUBLIC' && r.id !== 'VERIFY_CARD') {
+                      await demoLoginForRole(r.id);
+                    }
                     onRoleChange(r.id);
                     setShowRoleMenu(false);
                   }}

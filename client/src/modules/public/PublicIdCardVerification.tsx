@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
   ShieldCheck,
   ShieldAlert,
@@ -17,15 +18,19 @@ import { getApiUrl } from '../../services/api.js';
 
 interface PublicIdCardVerificationProps {
   initialToken?: string;
-  onBackToPublic: () => void;
+  onBackToPublic?: () => void;
 }
 
 export const PublicIdCardVerification: React.FC<PublicIdCardVerificationProps> = ({
-  initialToken = 'v-tok-8f2c-49a1-9b7e-e214',
+  initialToken,
   onBackToPublic,
 }) => {
   const { branding } = useSchoolBranding();
-  const [tokenInput, setTokenInput] = useState(initialToken);
+  const routeParams = useParams<{ token?: string }>();
+  const navigate = useNavigate();
+
+  const effectiveToken = routeParams.token || initialToken || 'v-tok-8f2c-49a1-9b7e-e214';
+  const [tokenInput, setTokenInput] = useState(effectiveToken);
   const [loading, setLoading] = useState(false);
   const [verificationResult, setVerificationResult] = useState<PublicIdCardVerificationResponse | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -77,7 +82,13 @@ export const PublicIdCardVerification: React.FC<PublicIdCardVerificationProps> =
       <div style={{ width: '100%', maxWidth: '600px' }}>
         {/* Navigation Back */}
         <button
-          onClick={onBackToPublic}
+          onClick={() => {
+            if (onBackToPublic) {
+              onBackToPublic();
+            } else {
+              navigate('/');
+            }
+          }}
           className="ed-btn ed-btn-secondary"
           style={{ marginBottom: 'var(--space-5)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
         >

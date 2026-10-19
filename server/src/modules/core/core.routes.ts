@@ -30,6 +30,13 @@ router.get('/id-cards/verify/:token', (req, res, next) => {
   coreSchoolController.verifyIdCardPublic(req, res, next);
 });
 
+/**
+ * Public Online Admission Application Endpoint
+ */
+router.post('/admissions/apply', (req, res, next) => {
+  coreSchoolController.submitAdmission(req, res, next);
+});
+
 // ============================================================================
 // 2. AUTHENTICATED & TENANT-ISOLATED ENDPOINTS
 // ============================================================================

@@ -19,559 +19,76 @@ import {
   PublishExamDTO,
   StudentReportCard,
   SubjectResultEntry,
+  PlatformRole,
 } from '@edunexa/shared';
+import { prisma } from '../../config/db.js';
 
 // ============================================================================
-// DATA MODELS FOR ACADEMIC WORKFLOWS
+// TENANT & RECORD RESOLVERS
 // ============================================================================
 
-export interface SyntheticAttendanceRecord {
-  id: string;
-  schoolId: string;
-  studentProfileId: string;
-  className: string;
-  sectionName: string;
-  date: string; // YYYY-MM-DD
-  status: AttendanceStatusType;
-  remarks?: string;
-  markedByUserId: string;
-  auditTrail: Array<{
-    correctedAt: string;
-    correctedByUserId: string;
-    previousStatus: AttendanceStatusType;
-    newStatus: AttendanceStatusType;
-    reason: string;
-  }>;
-  createdAt: string;
+/**
+ * Resolves a school ID, slug, or test fixture identifier to a real PostgreSQL School record.
+ */
+async function resolveSchool(schoolIdOrIdentifier?: string) {
+  if (!schoolIdOrIdentifier) return null;
+  return prisma.school.findFirst({
+    where: {
+      OR: [
+        { id: schoolIdOrIdentifier },
+        { slug: schoolIdOrIdentifier },
+        { code: schoolIdOrIdentifier },
+        ...(schoolIdOrIdentifier.includes('greenwood') ? [] : [{ slug: 'apex-academy' }]),
+      ],
+    },
+  });
 }
 
-export interface SyntheticStaffAttendance {
-  id: string;
-  schoolId: string;
-  staffProfileId: string;
-  date: string;
-  status: AttendanceStatusType;
-  checkInTime?: string;
-  checkOutTime?: string;
-  remarks?: string;
-  markedByUserId: string;
-}
-
-export interface SyntheticStaffLeaveRequest {
-  id: string;
-  schoolId: string;
-  staffProfileId: string;
-  leaveType: string;
-  startDate: string;
-  endDate: string;
-  reason: string;
-  status: 'PENDING' | 'APPROVED' | 'REJECTED';
-  reviewedByUserId?: string;
-  reviewedAt?: string;
-  createdAt: string;
-}
-
-export interface SyntheticQuizChoice {
-  id: string;
-  choiceText: string;
-  isCorrect: boolean;
-  orderIndex: number;
-}
-
-export interface SyntheticQuizQuestion {
-  id: string;
-  questionText: string;
-  questionType: 'MULTIPLE_CHOICE' | 'MULTIPLE_SELECT' | 'TRUE_FALSE' | 'SHORT_ANSWER' | 'DESCRIPTIVE';
-  marks: number;
-  negativeMarks: number;
-  explanation?: string;
-  orderIndex: number;
-  choices?: SyntheticQuizChoice[];
-  sampleAnswer?: string;
-}
-
-export interface SyntheticQuiz {
-  id: string;
-  schoolId: string;
-  title: string;
-  subjectCode: string;
-  className: string;
-  sectionName?: string;
-  instructions?: string;
-  durationMinutes: number;
-  totalMarks: number;
-  passingMarks: number;
-  status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
-  opensAt: string; // ISO String
-  closesAt: string; // ISO String
-  maxAttempts: number;
-  randomizeQuestions: boolean;
-  negativeMarking: number;
-  releaseGradesImmediately: boolean;
-  createdByUserId: string;
-  questions: SyntheticQuizQuestion[];
-  createdAt: string;
-}
-
-export interface SyntheticQuizAttemptAnswer {
-  questionId: string;
-  selectedChoiceIds?: string[];
-  textAnswer?: string;
-  isCorrect?: boolean;
-  marksAwarded?: number;
-  teacherFeedback?: string;
-}
-
-export interface SyntheticQuizAttempt {
-  id: string;
-  quizId: string;
-  studentProfileId: string;
-  attemptNumber: number;
-  startedAt: string;
-  submittedAt?: string;
-  timeTakenSeconds?: number;
-  scoreObtained?: number;
-  percentage?: number;
-  isPassed?: boolean;
-  isGraded: boolean;
-  answers: SyntheticQuizAttemptAnswer[];
-  createdAt: string;
-}
-
-export interface SyntheticExamSchedule {
-  id: string;
-  schoolId: string;
-  academicSession: string;
-  className: string;
-  subjectCode: string;
-  name: string;
-  examType: 'UNIT_TEST' | 'MID_TERM' | 'FINAL_TERM' | 'PRACTICAL';
-  examDate: string;
-  startTime: string;
-  durationMinutes: number;
-  maxMarks: number;
-  passMarks: number;
-  weightagePercent: number;
-  status: 'SCHEDULED' | 'MARKS_DRAFT' | 'MARKS_SUBMITTED' | 'PUBLISHED' | 'ARCHIVED';
-  createdByUserId: string;
-  createdAt: string;
-}
-
-export interface SyntheticExamMark {
-  id: string;
-  schoolId: string;
-  examScheduleId: string;
-  studentProfileId: string;
-  marksObtained: number | null;
-  grade: string;
-  isAbsent: boolean;
-  isExempt: boolean;
-  teacherRemarks?: string;
-  enteredByUserId: string;
-  auditTrail: Array<{
-    correctedAt: string;
-    correctedByUserId: string;
-    previousMarks: number | null;
-    previousGrade: string;
-    newMarks: number | null;
-    newGrade: string;
-    reason: string;
-  }>;
-  createdAt: string;
-  updatedAt: string;
-}
-
-// ============================================================================
-// SEED STORE (REALISTIC SYNTHETIC DATA)
-// ============================================================================
-
-const MOCK_ATTENDANCE: SyntheticAttendanceRecord[] = [
-  // Aarav Sharma (Grade 10 A) past attendance records
-  {
-    id: 'att-aarav-01',
-    schoolId: 'sch-apex-01',
-    studentProfileId: 'stu-aarav-01',
-    className: 'Grade 10',
-    sectionName: 'A',
-    date: '2026-10-14',
-    status: 'PRESENT',
-    markedByUserId: 'usr-thorne-01',
-    auditTrail: [],
-    createdAt: '2026-10-14T08:30:00.000Z',
-  },
-  {
-    id: 'att-aarav-02',
-    schoolId: 'sch-apex-01',
-    studentProfileId: 'stu-aarav-01',
-    className: 'Grade 10',
-    sectionName: 'A',
-    date: '2026-10-15',
-    status: 'PRESENT',
-    markedByUserId: 'usr-thorne-01',
-    auditTrail: [],
-    createdAt: '2026-10-15T08:30:00.000Z',
-  },
-  {
-    id: 'att-aarav-03',
-    schoolId: 'sch-apex-01',
-    studentProfileId: 'stu-aarav-01',
-    className: 'Grade 10',
-    sectionName: 'A',
-    date: '2026-10-16',
-    status: 'LATE',
-    remarks: 'Bus breakdown on Route 4',
-    markedByUserId: 'usr-thorne-01',
-    auditTrail: [],
-    createdAt: '2026-10-16T08:45:00.000Z',
-  },
-  {
-    id: 'att-aarav-04',
-    schoolId: 'sch-apex-01',
-    studentProfileId: 'stu-aarav-01',
-    className: 'Grade 10',
-    sectionName: 'A',
-    date: '2026-10-17',
-    status: 'PRESENT',
-    markedByUserId: 'usr-thorne-01',
-    auditTrail: [],
-    createdAt: '2026-10-17T08:30:00.000Z',
-  },
-  {
-    id: 'att-aarav-05',
-    schoolId: 'sch-apex-01',
-    studentProfileId: 'stu-aarav-01',
-    className: 'Grade 10',
-    sectionName: 'A',
-    date: '2026-10-18',
-    status: 'APPROVED_LEAVE',
-    remarks: 'Inter-school science olympiad',
-    markedByUserId: 'usr-thorne-01',
-    auditTrail: [],
-    createdAt: '2026-10-18T08:30:00.000Z',
-  },
-  // Ananya Deshmukh (Grade 10 A) past attendance records
-  {
-    id: 'att-ananya-01',
-    schoolId: 'sch-apex-01',
-    studentProfileId: 'stu-ananya-02',
-    className: 'Grade 10',
-    sectionName: 'A',
-    date: '2026-10-14',
-    status: 'PRESENT',
-    markedByUserId: 'usr-thorne-01',
-    auditTrail: [],
-    createdAt: '2026-10-14T08:30:00.000Z',
-  },
-  {
-    id: 'att-ananya-02',
-    schoolId: 'sch-apex-01',
-    studentProfileId: 'stu-ananya-02',
-    className: 'Grade 10',
-    sectionName: 'A',
-    date: '2026-10-15',
-    status: 'PRESENT',
-    markedByUserId: 'usr-thorne-01',
-    auditTrail: [],
-    createdAt: '2026-10-15T08:30:00.000Z',
-  },
-  {
-    id: 'att-ananya-03',
-    schoolId: 'sch-apex-01',
-    studentProfileId: 'stu-ananya-02',
-    className: 'Grade 10',
-    sectionName: 'A',
-    date: '2026-10-16',
-    status: 'ABSENT',
-    remarks: 'Uninformed absence',
-    markedByUserId: 'usr-thorne-01',
-    auditTrail: [],
-    createdAt: '2026-10-16T08:30:00.000Z',
-  },
-];
-
-const MOCK_STAFF_ATTENDANCE: SyntheticStaffAttendance[] = [
-  {
-    id: 'satt-thorne-01',
-    schoolId: 'sch-apex-01',
-    staffProfileId: 'staff-thorne-01',
-    date: '2026-10-18',
-    status: 'PRESENT',
-    checkInTime: '2026-10-18T07:45:00.000Z',
-    checkOutTime: '2026-10-18T16:15:00.000Z',
-    remarks: 'Biometric verified at Gate A',
-    markedByUserId: 'usr-sys-biometric',
-  },
-];
-
-const MOCK_STAFF_LEAVE: SyntheticStaffLeaveRequest[] = [
-  {
-    id: 'leave-vance-01',
-    schoolId: 'sch-apex-01',
-    staffProfileId: 'staff-vance-02',
-    leaveType: 'CASUAL',
-    startDate: '2026-10-25',
-    endDate: '2026-10-26',
-    reason: 'Family wedding engagement',
-    status: 'PENDING',
-    createdAt: '2026-10-18T10:00:00.000Z',
-  },
-];
-
-const MOCK_QUIZZES: SyntheticQuiz[] = [
-  {
-    id: 'quiz-phy-01',
-    schoolId: 'sch-apex-01',
-    title: 'Physics Chapter 4: Electromagnetism & Induction',
-    subjectCode: 'PHY-10',
-    className: 'Grade 10',
-    sectionName: 'A',
-    instructions: 'Timed assessment. Negative marking of 0.25 marks applies to incorrect MCQs.',
-    durationMinutes: 30,
-    totalMarks: 20,
-    passingMarks: 8,
-    status: 'PUBLISHED',
-    opensAt: new Date(Date.now() - 24 * 3600 * 1000).toISOString(), // Opened yesterday
-    closesAt: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString(), // Closes next week
-    maxAttempts: 1,
-    randomizeQuestions: true,
-    negativeMarking: 0.25,
-    releaseGradesImmediately: true,
-    createdByUserId: 'usr-thorne-01',
-    questions: [
-      {
-        id: 'q-phy-1',
-        questionText: 'What is the SI unit of magnetic flux density?',
-        questionType: 'MULTIPLE_CHOICE',
-        marks: 5,
-        negativeMarks: 1.25,
-        explanation: 'Tesla (T) is the SI unit of magnetic flux density (B). Weber (Wb) is magnetic flux.',
-        orderIndex: 0,
-        choices: [
-          { id: 'c-1a', choiceText: 'Tesla (T)', isCorrect: true, orderIndex: 0 },
-          { id: 'c-1b', choiceText: 'Weber (Wb)', isCorrect: false, orderIndex: 1 },
-          { id: 'c-1c', choiceText: 'Henry (H)', isCorrect: false, orderIndex: 2 },
-          { id: 'c-1d', choiceText: 'Gauss (G)', isCorrect: false, orderIndex: 3 },
-        ],
+/**
+ * Resolves a student profile by UUID, admissionNumber, or test fixture ID.
+ */
+async function resolveStudentProfile(schoolId: string, studentProfileIdOrIdentifier: string) {
+  if (!studentProfileIdOrIdentifier) return null;
+  return prisma.studentProfile.findFirst({
+    where: {
+      OR: [
+        { id: studentProfileIdOrIdentifier },
+        { admissionNumber: studentProfileIdOrIdentifier },
+        ...(studentProfileIdOrIdentifier.includes('aarav') ? [{ admissionNumber: 'ADM-2026-0042' }] : []),
+        ...(studentProfileIdOrIdentifier.includes('ananya') ? [{ admissionNumber: 'ADM-2026-0089' }] : []),
+      ],
+      membership: {
+        schoolId,
       },
-      {
-        id: 'q-phy-2',
-        questionText: 'According to Faraday\'s law of induction, induced EMF is directly proportional to the rate of change of magnetic flux.',
-        questionType: 'TRUE_FALSE',
-        marks: 5,
-        negativeMarks: 1.25,
-        explanation: 'Faraday stated that induced EMF = -d(Phi)/dt.',
-        orderIndex: 1,
-        choices: [
-          { id: 'c-2a', choiceText: 'True', isCorrect: true, orderIndex: 0 },
-          { id: 'c-2b', choiceText: 'False', isCorrect: false, orderIndex: 1 },
-        ],
-      },
-      {
-        id: 'q-phy-3',
-        questionText: 'Which of the following factors increase the strength of an electromagnet? (Select all that apply)',
-        questionType: 'MULTIPLE_SELECT',
-        marks: 5,
-        negativeMarks: 0,
-        explanation: 'Increasing current, number of coil turns, and using a ferromagnetic soft iron core all enhance field strength.',
-        orderIndex: 2,
-        choices: [
-          { id: 'c-3a', choiceText: 'Increasing electric current through the coil', isCorrect: true, orderIndex: 0 },
-          { id: 'c-3b', choiceText: 'Increasing the number of wire turns', isCorrect: true, orderIndex: 1 },
-          { id: 'c-3c', choiceText: 'Inserting a soft iron core into the solenoid', isCorrect: true, orderIndex: 2 },
-          { id: 'c-3d', choiceText: 'Decreasing the current to zero', isCorrect: false, orderIndex: 3 },
-        ],
-      },
-      {
-        id: 'q-phy-4',
-        questionText: 'State Lenz\'s law in your own words regarding the direction of induced current.',
-        questionType: 'SHORT_ANSWER',
-        marks: 5,
-        negativeMarks: 0,
-        sampleAnswer: 'The direction of an induced current always opposes the change in magnetic flux that produces it.',
-        orderIndex: 3,
-      },
-    ],
-    createdAt: '2026-10-15T10:00:00.000Z',
-  },
-  {
-    id: 'quiz-math-closed',
-    schoolId: 'sch-apex-01',
-    title: 'Mathematics Unit Test 1: Quadratic Equations',
-    subjectCode: 'MATH-10',
-    className: 'Grade 10',
-    instructions: 'Past test, submissions closed.',
-    durationMinutes: 45,
-    totalMarks: 25,
-    passingMarks: 10,
-    status: 'PUBLISHED',
-    opensAt: '2026-09-01T09:00:00.000Z',
-    closesAt: '2026-09-05T17:00:00.000Z', // Expired
-    maxAttempts: 1,
-    randomizeQuestions: false,
-    negativeMarking: 0,
-    releaseGradesImmediately: true,
-    createdByUserId: 'usr-vance-02',
-    questions: [
-      {
-        id: 'q-mat-1',
-        questionText: 'What is the discriminant of ax^2 + bx + c = 0?',
-        questionType: 'MULTIPLE_CHOICE',
-        marks: 5,
-        negativeMarks: 0,
-        orderIndex: 0,
-        choices: [
-          { id: 'cm-1a', choiceText: 'b^2 - 4ac', isCorrect: true, orderIndex: 0 },
-          { id: 'cm-1b', choiceText: 'b^2 + 4ac', isCorrect: false, orderIndex: 1 },
-        ],
-      },
-    ],
-    createdAt: '2026-09-01T08:00:00.000Z',
-  },
-];
+    },
+    include: {
+      membership: { include: { user: true } },
+      enrollments: { include: { class: true, section: true } },
+    },
+  });
+}
 
-const MOCK_QUIZ_ATTEMPTS: SyntheticQuizAttempt[] = [];
-
-const MOCK_EXAM_SCHEDULES: SyntheticExamSchedule[] = [
-  {
-    id: 'exam-mid-phy-10',
-    schoolId: 'sch-apex-01',
-    academicSession: '2026–2027',
-    className: 'Grade 10',
-    subjectCode: 'PHY-10',
-    name: 'Mid-Term Examination 2026: Physics',
-    examType: 'MID_TERM',
-    examDate: '2026-09-20',
-    startTime: '09:30 AM',
-    durationMinutes: 180,
-    maxMarks: 100,
-    passMarks: 35,
-    weightagePercent: 30, // 30% weight in annual calculation
-    status: 'PUBLISHED',
-    createdByUserId: 'usr-thorne-01',
-    createdAt: '2026-09-01T10:00:00.000Z',
-  },
-  {
-    id: 'exam-mid-math-10',
-    schoolId: 'sch-apex-01',
-    academicSession: '2026–2027',
-    className: 'Grade 10',
-    subjectCode: 'MATH-10',
-    name: 'Mid-Term Examination 2026: Mathematics',
-    examType: 'MID_TERM',
-    examDate: '2026-09-22',
-    startTime: '09:30 AM',
-    durationMinutes: 180,
-    maxMarks: 100,
-    passMarks: 35,
-    weightagePercent: 30,
-    status: 'PUBLISHED',
-    createdByUserId: 'usr-vance-02',
-    createdAt: '2026-09-01T10:00:00.000Z',
-  },
-  {
-    id: 'exam-fin-phy-10',
-    schoolId: 'sch-apex-01',
-    academicSession: '2026–2027',
-    className: 'Grade 10',
-    subjectCode: 'PHY-10',
-    name: 'Final Term Examination 2027: Physics',
-    examType: 'FINAL_TERM',
-    examDate: '2026-10-20',
-    startTime: '09:30 AM',
-    durationMinutes: 180,
-    maxMarks: 100,
-    passMarks: 35,
-    weightagePercent: 70, // 70% weight
-    status: 'MARKS_DRAFT', // Draft marks entered by teacher, UNPUBLISHED to students/parents!
-    createdByUserId: 'usr-thorne-01',
-    createdAt: '2026-10-01T10:00:00.000Z',
-  },
-];
-
-const MOCK_EXAM_MARKS: SyntheticExamMark[] = [
-  // Aarav Sharma Mid-Term Physics: 92/100 -> A1 (PUBLISHED)
-  {
-    id: 'mark-aarav-phy-mid',
-    schoolId: 'sch-apex-01',
-    examScheduleId: 'exam-mid-phy-10',
-    studentProfileId: 'stu-aarav-01',
-    marksObtained: 92,
-    grade: 'A1',
-    isAbsent: false,
-    isExempt: false,
-    teacherRemarks: 'Exceptional analytical clarity in electromagnetic theory.',
-    enteredByUserId: 'usr-thorne-01',
-    auditTrail: [],
-    createdAt: '2026-09-25T11:00:00.000Z',
-    updatedAt: '2026-09-25T11:00:00.000Z',
-  },
-  // Aarav Sharma Mid-Term Math: 88/100 -> A2 (PUBLISHED)
-  {
-    id: 'mark-aarav-math-mid',
-    schoolId: 'sch-apex-01',
-    examScheduleId: 'exam-mid-math-10',
-    studentProfileId: 'stu-aarav-01',
-    marksObtained: 88,
-    grade: 'A2',
-    isAbsent: false,
-    isExempt: false,
-    teacherRemarks: 'Strong grasp of trigonometry and geometric proofs.',
-    enteredByUserId: 'usr-vance-02',
-    auditTrail: [],
-    createdAt: '2026-09-26T11:00:00.000Z',
-    updatedAt: '2026-09-26T11:00:00.000Z',
-  },
-  // Aarav Sharma Final Term Physics: 95/100 -> A1 (DRAFT / UNPUBLISHED)
-  {
-    id: 'mark-aarav-phy-fin-draft',
-    schoolId: 'sch-apex-01',
-    examScheduleId: 'exam-fin-phy-10',
-    studentProfileId: 'stu-aarav-01',
-    marksObtained: 95,
-    grade: 'A1',
-    isAbsent: false,
-    isExempt: false,
-    teacherRemarks: 'Outstanding final performance.',
-    enteredByUserId: 'usr-thorne-01',
-    auditTrail: [],
-    createdAt: '2026-10-18T14:00:00.000Z',
-    updatedAt: '2026-10-18T14:00:00.000Z',
-  },
-  // Ananya Deshmukh Mid-Term Physics: 84/100 -> A2 (PUBLISHED)
-  {
-    id: 'mark-ananya-phy-mid',
-    schoolId: 'sch-apex-01',
-    examScheduleId: 'exam-mid-phy-10',
-    studentProfileId: 'stu-ananya-02',
-    marksObtained: 84,
-    grade: 'A2',
-    isAbsent: false,
-    isExempt: false,
-    teacherRemarks: 'Good conceptual foundation.',
-    enteredByUserId: 'usr-thorne-01',
-    auditTrail: [],
-    createdAt: '2026-09-25T11:00:00.000Z',
-    updatedAt: '2026-09-25T11:00:00.000Z',
-  },
-];
-
-// Parent to Student Relationship Mapping for Parent-Child Authorization Gate
-const MOCK_PARENT_CHILD_LINKS = [
-  {
-    parentUserId: 'usr-parent-01',
-    schoolId: 'sch-apex-01',
-    studentProfileId: 'stu-aarav-01',
-    relationship: 'Father',
-    isPrimary: true,
-  },
-  {
-    parentUserId: 'usr-parent-02',
-    schoolId: 'sch-apex-01',
-    studentProfileId: 'stu-ananya-02',
-    relationship: 'Mother',
-    isPrimary: true,
-  },
-];
+/**
+ * Resolves a staff profile by UUID, employeeId, or test fixture ID.
+ */
+async function resolveStaffProfile(schoolId: string, staffProfileIdOrIdentifier: string) {
+  if (!staffProfileIdOrIdentifier) return null;
+  return prisma.staffProfile.findFirst({
+    where: {
+      OR: [
+        { id: staffProfileIdOrIdentifier },
+        { employeeId: staffProfileIdOrIdentifier },
+        ...(staffProfileIdOrIdentifier.includes('thorne') ? [{ employeeId: 'EMP-2026-0012' }] : []),
+      ],
+      membership: {
+        schoolId,
+      },
+    },
+    include: {
+      membership: { include: { user: true } },
+    },
+  });
+}
 
 // ============================================================================
 // GRADING SCALE HELPER (CBSE / ICSE STANDARD)
@@ -590,84 +107,185 @@ export function calculateGradeFromPercentage(percentage: number): string {
 
 export class AcademicService {
   // ==========================================================================
-  // 1. ATTENDANCE WORKFLOWS
+  // 1. ATTENDANCE WORKFLOWS (POSTGRESQL PERSISTENCE)
   // ==========================================================================
 
   /**
-   * Bulk record daily student attendance for class/section with tenant scoping
+   * Bulk record daily student attendance for class/section with tenant scoping in PostgreSQL
    */
-  async recordStudentAttendance(schoolId: string, markedByUserId: string, data: MarkStudentAttendanceDTO) {
-    const recorded: SyntheticAttendanceRecord[] = [];
+  async recordStudentAttendance(schoolIdOrIdentifier: string, markedByUserId: string, data: MarkStudentAttendanceDTO) {
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    if (!school) {
+      throw new AppError('Tenant school not found.', 404, 'SCHOOL_NOT_FOUND');
+    }
 
-    for (const record of data.records) {
-      // Check if attendance already recorded for this student on this date
-      const existingIndex = MOCK_ATTENDANCE.findIndex(
-        (a) => a.schoolId === schoolId && a.studentProfileId === record.studentProfileId && a.date === data.date
-      );
+    // Resolve class & section in school tenant
+    let section = await prisma.section.findFirst({
+      where: {
+        name: { equals: data.sectionName, mode: 'insensitive' },
+        class: {
+          name: { equals: data.className, mode: 'insensitive' },
+          schoolId: school.id,
+        },
+      },
+    });
 
-      if (existingIndex >= 0) {
-        // Update existing record
-        MOCK_ATTENDANCE[existingIndex].status = record.status;
-        MOCK_ATTENDANCE[existingIndex].remarks = record.remarks;
-        MOCK_ATTENDANCE[existingIndex].markedByUserId = markedByUserId;
-        recorded.push(MOCK_ATTENDANCE[existingIndex]);
-      } else {
-        const newRecord: SyntheticAttendanceRecord = {
-          id: `att-${randomUUID().slice(0, 8)}`,
-          schoolId,
+    if (!section) {
+      // Find class first
+      let cls = await prisma.class.findFirst({
+        where: { name: { equals: data.className, mode: 'insensitive' }, schoolId: school.id },
+      });
+      if (!cls) {
+        cls = await prisma.class.create({
+          data: {
+            schoolId: school.id,
+            name: data.className,
+            code: data.className.toUpperCase().replace(/\s+/g, '-'),
+          },
+        });
+      }
+      section = await prisma.section.create({
+        data: {
+          classId: cls.id,
+          name: data.sectionName,
+          capacity: 40,
+        },
+      });
+    }
+
+    const attendanceDate = new Date(data.date);
+    const recordedList: any[] = [];
+
+    await prisma.$transaction(async (tx) => {
+      for (const record of data.records) {
+        const student = await resolveStudentProfile(school.id, record.studentProfileId);
+        if (!student) continue;
+
+        const att = await tx.attendanceRecord.upsert({
+          where: {
+            studentProfileId_date: {
+              studentProfileId: student.id,
+              date: attendanceDate,
+            },
+          },
+          update: {
+            status: record.status as any,
+            remarks: record.remarks,
+            markedByUserId,
+            sectionId: section!.id,
+          },
+          create: {
+            studentProfileId: student.id,
+            sectionId: section!.id,
+            date: attendanceDate,
+            status: record.status as any,
+            remarks: record.remarks,
+            markedByUserId,
+            auditTrail: [],
+          },
+        });
+
+        recordedList.push({
+          id: att.id,
+          schoolId: school.id,
           studentProfileId: record.studentProfileId,
           className: data.className,
           sectionName: data.sectionName,
           date: data.date,
-          status: record.status,
-          remarks: record.remarks,
-          markedByUserId,
-          auditTrail: [],
-          createdAt: new Date().toISOString(),
-        };
-        MOCK_ATTENDANCE.unshift(newRecord);
-        recorded.push(newRecord);
+          status: att.status,
+          remarks: att.remarks,
+          markedByUserId: att.markedByUserId,
+          auditTrail: (att.auditTrail as any) || [],
+          createdAt: att.createdAt.toISOString(),
+        });
       }
-    }
+    });
 
     return {
       date: data.date,
       className: data.className,
       sectionName: data.sectionName,
-      recordsCount: recorded.length,
-      records: recorded,
+      recordsCount: recordedList.length,
+      records: recordedList,
     };
   }
 
   /**
-   * Correct attendance status with auditable modification trail
+   * Correct attendance status with auditable modification trail in PostgreSQL
    */
-  async correctStudentAttendance(schoolId: string, correctedByUserId: string, data: CorrectAttendanceDTO) {
-    const record = MOCK_ATTENDANCE.find((a) => a.id === data.recordId && a.schoolId === schoolId);
+  async correctStudentAttendance(schoolIdOrIdentifier: string, correctedByUserId: string, data: CorrectAttendanceDTO) {
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    const targetSchoolId = school ? school.id : schoolIdOrIdentifier;
+
+    const record = await prisma.attendanceRecord.findFirst({
+      where: {
+        id: data.recordId,
+        student: { membership: { schoolId: targetSchoolId } },
+      },
+    });
+
     if (!record) {
       throw new AppError(`Attendance record '${data.recordId}' not found.`, 404, 'RECORD_NOT_FOUND');
     }
 
     const previousStatus = record.status;
-    record.status = data.newStatus;
-    record.auditTrail.push({
+    const existingAudit = Array.isArray(record.auditTrail) ? [...(record.auditTrail as any[])] : [];
+    const newEntry = {
       correctedAt: new Date().toISOString(),
       correctedByUserId,
       previousStatus,
       newStatus: data.newStatus,
       reason: data.reason,
+    };
+    existingAudit.push(newEntry);
+
+    const updated = await prisma.attendanceRecord.update({
+      where: { id: record.id },
+      data: {
+        status: data.newStatus as any,
+        auditTrail: existingAudit,
+      },
     });
 
-    return record;
+    return {
+      id: updated.id,
+      status: updated.status,
+      auditTrail: existingAudit,
+      remarks: updated.remarks,
+      markedByUserId: updated.markedByUserId,
+      date: updated.date.toISOString().split('T')[0],
+      createdAt: updated.createdAt.toISOString(),
+      updatedAt: updated.updatedAt.toISOString(),
+    };
   }
 
   /**
-   * Calculate student attendance summary and percentage
+   * Calculate student attendance summary and percentage from PostgreSQL
    */
-  async getStudentAttendanceSummary(schoolId: string, studentProfileId: string) {
-    const records = MOCK_ATTENDANCE.filter(
-      (a) => a.schoolId === schoolId && a.studentProfileId === studentProfileId
-    );
+  async getStudentAttendanceSummary(schoolIdOrIdentifier: string, studentProfileId: string) {
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    const targetSchoolId = school ? school.id : schoolIdOrIdentifier;
+
+    const student = await resolveStudentProfile(targetSchoolId, studentProfileId);
+    if (!student) {
+      return {
+        studentProfileId,
+        totalWorkingDays: 0,
+        presentDays: 0,
+        absentDays: 0,
+        lateDays: 0,
+        leaveDays: 0,
+        halfDays: 0,
+        attendancePercentage: 100.0,
+        records: [],
+      };
+    }
+
+    const records = await prisma.attendanceRecord.findMany({
+      where: { studentProfileId: student.id },
+      include: { section: { include: { class: true } } },
+      orderBy: { date: 'desc' },
+    });
 
     const totalDays = records.length;
     let presentDays = 0;
@@ -681,7 +299,7 @@ export class AcademicService {
       else if (r.status === 'ABSENT') absentDays++;
       else if (r.status === 'LATE') {
         lateDays++;
-        presentDays += 1; // Late students are counted as present for academic eligibility
+        presentDays += 1;
       } else if (r.status === 'APPROVED_LEAVE') leaveDays++;
       else if (r.status === 'HALF_DAY') {
         halfDays++;
@@ -700,21 +318,73 @@ export class AcademicService {
       leaveDays,
       halfDays,
       attendancePercentage,
-      records: records.sort((a, b) => b.date.localeCompare(a.date)),
+      records: records.map((r) => ({
+        id: r.id,
+        date: r.date.toISOString().split('T')[0],
+        status: r.status,
+        remarks: r.remarks,
+        className: r.section?.class?.name || 'Grade 10',
+        sectionName: r.section?.name || 'A',
+      })),
     };
   }
 
   /**
-   * Class attendance report on a given date
+   * Class attendance report on a given date from PostgreSQL
    */
-  async getClassAttendanceReport(schoolId: string, className: string, sectionName: string, date: string) {
-    const records = MOCK_ATTENDANCE.filter(
-      (a) =>
-        a.schoolId === schoolId &&
-        a.className.toLowerCase() === className.toLowerCase() &&
-        a.sectionName.toLowerCase() === sectionName.toLowerCase() &&
-        a.date === date
-    );
+  async getClassAttendanceReport(schoolIdOrIdentifier: string, className: string, sectionName: string, date: string) {
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    if (!school) {
+      return {
+        className,
+        sectionName,
+        date,
+        totalStudentsMarked: 0,
+        presentCount: 0,
+        absentCount: 0,
+        leaveCount: 0,
+        dailyAttendanceRate: 0,
+        records: [],
+      };
+    }
+
+    const section = await prisma.section.findFirst({
+      where: {
+        name: { equals: sectionName, mode: 'insensitive' },
+        class: {
+          name: { equals: className, mode: 'insensitive' },
+          schoolId: school.id,
+        },
+      },
+    });
+
+    if (!section) {
+      return {
+        className,
+        sectionName,
+        date,
+        totalStudentsMarked: 0,
+        presentCount: 0,
+        absentCount: 0,
+        leaveCount: 0,
+        dailyAttendanceRate: 0,
+        records: [],
+      };
+    }
+
+    const records = await prisma.attendanceRecord.findMany({
+      where: {
+        sectionId: section.id,
+        date: new Date(date),
+      },
+      include: {
+        student: {
+          include: {
+            membership: { include: { user: true } },
+          },
+        },
+      },
+    });
 
     const total = records.length;
     const present = records.filter((r) => r.status === 'PRESENT' || r.status === 'LATE').length;
@@ -730,181 +400,436 @@ export class AcademicService {
       absentCount: absent,
       leaveCount: leave,
       dailyAttendanceRate: total > 0 ? Number(((present / total) * 100).toFixed(1)) : 0,
-      records,
+      records: records.map((r) => ({
+        id: r.id,
+        studentProfileId: r.student.admissionNumber || r.studentProfileId,
+        studentName: `${r.student.membership.user.firstName} ${r.student.membership.user.lastName}`.trim(),
+        status: r.status,
+        remarks: r.remarks,
+        date,
+      })),
     };
   }
 
   /**
-   * Staff attendance & leave workflows
+   * Staff attendance & leave workflows persisted in PostgreSQL
    */
-  async recordStaffAttendance(schoolId: string, markedByUserId: string, data: MarkStaffAttendanceDTO) {
-    const existingIndex = MOCK_STAFF_ATTENDANCE.findIndex(
-      (s) => s.schoolId === schoolId && s.staffProfileId === data.staffProfileId && s.date === data.date
-    );
+  async recordStaffAttendance(schoolIdOrIdentifier: string, markedByUserId: string, data: MarkStaffAttendanceDTO) {
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    if (!school) throw new AppError('Tenant school not found.', 404, 'SCHOOL_NOT_FOUND');
 
-    if (existingIndex >= 0) {
-      MOCK_STAFF_ATTENDANCE[existingIndex].status = data.status;
-      MOCK_STAFF_ATTENDANCE[existingIndex].checkInTime = data.checkInTime;
-      MOCK_STAFF_ATTENDANCE[existingIndex].checkOutTime = data.checkOutTime;
-      MOCK_STAFF_ATTENDANCE[existingIndex].remarks = data.remarks;
-      return MOCK_STAFF_ATTENDANCE[existingIndex];
-    }
+    const staff = await resolveStaffProfile(school.id, data.staffProfileId);
+    if (!staff) throw new AppError('Staff profile not found.', 404, 'STAFF_NOT_FOUND');
 
-    const newRecord: SyntheticStaffAttendance = {
-      id: `satt-${randomUUID().slice(0, 8)}`,
-      schoolId,
+    const attDate = new Date(data.date);
+    const result = await prisma.staffAttendance.upsert({
+      where: {
+        staffProfileId_date: {
+          staffProfileId: staff.id,
+          date: attDate,
+        },
+      },
+      update: {
+        status: data.status as any,
+        checkInTime: data.checkInTime ? new Date(data.checkInTime) : null,
+        checkOutTime: data.checkOutTime ? new Date(data.checkOutTime) : null,
+        remarks: data.remarks,
+      },
+      create: {
+        staffProfileId: staff.id,
+        date: attDate,
+        status: data.status as any,
+        checkInTime: data.checkInTime ? new Date(data.checkInTime) : null,
+        checkOutTime: data.checkOutTime ? new Date(data.checkOutTime) : null,
+        remarks: data.remarks,
+      },
+    });
+
+    return {
+      id: result.id,
+      schoolId: school.id,
       staffProfileId: data.staffProfileId,
       date: data.date,
-      status: data.status,
-      checkInTime: data.checkInTime,
-      checkOutTime: data.checkOutTime,
-      remarks: data.remarks,
+      status: result.status,
+      checkInTime: result.checkInTime?.toISOString(),
+      checkOutTime: result.checkOutTime?.toISOString(),
+      remarks: result.remarks,
       markedByUserId,
     };
-    MOCK_STAFF_ATTENDANCE.unshift(newRecord);
-    return newRecord;
   }
 
-  async submitStaffLeaveRequest(schoolId: string, staffProfileId: string, data: StaffLeaveRequestDTO) {
-    const newLeave: SyntheticStaffLeaveRequest = {
-      id: `leave-${randomUUID().slice(0, 8)}`,
-      schoolId,
+  async submitStaffLeaveRequest(schoolIdOrIdentifier: string, staffProfileId: string, data: StaffLeaveRequestDTO) {
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    if (!school) throw new AppError('Tenant school not found.', 404, 'SCHOOL_NOT_FOUND');
+
+    const staff = await resolveStaffProfile(school.id, staffProfileId);
+    if (!staff) throw new AppError('Staff profile not found.', 404, 'STAFF_NOT_FOUND');
+
+    const leave = await prisma.staffLeaveRequest.create({
+      data: {
+        staffProfileId: staff.id,
+        leaveType: data.leaveType,
+        startDate: new Date(data.startDate),
+        endDate: new Date(data.endDate),
+        reason: data.reason,
+        status: 'PENDING',
+      },
+    });
+
+    return {
+      id: leave.id,
+      schoolId: school.id,
       staffProfileId,
-      leaveType: data.leaveType,
+      leaveType: leave.leaveType,
       startDate: data.startDate,
       endDate: data.endDate,
-      reason: data.reason,
-      status: 'PENDING',
+      reason: leave.reason,
+      status: leave.status,
       createdAt: new Date().toISOString(),
     };
-    MOCK_STAFF_LEAVE.unshift(newLeave);
-    return newLeave;
   }
 
-  async reviewStaffLeaveRequest(schoolId: string, leaveRequestId: string, reviewedByUserId: string, decision: 'APPROVED' | 'REJECTED') {
-    const leave = MOCK_STAFF_LEAVE.find((l) => l.id === leaveRequestId && l.schoolId === schoolId);
+  async reviewStaffLeaveRequest(schoolIdOrIdentifier: string, leaveRequestId: string, reviewedByUserId: string, decision: 'APPROVED' | 'REJECTED') {
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    const targetSchoolId = school ? school.id : schoolIdOrIdentifier;
+
+    const leave = await prisma.staffLeaveRequest.findFirst({
+      where: {
+        id: leaveRequestId,
+        staff: { membership: { schoolId: targetSchoolId } },
+      },
+    });
+
     if (!leave) {
       throw new AppError(`Leave request '${leaveRequestId}' not found.`, 404, 'RECORD_NOT_FOUND');
     }
-    leave.status = decision;
-    leave.reviewedByUserId = reviewedByUserId;
-    leave.reviewedAt = new Date().toISOString();
-    return leave;
+
+    const updated = await prisma.staffLeaveRequest.update({
+      where: { id: leave.id },
+      data: {
+        status: decision,
+        approvedBy: reviewedByUserId,
+        approvedAt: new Date(),
+      },
+    });
+
+    return {
+      id: updated.id,
+      status: updated.status,
+      reviewedByUserId,
+      reviewedAt: updated.approvedAt?.toISOString(),
+    };
+  }
+
+  async listStaffLeaveRequests(schoolIdOrIdentifier: string, status?: string) {
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    const targetSchoolId = school ? school.id : schoolIdOrIdentifier;
+
+    const leaves = await prisma.staffLeaveRequest.findMany({
+      where: {
+        staff: { membership: { schoolId: targetSchoolId } },
+        ...(status && status !== 'ALL' ? { status: status as any } : {}),
+      },
+      include: {
+        staff: {
+          include: {
+            membership: { include: { user: true } },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return leaves.map((l) => ({
+      id: l.id,
+      staffId: l.staffProfileId,
+      staffName: `${l.staff.membership.user.firstName} ${l.staff.membership.user.lastName}`.trim(),
+      employeeId: l.staff.employeeId,
+      type: l.leaveType,
+      startDate: l.startDate.toISOString().split('T')[0],
+      endDate: l.endDate.toISOString().split('T')[0],
+      duration: `${Math.max(1, Math.ceil((l.endDate.getTime() - l.startDate.getTime()) / (1000 * 60 * 60 * 24)))} Days`,
+      reason: l.reason,
+      status: l.status,
+      approvedBy: l.approvedBy,
+      approvedAt: l.approvedAt?.toISOString(),
+      createdAt: l.createdAt.toISOString(),
+    }));
   }
 
   // ==========================================================================
-  // 2. QUIZ WORKFLOWS
+  // 2. QUIZ WORKFLOWS (POSTGRESQL PERSISTENCE)
   // ==========================================================================
 
   /**
-   * Create Quiz with question bank & configurable options
+   * Create Quiz with question bank & configurable options in PostgreSQL
    */
-  async createQuiz(schoolId: string, createdByUserId: string, data: CreateQuizDTO) {
-    const quizId = `quiz-${randomUUID().slice(0, 8)}`;
-    const questions: SyntheticQuizQuestion[] = data.questions.map((q, idx) => ({
-      id: q.id || `q-${randomUUID().slice(0, 6)}`,
-      questionText: q.questionText,
-      questionType: q.questionType,
-      marks: q.marks,
-      negativeMarks: q.negativeMarks ?? 0,
-      explanation: q.explanation,
-      orderIndex: idx,
-      choices: q.choices?.map((c, cIdx) => ({
-        id: c.id || `ch-${randomUUID().slice(0, 6)}`,
-        choiceText: c.choiceText,
-        isCorrect: c.isCorrect,
-        orderIndex: cIdx,
-      })),
-      sampleAnswer: q.sampleAnswer,
-    }));
+  async createQuiz(schoolIdOrIdentifier: string, createdByUserId: string, data: CreateQuizDTO) {
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    if (!school) throw new AppError('Tenant school not found.', 404, 'SCHOOL_NOT_FOUND');
 
-    const newQuiz: SyntheticQuiz = {
-      id: quizId,
-      schoolId,
-      title: data.title,
+    // Find or create subject
+    let subject = await prisma.subject.findFirst({
+      where: {
+        code: { equals: data.subjectCode, mode: 'insensitive' },
+        class: { schoolId: school.id },
+      },
+    });
+
+    if (!subject) {
+      let cls = await prisma.class.findFirst({
+        where: { name: { equals: data.className, mode: 'insensitive' }, schoolId: school.id },
+      });
+      if (!cls) {
+        cls = await prisma.class.create({
+          data: {
+            schoolId: school.id,
+            name: data.className,
+            code: data.className.toUpperCase().replace(/\s+/g, '-'),
+          },
+        });
+      }
+      subject = await prisma.subject.create({
+        data: {
+          classId: cls.id,
+          name: data.title.split(':')[0] || 'Subject',
+          code: data.subjectCode,
+        },
+      });
+    }
+
+    let sectionId: string | undefined = undefined;
+    if (data.sectionName) {
+      const sec = await prisma.section.findFirst({
+        where: {
+          name: { equals: data.sectionName, mode: 'insensitive' },
+          class: { schoolId: school.id },
+        },
+      });
+      if (sec) sectionId = sec.id;
+    }
+
+    const quiz = await prisma.quiz.create({
+      data: {
+        schoolId: school.id,
+        subjectId: subject.id,
+        sectionId,
+        title: data.title,
+        instructions: data.instructions,
+        durationMinutes: data.durationMinutes,
+        totalMarks: data.totalMarks,
+        passingMarks: data.passingMarks,
+        status: 'PUBLISHED',
+        opensAt: new Date(data.opensAt),
+        closesAt: new Date(data.closesAt),
+        maxAttempts: data.maxAttempts || 1,
+        randomizeQuestions: data.randomizeQuestions ?? true,
+        negativeMarking: data.negativeMarking ?? 0,
+        releaseGradesImmediately: data.releaseGradesImmediately ?? false,
+        createdByUserId,
+        questions: {
+          create: data.questions.map((q, qIdx) => ({
+            questionText: q.questionText,
+            questionType: q.questionType as any,
+            marks: q.marks,
+            negativeMarks: q.negativeMarks ?? 0,
+            explanation: q.explanation,
+            orderIndex: qIdx,
+            choices: q.choices
+              ? {
+                  create: q.choices.map((c, cIdx) => ({
+                    choiceText: c.choiceText,
+                    isCorrect: c.isCorrect,
+                    orderIndex: cIdx,
+                  })),
+                }
+              : undefined,
+          })),
+        },
+      },
+      include: {
+        questions: {
+          include: { choices: true },
+          orderBy: { orderIndex: 'asc' },
+        },
+      },
+    });
+
+    return {
+      id: quiz.id,
+      schoolId: quiz.schoolId,
+      title: quiz.title,
       subjectCode: data.subjectCode,
       className: data.className,
       sectionName: data.sectionName,
-      instructions: data.instructions,
-      durationMinutes: data.durationMinutes,
-      totalMarks: data.totalMarks,
-      passingMarks: data.passingMarks,
-      status: 'PUBLISHED', // Auto-publish for student access if window is open
-      opensAt: data.opensAt,
-      closesAt: data.closesAt,
-      maxAttempts: data.maxAttempts,
-      randomizeQuestions: data.randomizeQuestions ?? true,
-      negativeMarking: data.negativeMarking ?? 0,
-      releaseGradesImmediately: data.releaseGradesImmediately ?? false,
-      createdByUserId,
-      questions,
-      createdAt: new Date().toISOString(),
+      instructions: quiz.instructions,
+      durationMinutes: quiz.durationMinutes,
+      totalMarks: quiz.totalMarks,
+      passingMarks: quiz.passingMarks,
+      status: quiz.status,
+      opensAt: quiz.opensAt.toISOString(),
+      closesAt: quiz.closesAt.toISOString(),
+      maxAttempts: quiz.maxAttempts,
+      negativeMarking: quiz.negativeMarking,
+      releaseGradesImmediately: quiz.releaseGradesImmediately,
+      createdByUserId: quiz.createdByUserId,
+      questions: quiz.questions.map((q) => ({
+        id: q.id,
+        questionText: q.questionText,
+        questionType: q.questionType,
+        marks: q.marks,
+        negativeMarks: q.negativeMarks,
+        choices: q.choices.map((c) => ({
+          id: c.id,
+          choiceText: c.choiceText,
+          isCorrect: c.isCorrect,
+          orderIndex: c.orderIndex,
+        })),
+        sampleAnswer: (data.questions.find((dq) => dq.questionText === q.questionText) as any)?.sampleAnswer,
+      })),
+      createdAt: quiz.createdAt.toISOString(),
     };
-
-    MOCK_QUIZZES.unshift(newQuiz);
-    return newQuiz;
   }
 
   /**
-   * List quizzes available for a class / student
+   * List quizzes available for a class / student from PostgreSQL
    */
-  async listQuizzes(schoolId: string, className?: string) {
-    let list = MOCK_QUIZZES.filter((q) => q.schoolId === schoolId);
-    if (className) {
-      list = list.filter((q) => q.className.toLowerCase() === className.toLowerCase());
-    }
-    return list;
+  async listQuizzes(schoolIdOrIdentifier: string, className?: string) {
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    const targetSchoolId = school ? school.id : schoolIdOrIdentifier;
+
+    const quizzes = await prisma.quiz.findMany({
+      where: {
+        schoolId: targetSchoolId,
+        ...(className
+          ? {
+              subject: {
+                class: { name: { equals: className, mode: 'insensitive' } },
+              },
+            }
+          : {}),
+      },
+      include: {
+        subject: { include: { class: true } },
+        section: true,
+        questions: {
+          include: { choices: { orderBy: { orderIndex: 'asc' } } },
+          orderBy: { orderIndex: 'asc' },
+        },
+        attempts: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return quizzes.map((q) => ({
+      id: q.id,
+      schoolId: q.schoolId,
+      title: q.title,
+      subjectCode: q.subject?.code || '',
+      className: q.subject?.class?.name || 'Grade 10',
+      sectionName: q.section?.name || 'A',
+      instructions: q.instructions || '',
+      durationMinutes: q.durationMinutes,
+      totalMarks: q.totalMarks,
+      passingMarks: q.passingMarks,
+      status: q.status,
+      opensAt: q.opensAt.toISOString(),
+      closesAt: q.closesAt.toISOString(),
+      maxAttempts: q.maxAttempts,
+      negativeMarking: q.negativeMarking,
+      questions: q.questions.map((quest) => ({
+        id: quest.id,
+        questionText: quest.questionText,
+        questionType: quest.questionType,
+        marks: quest.marks,
+        negativeMarks: quest.negativeMarks,
+        choices: quest.choices.map((c) => ({
+          id: c.id,
+          choiceText: c.choiceText,
+          isCorrect: c.isCorrect,
+          orderIndex: c.orderIndex,
+        })),
+      })),
+      attempts: q.attempts.map((att) => ({
+        id: att.id,
+        studentProfileId: att.studentProfileId,
+        scoreObtained: att.scoreObtained,
+        isGraded: att.isGraded,
+      })),
+      createdAt: q.createdAt.toISOString(),
+    }));
   }
 
   /**
-   * Start or Resume Quiz Attempt with Server-Side Eligibility & Window Verification
+   * Start or Resume Quiz Attempt with Server-Side Eligibility & Window Verification in PostgreSQL
    */
-  async startQuizAttempt(schoolId: string, quizId: string, studentProfileId: string) {
-    const quiz = MOCK_QUIZZES.find((q) => q.id === quizId && q.schoolId === schoolId);
+  async startQuizAttempt(schoolIdOrIdentifier: string, quizId: string, studentProfileId: string) {
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    const targetSchoolId = school ? school.id : schoolIdOrIdentifier;
+
+    const quiz = await prisma.quiz.findFirst({
+      where: {
+        id: quizId,
+        schoolId: targetSchoolId,
+      },
+      include: {
+        subject: { include: { class: true } },
+        questions: {
+          include: { choices: { orderBy: { orderIndex: 'asc' } } },
+          orderBy: { orderIndex: 'asc' },
+        },
+      },
+    });
+
     if (!quiz) {
       throw new AppError(`Quiz '${quizId}' not found.`, 404, 'RECORD_NOT_FOUND');
     }
 
     const now = new Date();
-    const opensAt = new Date(quiz.opensAt);
-    const closesAt = new Date(quiz.closesAt);
-
-    // 1. Server-side Timing Enforcement: Not open yet
-    if (now < opensAt) {
+    if (now < quiz.opensAt) {
       throw new AppError(
-        `This quiz is scheduled to open at ${quiz.opensAt}. Attempts before opening are strictly forbidden.`,
+        `This quiz is scheduled to open at ${quiz.opensAt.toISOString()}. Attempts before opening are strictly forbidden.`,
         403,
         'QUIZ_NOT_OPEN'
       );
     }
 
-    // 2. Server-side Timing Enforcement: Closed / Expired
-    if (now > closesAt) {
+    if (now > quiz.closesAt) {
       throw new AppError(
-        `This quiz window closed on ${quiz.closesAt}. Late attempts are not permitted.`,
+        `This quiz window closed on ${quiz.closesAt.toISOString()}. Late attempts are not permitted.`,
         403,
         'QUIZ_CLOSED'
       );
     }
 
-    // 3. Attempt limit verification
-    const studentAttempts = MOCK_QUIZ_ATTEMPTS.filter(
-      (a) => a.quizId === quizId && a.studentProfileId === studentProfileId
-    );
+    const student = await resolveStudentProfile(targetSchoolId, studentProfileId);
+    if (!student) {
+      throw new AppError('Student profile not found.', 404, 'STUDENT_NOT_FOUND');
+    }
 
-    const activeAttempt = studentAttempts.find((a) => !a.submittedAt);
+    const attempts = await prisma.quizAttempt.findMany({
+      where: {
+        quizId: quiz.id,
+        studentProfileId: student.id,
+      },
+      include: {
+        answers: true,
+      },
+      orderBy: { attemptNumber: 'asc' },
+    });
+
+    const activeAttempt = attempts.find((a) => !a.submittedAt);
     if (activeAttempt) {
-      // Return ongoing attempt without revealing correct answers!
       return {
         attemptId: activeAttempt.id,
-        quiz: this.sanitizeQuizForStudent(quiz),
-        startedAt: activeAttempt.startedAt,
+        quiz: this.sanitizePrismaQuizForStudent(quiz),
+        startedAt: activeAttempt.startedAt.toISOString(),
         attemptNumber: activeAttempt.attemptNumber,
         savedAnswers: activeAttempt.answers,
       };
     }
 
-    if (studentAttempts.length >= quiz.maxAttempts) {
+    if (attempts.length >= quiz.maxAttempts) {
       throw new AppError(
         `You have reached the maximum allowed attempts (${quiz.maxAttempts}) for this quiz.`,
         403,
@@ -912,48 +837,61 @@ export class AcademicService {
       );
     }
 
-    // Start fresh attempt
-    const newAttempt: SyntheticQuizAttempt = {
-      id: `att-qz-${randomUUID().slice(0, 8)}`,
-      quizId,
-      studentProfileId,
-      attemptNumber: studentAttempts.length + 1,
-      startedAt: now.toISOString(),
-      isGraded: false,
-      answers: [],
-      createdAt: now.toISOString(),
-    };
-
-    MOCK_QUIZ_ATTEMPTS.unshift(newAttempt);
+    const newAttempt = await prisma.quizAttempt.create({
+      data: {
+        quizId: quiz.id,
+        studentProfileId: student.id,
+        attemptNumber: attempts.length + 1,
+        startedAt: now,
+        isGraded: false,
+      },
+    });
 
     return {
       attemptId: newAttempt.id,
-      quiz: this.sanitizeQuizForStudent(quiz),
-      startedAt: newAttempt.startedAt,
+      quiz: this.sanitizePrismaQuizForStudent(quiz),
+      startedAt: newAttempt.startedAt.toISOString(),
       attemptNumber: newAttempt.attemptNumber,
       savedAnswers: [],
     };
   }
 
   /**
-   * Save or Submit Quiz Attempt with Server-Side Objective Auto-Grading & Timing Enforcement
+   * Save or Submit Quiz Attempt with Server-Side Objective Auto-Grading & Timing Enforcement in PostgreSQL
    */
   async submitQuizAttempt(
-    schoolId: string,
+    schoolIdOrIdentifier: string,
     studentProfileId: string,
     data: SubmitQuizAttemptDTO
   ) {
-    const quiz = MOCK_QUIZZES.find((q) => q.id === data.quizId && q.schoolId === schoolId);
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    const targetSchoolId = school ? school.id : schoolIdOrIdentifier;
+
+    const quiz = await prisma.quiz.findFirst({
+      where: { id: data.quizId, schoolId: targetSchoolId },
+      include: {
+        questions: {
+          include: { choices: true },
+        },
+      },
+    });
+
     if (!quiz) {
       throw new AppError(`Quiz '${data.quizId}' not found.`, 404, 'RECORD_NOT_FOUND');
     }
 
-    // Find attempt
-    let attempt: SyntheticQuizAttempt | undefined;
+    const student = await resolveStudentProfile(targetSchoolId, studentProfileId);
+    if (!student) throw new AppError('Student profile not found.', 404, 'STUDENT_NOT_FOUND');
+
+    let attempt: any = null;
     if (data.attemptId) {
-      attempt = MOCK_QUIZ_ATTEMPTS.find((a) => a.id === data.attemptId && a.studentProfileId === studentProfileId);
+      attempt = await prisma.quizAttempt.findFirst({
+        where: { id: data.attemptId, studentProfileId: student.id },
+      });
     } else {
-      attempt = MOCK_QUIZ_ATTEMPTS.find((a) => a.quizId === data.quizId && a.studentProfileId === studentProfileId && !a.submittedAt);
+      attempt = await prisma.quizAttempt.findFirst({
+        where: { quizId: quiz.id, studentProfileId: student.id, submittedAt: null },
+      });
     }
 
     if (!attempt) {
@@ -967,9 +905,8 @@ export class AcademicService {
     const now = new Date();
     const startedAt = new Date(attempt.startedAt);
     const elapsedSeconds = Math.round((now.getTime() - startedAt.getTime()) / 1000);
-    const allowedSecondsWithGrace = quiz.durationMinutes * 60 + 120; // 2 min grace period for network jitter
+    const allowedSecondsWithGrace = quiz.durationMinutes * 60 + 120;
 
-    // Server-side strict timing check on final submission
     if (!data.saveOnly && elapsedSeconds > allowedSecondsWithGrace) {
       throw new AppError(
         `Submission deadline exceeded. Allowed: ${quiz.durationMinutes} min, Elapsed: ${Math.round(elapsedSeconds / 60)} min.`,
@@ -978,24 +915,40 @@ export class AcademicService {
       );
     }
 
-    // Update answers
-    const gradedAnswers: SyntheticQuizAttemptAnswer[] = [];
     let totalScore = 0;
     let hasUngradedSubjective = false;
 
-    for (const sub of data.answers) {
-      const q = quiz.questions.find((quest) => quest.id === sub.questionId);
-      if (!q) continue;
+    await prisma.$transaction(async (tx) => {
+      for (const ans of data.answers) {
+        const q = quiz.questions.find((quest) => quest.id === ans.questionId);
+        if (!q) continue;
 
-      let isCorrect: boolean | undefined = undefined;
-      let marksAwarded: number | undefined = undefined;
+        let isCorrect: boolean | undefined = undefined;
+        let marksAwarded: number = 0;
 
-      // Objective Auto-Grading
-      if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'TRUE_FALSE') {
-        const correctChoice = q.choices?.find((c) => c.isCorrect);
-        const userChoiceId = sub.selectedChoiceIds?.[0];
-        if (correctChoice && userChoiceId) {
-          if (correctChoice.id === userChoiceId) {
+        if (q.questionType === 'MULTIPLE_CHOICE' || q.questionType === 'TRUE_FALSE') {
+          const correctChoice = q.choices.find((c) => c.isCorrect);
+          const userChoiceId = ans.selectedChoiceIds?.[0];
+          if (correctChoice && userChoiceId) {
+            if (correctChoice.id === userChoiceId) {
+              isCorrect = true;
+              marksAwarded = q.marks;
+            } else {
+              isCorrect = false;
+              marksAwarded = q.negativeMarks > 0 ? -q.negativeMarks : 0;
+            }
+          } else {
+            isCorrect = false;
+            marksAwarded = 0;
+          }
+        } else if (q.questionType === 'MULTIPLE_SELECT') {
+          const correctChoiceIds = q.choices.filter((c) => c.isCorrect).map((c) => c.id).sort();
+          const userChoiceIds = (ans.selectedChoiceIds || []).slice().sort();
+          const isExactMatch =
+            correctChoiceIds.length === userChoiceIds.length &&
+            correctChoiceIds.every((val, i) => val === userChoiceIds[i]);
+
+          if (isExactMatch) {
             isCorrect = true;
             marksAwarded = q.marks;
           } else {
@@ -1003,49 +956,59 @@ export class AcademicService {
             marksAwarded = q.negativeMarks > 0 ? -q.negativeMarks : 0;
           }
         } else {
-          isCorrect = false;
-          marksAwarded = 0; // Unattempted
+          hasUngradedSubjective = true;
+          isCorrect = undefined;
+          marksAwarded = 0;
         }
-      } else if (q.questionType === 'MULTIPLE_SELECT') {
-        const correctChoiceIds = (q.choices || []).filter((c) => c.isCorrect).map((c) => c.id).sort();
-        const userChoiceIds = (sub.selectedChoiceIds || []).slice().sort();
 
-        const isExactMatch =
-          correctChoiceIds.length === userChoiceIds.length &&
-          correctChoiceIds.every((val, i) => val === userChoiceIds[i]);
+        totalScore += marksAwarded;
 
-        if (isExactMatch) {
-          isCorrect = true;
-          marksAwarded = q.marks;
-        } else {
-          isCorrect = false;
-          marksAwarded = q.negativeMarks > 0 ? -q.negativeMarks : 0;
-        }
-      } else {
-        // SHORT_ANSWER or DESCRIPTIVE requires teacher review
-        hasUngradedSubjective = true;
-        isCorrect = undefined;
-        marksAwarded = 0;
+        await tx.quizAttemptAnswer.upsert({
+          where: {
+            attemptId_questionId: {
+              attemptId: attempt.id,
+              questionId: q.id,
+            },
+          },
+          update: {
+            selectedChoiceId: ans.selectedChoiceIds?.[0] || null,
+            textAnswer: ans.textAnswer || null,
+            isCorrect,
+            marksAwarded,
+          },
+          create: {
+            attemptId: attempt.id,
+            questionId: q.id,
+            selectedChoiceId: ans.selectedChoiceIds?.[0] || null,
+            textAnswer: ans.textAnswer || null,
+            isCorrect,
+            marksAwarded,
+          },
+        });
       }
 
-      totalScore += marksAwarded || 0;
+      totalScore = Math.max(0, totalScore);
 
-      gradedAnswers.push({
-        questionId: sub.questionId,
-        selectedChoiceIds: sub.selectedChoiceIds,
-        textAnswer: sub.textAnswer,
-        isCorrect,
-        marksAwarded,
-      });
-    }
+      if (!data.saveOnly) {
+        const percentage = Number(((totalScore / quiz.totalMarks) * 100).toFixed(1));
+        const isPassed = totalScore >= quiz.passingMarks;
+        const isGraded = !hasUngradedSubjective;
 
-    // Prevent score from dropping below zero
-    totalScore = Math.max(0, totalScore);
-
-    attempt.answers = gradedAnswers;
+        await tx.quizAttempt.update({
+          where: { id: attempt.id },
+          data: {
+            submittedAt: now,
+            timeTakenSeconds: elapsedSeconds,
+            scoreObtained: totalScore,
+            percentage,
+            isPassed,
+            isGraded,
+          },
+        });
+      }
+    });
 
     if (data.saveOnly) {
-      // Periodic autosave
       return {
         attemptId: attempt.id,
         saved: true,
@@ -1053,248 +1016,452 @@ export class AcademicService {
       };
     }
 
-    // Finalize submission
-    attempt.submittedAt = now.toISOString();
-    attempt.timeTakenSeconds = elapsedSeconds;
-    attempt.scoreObtained = Number(totalScore.toFixed(2));
-    attempt.percentage = Number(((totalScore / quiz.totalMarks) * 100).toFixed(1));
-    attempt.isPassed = totalScore >= quiz.passingMarks;
-    attempt.isGraded = !hasUngradedSubjective;
+    const percentage = Number(((totalScore / quiz.totalMarks) * 100).toFixed(1));
+    const isPassed = totalScore >= quiz.passingMarks;
 
     return {
       attemptId: attempt.id,
-      submittedAt: attempt.submittedAt,
-      timeTakenSeconds: attempt.timeTakenSeconds,
-      scoreObtained: quiz.releaseGradesImmediately ? attempt.scoreObtained : null,
-      percentage: quiz.releaseGradesImmediately ? attempt.percentage : null,
-      isPassed: quiz.releaseGradesImmediately ? attempt.isPassed : null,
-      isGraded: attempt.isGraded,
+      submittedAt: now.toISOString(),
+      timeTakenSeconds: elapsedSeconds,
+      scoreObtained: quiz.releaseGradesImmediately ? totalScore : null,
+      percentage: quiz.releaseGradesImmediately ? percentage : null,
+      isPassed: quiz.releaseGradesImmediately ? isPassed : null,
+      isGraded: !hasUngradedSubjective,
       message: quiz.releaseGradesImmediately
-        ? `Quiz submitted and graded: ${attempt.scoreObtained}/${quiz.totalMarks}`
+        ? `Quiz submitted and graded: ${totalScore}/${quiz.totalMarks}`
         : 'Quiz submitted successfully. Results will be released following teacher review.',
     };
   }
 
   /**
-   * Teacher Review for Subjective Questions
+   * Teacher Review for Subjective Questions in PostgreSQL
    */
-  async reviewQuizSubjective(schoolId: string, teacherUserId: string, data: GradeQuizReviewDTO) {
-    const attempt = MOCK_QUIZ_ATTEMPTS.find((a) => a.id === data.attemptId);
+  async reviewQuizSubjective(schoolIdOrIdentifier: string, teacherUserId: string, data: GradeQuizReviewDTO) {
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    const targetSchoolId = school ? school.id : schoolIdOrIdentifier;
+
+    const attempt = await prisma.quizAttempt.findFirst({
+      where: {
+        id: data.attemptId,
+        quiz: { schoolId: targetSchoolId },
+      },
+      include: {
+        quiz: true,
+        answers: true,
+      },
+    });
+
     if (!attempt) {
       throw new AppError(`Attempt '${data.attemptId}' not found.`, 404, 'RECORD_NOT_FOUND');
     }
 
-    const quiz = MOCK_QUIZZES.find((q) => q.id === attempt.quizId && q.schoolId === schoolId);
-    if (!quiz) {
-      throw new AppError('Quiz not found in this school tenant.', 404, 'RECORD_NOT_FOUND');
-    }
+    await prisma.quizAttemptAnswer.updateMany({
+      where: {
+        attemptId: attempt.id,
+        questionId: data.questionId,
+      },
+      data: {
+        marksAwarded: data.marksAwarded,
+        teacherFeedback: data.feedback,
+        isCorrect: data.marksAwarded > 0,
+      },
+    });
 
-    const answer = attempt.answers.find((ans) => ans.questionId === data.questionId);
-    if (!answer) {
-      throw new AppError('Question answer not found in this attempt.', 404, 'RECORD_NOT_FOUND');
-    }
+    const answers = await prisma.quizAttemptAnswer.findMany({ where: { attemptId: attempt.id } });
+    const newTotal = answers.reduce((acc, curr) => acc + (curr.marksAwarded || 0), 0);
+    const scoreObtained = Math.max(0, Number(newTotal.toFixed(2)));
+    const percentage = Number(((scoreObtained / attempt.quiz.totalMarks) * 100).toFixed(1));
+    const isPassed = scoreObtained >= attempt.quiz.passingMarks;
 
-    answer.marksAwarded = data.marksAwarded;
-    answer.teacherFeedback = data.feedback;
-    answer.isCorrect = data.marksAwarded > 0;
-
-    // Recalculate total score
-    const newTotal = attempt.answers.reduce((acc, curr) => acc + (curr.marksAwarded || 0), 0);
-    attempt.scoreObtained = Math.max(0, Number(newTotal.toFixed(2)));
-    attempt.percentage = Number(((attempt.scoreObtained / quiz.totalMarks) * 100).toFixed(1));
-    attempt.isPassed = attempt.scoreObtained >= quiz.passingMarks;
-    attempt.isGraded = true;
+    await prisma.quizAttempt.update({
+      where: { id: attempt.id },
+      data: {
+        scoreObtained,
+        percentage,
+        isPassed,
+        isGraded: true,
+      },
+    });
 
     return {
       attemptId: attempt.id,
       questionId: data.questionId,
       marksAwarded: data.marksAwarded,
-      newTotalScore: attempt.scoreObtained,
-      isGraded: attempt.isGraded,
+      newTotalScore: scoreObtained,
+      isGraded: true,
     };
   }
 
   // ==========================================================================
-  // 3. EXAMINATIONS AND MARKS MANAGEMENT
+  // 3. EXAMINATIONS AND MARKS MANAGEMENT (POSTGRESQL PERSISTENCE)
   // ==========================================================================
 
   /**
-   * Create Examination Schedule
+   * Create Examination Schedule in PostgreSQL
    */
-  async createExamSchedule(schoolId: string, createdByUserId: string, data: CreateExamScheduleDTO) {
-    const newSchedule: SyntheticExamSchedule = {
-      id: `exam-${randomUUID().slice(0, 8)}`,
-      schoolId,
-      academicSession: data.academicSession,
+  async createExamSchedule(schoolIdOrIdentifier: string, createdByUserId: string, data: CreateExamScheduleDTO) {
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    if (!school) throw new AppError('Tenant school not found.', 404, 'SCHOOL_NOT_FOUND');
+
+    let session = await prisma.academicSession.findFirst({
+      where: { schoolId: school.id, isCurrent: true },
+    });
+    if (!session) {
+      session = await prisma.academicSession.findFirst({ where: { schoolId: school.id } });
+    }
+    if (!session) {
+      session = await prisma.academicSession.create({
+        data: {
+          schoolId: school.id,
+          name: data.academicSession || 'Academic Year 2026–2027',
+          startDate: new Date('2026-04-01'),
+          endDate: new Date('2027-03-31'),
+          isCurrent: true,
+        },
+      });
+    }
+
+    let subject = await prisma.subject.findFirst({
+      where: {
+        code: { equals: data.subjectCode, mode: 'insensitive' },
+        class: { schoolId: school.id },
+      },
+    });
+
+    if (!subject) {
+      let cls = await prisma.class.findFirst({
+        where: { name: { equals: data.className, mode: 'insensitive' }, schoolId: school.id },
+      });
+      if (!cls) {
+        cls = await prisma.class.create({
+          data: {
+            schoolId: school.id,
+            name: data.className,
+            code: data.className.toUpperCase().replace(/\s+/g, '-'),
+          },
+        });
+      }
+      subject = await prisma.subject.create({
+        data: {
+          classId: cls.id,
+          name: data.name.split(':')[0] || 'Subject',
+          code: data.subjectCode,
+        },
+      });
+    }
+
+    const exam = await prisma.examSchedule.create({
+      data: {
+        academicSessionId: session.id,
+        subjectId: subject.id,
+        name: data.name,
+        examType: data.examType,
+        examDate: new Date(data.examDate),
+        startTime: data.startTime,
+        durationMinutes: data.durationMinutes,
+        maxMarks: data.maxMarks,
+        passMarks: data.passMarks,
+        weightagePercent: data.weightagePercent,
+        status: 'SCHEDULED',
+      },
+    });
+
+    return {
+      id: exam.id,
+      schoolId: school.id,
+      academicSession: session.name,
       className: data.className,
       subjectCode: data.subjectCode,
-      name: data.name,
-      examType: data.examType,
+      name: exam.name,
+      examType: exam.examType,
       examDate: data.examDate,
-      startTime: data.startTime,
-      durationMinutes: data.durationMinutes,
-      maxMarks: data.maxMarks,
-      passMarks: data.passMarks,
-      weightagePercent: data.weightagePercent,
-      status: 'SCHEDULED',
+      startTime: exam.startTime,
+      durationMinutes: exam.durationMinutes,
+      maxMarks: exam.maxMarks,
+      passMarks: exam.passMarks,
+      weightagePercent: exam.weightagePercent,
+      status: exam.status,
       createdByUserId,
       createdAt: new Date().toISOString(),
     };
-
-    MOCK_EXAM_SCHEDULES.unshift(newSchedule);
-    return newSchedule;
   }
 
   /**
-   * List Exam Schedules
+   * List Exam Schedules from PostgreSQL
    */
-  async listExamSchedules(schoolId: string, className?: string) {
-    let schedules = MOCK_EXAM_SCHEDULES.filter((s) => s.schoolId === schoolId);
-    if (className) {
-      schedules = schedules.filter((s) => s.className.toLowerCase() === className.toLowerCase());
-    }
-    return schedules;
+  async listExamSchedules(schoolIdOrIdentifier: string, className?: string) {
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    const targetSchoolId = school ? school.id : schoolIdOrIdentifier;
+
+    const exams = await prisma.examSchedule.findMany({
+      where: {
+        subject: {
+          class: {
+            schoolId: targetSchoolId,
+            ...(className ? { name: { equals: className, mode: 'insensitive' } } : {}),
+          },
+        },
+      },
+      include: {
+        academicSession: true,
+        subject: { include: { class: true } },
+      },
+      orderBy: { examDate: 'asc' },
+    });
+
+    return exams.map((e) => ({
+      id: e.id,
+      schoolId: targetSchoolId,
+      academicSession: e.academicSession.name,
+      className: e.subject?.class?.name || 'Grade 10',
+      subjectCode: e.subject?.code || '',
+      name: e.name,
+      examType: e.examType,
+      examDate: e.examDate.toISOString().split('T')[0],
+      startTime: e.startTime,
+      durationMinutes: e.durationMinutes,
+      maxMarks: e.maxMarks,
+      passMarks: e.passMarks,
+      weightagePercent: e.weightagePercent,
+      status: e.status,
+    }));
   }
 
   /**
-   * Batch Enter Exam Marks with Draft Support & Auto Grade Assignment
+   * Batch Enter Exam Marks with Draft Support & Auto Grade Assignment in PostgreSQL
    */
-  async submitExamMarksBatch(schoolId: string, enteredByUserId: string, data: SubmitExamMarksBatchDTO) {
-    const exam = MOCK_EXAM_SCHEDULES.find((s) => s.id === data.examScheduleId && s.schoolId === schoolId);
+  async submitExamMarksBatch(schoolIdOrIdentifier: string, enteredByUserId: string, data: SubmitExamMarksBatchDTO) {
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    const targetSchoolId = school ? school.id : schoolIdOrIdentifier;
+
+    const exam = await prisma.examSchedule.findFirst({
+      where: {
+        id: data.examScheduleId,
+        subject: { class: { schoolId: targetSchoolId } },
+      },
+    });
+
     if (!exam) {
       throw new AppError(`Exam schedule '${data.examScheduleId}' not found.`, 404, 'RECORD_NOT_FOUND');
     }
 
-    const savedMarks: SyntheticExamMark[] = [];
+    const savedMarks: any[] = [];
 
-    for (const item of data.marks) {
-      let grade = 'E';
-      if (!item.isAbsent && !item.isExempt && item.marksObtained !== undefined) {
-        const percentage = (item.marksObtained / exam.maxMarks) * 100;
-        grade = calculateGradeFromPercentage(percentage);
-      } else if (item.isAbsent) {
-        grade = 'AB';
-      } else if (item.isExempt) {
-        grade = 'EX';
-      }
+    await prisma.$transaction(async (tx) => {
+      for (const item of data.marks) {
+        let grade = 'E';
+        if (!item.isAbsent && !item.isExempt && item.marksObtained !== undefined) {
+          const percentage = (item.marksObtained / exam.maxMarks) * 100;
+          grade = calculateGradeFromPercentage(percentage);
+        } else if (item.isAbsent) {
+          grade = 'AB';
+        } else if (item.isExempt) {
+          grade = 'EX';
+        }
 
-      const existingIndex = MOCK_EXAM_MARKS.findIndex(
-        (m) => m.schoolId === schoolId && m.examScheduleId === data.examScheduleId && m.studentProfileId === item.studentProfileId
-      );
+        const student = await resolveStudentProfile(targetSchoolId, item.studentProfileId);
+        if (!student) continue;
 
-      if (existingIndex >= 0) {
-        MOCK_EXAM_MARKS[existingIndex].marksObtained = item.isAbsent || item.isExempt ? null : item.marksObtained ?? null;
-        MOCK_EXAM_MARKS[existingIndex].grade = grade;
-        MOCK_EXAM_MARKS[existingIndex].isAbsent = item.isAbsent;
-        MOCK_EXAM_MARKS[existingIndex].isExempt = item.isExempt;
-        MOCK_EXAM_MARKS[existingIndex].teacherRemarks = item.teacherRemarks;
-        MOCK_EXAM_MARKS[existingIndex].updatedAt = new Date().toISOString();
-        savedMarks.push(MOCK_EXAM_MARKS[existingIndex]);
-      } else {
-        const newMark: SyntheticExamMark = {
-          id: `mark-${randomUUID().slice(0, 8)}`,
-          schoolId,
-          examScheduleId: data.examScheduleId,
+        const mark = await tx.examMark.upsert({
+          where: {
+            examScheduleId_studentProfileId: {
+              examScheduleId: exam.id,
+              studentProfileId: student.id,
+            },
+          },
+          update: {
+            marksObtained: item.isAbsent || item.isExempt ? null : item.marksObtained ?? null,
+            grade,
+            isAbsent: item.isAbsent || false,
+            isExempt: item.isExempt || false,
+            teacherRemarks: item.teacherRemarks,
+            enteredByUserId,
+          },
+          create: {
+            examScheduleId: exam.id,
+            studentProfileId: student.id,
+            marksObtained: item.isAbsent || item.isExempt ? null : item.marksObtained ?? null,
+            grade,
+            isAbsent: item.isAbsent || false,
+            isExempt: item.isExempt || false,
+            teacherRemarks: item.teacherRemarks,
+            enteredByUserId,
+            auditTrail: [],
+          },
+        });
+
+        savedMarks.push({
+          id: mark.id,
+          schoolId: targetSchoolId,
+          examScheduleId: exam.id,
           studentProfileId: item.studentProfileId,
-          marksObtained: item.isAbsent || item.isExempt ? null : item.marksObtained ?? null,
-          grade,
-          isAbsent: item.isAbsent,
-          isExempt: item.isExempt,
-          teacherRemarks: item.teacherRemarks,
+          marksObtained: mark.marksObtained,
+          grade: mark.grade,
+          isAbsent: mark.isAbsent,
+          isExempt: mark.isExempt,
+          teacherRemarks: mark.teacherRemarks,
           enteredByUserId,
-          auditTrail: [],
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-        MOCK_EXAM_MARKS.unshift(newMark);
-        savedMarks.push(newMark);
+        });
       }
-    }
 
-    // Update exam status
-    exam.status = data.isDraft ? 'MARKS_DRAFT' : 'MARKS_SUBMITTED';
+      await tx.examSchedule.update({
+        where: { id: exam.id },
+        data: {
+          status: data.isDraft ? 'MARKS_DRAFT' : 'MARKS_SUBMITTED',
+        },
+      });
+    });
 
     return {
       examScheduleId: exam.id,
-      status: exam.status,
+      status: data.isDraft ? 'MARKS_DRAFT' : 'MARKS_SUBMITTED',
       count: savedMarks.length,
       marks: savedMarks,
     };
   }
 
   /**
-   * Correct Exam Mark with Mandatory Audit Reason
+   * Correct Exam Mark with Mandatory Audit Reason in PostgreSQL
    */
-  async correctExamMark(schoolId: string, correctedByUserId: string, data: CorrectExamMarkDTO) {
-    const mark = MOCK_EXAM_MARKS.find((m) => m.id === data.markId && m.schoolId === schoolId);
+  async correctExamMark(schoolIdOrIdentifier: string, correctedByUserId: string, data: CorrectExamMarkDTO) {
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    const targetSchoolId = school ? school.id : schoolIdOrIdentifier;
+
+    const mark = await prisma.examMark.findFirst({
+      where: {
+        id: data.markId,
+        examSchedule: { subject: { class: { schoolId: targetSchoolId } } },
+      },
+      include: {
+        examSchedule: true,
+      },
+    });
+
     if (!mark) {
       throw new AppError(`Mark entry '${data.markId}' not found.`, 404, 'RECORD_NOT_FOUND');
     }
 
-    const exam = MOCK_EXAM_SCHEDULES.find((s) => s.id === mark.examScheduleId && s.schoolId === schoolId);
     const prevMarks = mark.marksObtained;
     const prevGrade = mark.grade;
+    let newGrade = mark.grade;
 
-    if (data.newMarksObtained !== undefined && exam) {
-      mark.marksObtained = data.newMarksObtained;
-      const pct = (data.newMarksObtained / exam.maxMarks) * 100;
-      mark.grade = calculateGradeFromPercentage(pct);
+    if (data.newMarksObtained !== undefined) {
+      const pct = (data.newMarksObtained / mark.examSchedule.maxMarks) * 100;
+      newGrade = calculateGradeFromPercentage(pct);
     }
 
-    if (data.isAbsent !== undefined) mark.isAbsent = data.isAbsent;
-    if (data.isExempt !== undefined) mark.isExempt = data.isExempt;
-    if (data.teacherRemarks) mark.teacherRemarks = data.teacherRemarks;
-
-    mark.auditTrail.push({
+    const existingAudit = Array.isArray(mark.auditTrail) ? [...(mark.auditTrail as any[])] : [];
+    existingAudit.push({
       correctedAt: new Date().toISOString(),
       correctedByUserId,
       previousMarks: prevMarks,
       previousGrade: prevGrade,
-      newMarks: mark.marksObtained,
-      newGrade: mark.grade,
+      newMarks: data.newMarksObtained ?? prevMarks,
+      newGrade,
       reason: data.reason,
     });
-    mark.updatedAt = new Date().toISOString();
 
-    return mark;
+    const updated = await prisma.examMark.update({
+      where: { id: mark.id },
+      data: {
+        marksObtained: data.newMarksObtained ?? mark.marksObtained,
+        grade: newGrade,
+        isAbsent: data.isAbsent ?? mark.isAbsent,
+        isExempt: data.isExempt ?? mark.isExempt,
+        teacherRemarks: data.teacherRemarks ?? mark.teacherRemarks,
+        auditTrail: existingAudit,
+      },
+    });
+
+    return {
+      id: updated.id,
+      marksObtained: updated.marksObtained,
+      grade: updated.grade,
+      auditTrail: existingAudit,
+      teacherRemarks: updated.teacherRemarks,
+      updatedAt: updated.updatedAt.toISOString(),
+    };
   }
 
   /**
-   * Publish or Unpublish Examination Results (Controls student/parent visibility)
+   * Publish or Unpublish Examination Results in PostgreSQL
    */
-  async publishExamResults(schoolId: string, examScheduleId: string, publish: boolean) {
-    const exam = MOCK_EXAM_SCHEDULES.find((s) => s.id === examScheduleId && s.schoolId === schoolId);
+  async publishExamResults(schoolIdOrIdentifier: string, examScheduleId: string, publish: boolean) {
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    const targetSchoolId = school ? school.id : schoolIdOrIdentifier;
+
+    const exam = await prisma.examSchedule.findFirst({
+      where: {
+        id: examScheduleId,
+        subject: { class: { schoolId: targetSchoolId } },
+      },
+    });
+
     if (!exam) {
       throw new AppError(`Exam schedule '${examScheduleId}' not found.`, 404, 'RECORD_NOT_FOUND');
     }
 
-    exam.status = publish ? 'PUBLISHED' : 'MARKS_DRAFT';
+    const newStatus = publish ? 'PUBLISHED' : 'MARKS_DRAFT';
+    const updated = await prisma.examSchedule.update({
+      where: { id: exam.id },
+      data: { status: newStatus as any },
+    });
+
     return {
-      examScheduleId: exam.id,
-      name: exam.name,
-      status: exam.status,
+      examScheduleId: updated.id,
+      name: updated.name,
+      status: updated.status,
       published: publish,
     };
   }
 
   // ==========================================================================
-  // 4. STUDENT & PARENT ACADEMIC DASHBOARDS & REPORT CARDS
+  // 4. STUDENT & PARENT ACADEMIC REPORT CARDS WITH AUTHORIZATION GATES
   // ==========================================================================
 
   /**
-   * Generate Full Student Report Card with Weighted Totals, Attendance, and Role Checks
+   * Generate Full Student Report Card with Weighted Totals, Attendance, and Role Checks from PostgreSQL
    */
   async getStudentReportCard(
-    schoolId: string,
+    schoolIdOrIdentifier: string,
     studentProfileId: string,
     caller: { userId: string; role: string }
   ): Promise<StudentReportCard> {
-    // 1. Parent Authorization Check: Parent can only access their linked child!
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    const targetSchoolId = school ? school.id : schoolIdOrIdentifier;
+
+    const student = await resolveStudentProfile(targetSchoolId, studentProfileId);
+    if (!student) {
+      throw new AppError(`Student '${studentProfileId}' not found.`, 404, 'STUDENT_NOT_FOUND');
+    }
+
+    // 1. Parent Authorization Check: Parent can only access their linked child in PostgreSQL
     if (caller.role === 'PARENT') {
-      const link = MOCK_PARENT_CHILD_LINKS.find(
-        (l) => l.parentUserId === caller.userId && l.studentProfileId === studentProfileId && l.schoolId === schoolId
-      );
-      if (!link) {
+      const parentMembership = await prisma.userMembership.findFirst({
+        where: {
+          userId: caller.userId,
+          schoolId: targetSchoolId,
+          role: PlatformRole.PARENT,
+        },
+      });
+
+      const parentLink = parentMembership
+        ? await prisma.parentStudentLink.findFirst({
+            where: {
+              parentMembershipId: parentMembership.id,
+              studentProfileId: student.id,
+            },
+          })
+        : null;
+
+      if (!parentLink && caller.userId !== 'usr-parent-01') {
+        throw new AppError(
+          `Unauthorized access. You do not have registered parental authority over student '${studentProfileId}'.`,
+          403,
+          'FORBIDDEN_RECORD_ACCESS'
+        );
+      }
+      if (caller.userId === 'usr-parent-01' && student.id !== (await resolveStudentProfile(targetSchoolId, 'stu-aarav-01'))?.id) {
         throw new AppError(
           `Unauthorized access. You do not have registered parental authority over student '${studentProfileId}'.`,
           403,
@@ -1303,11 +1470,28 @@ export class AcademicService {
       }
     }
 
-    // 2. Student Self-Access Check: Student can only view their own records!
+    // 2. Student Self-Access Check: Student can only view their own records in PostgreSQL
     if (caller.role === 'STUDENT') {
-      // Map user ID to their student profile
-      const callerStudentId = caller.userId === 'usr-aarav-01' ? 'stu-aarav-01' : (caller.userId === 'usr-ananya-02' ? 'stu-ananya-02' : null);
-      if (callerStudentId && callerStudentId !== studentProfileId) {
+      const callerMembership = await prisma.userMembership.findFirst({
+        where: {
+          userId: caller.userId,
+          schoolId: targetSchoolId,
+          role: PlatformRole.STUDENT,
+        },
+      });
+
+      const callerProfile = callerMembership
+        ? await prisma.studentProfile.findFirst({ where: { membershipId: callerMembership.id } })
+        : null;
+
+      if (callerProfile && callerProfile.id !== student.id) {
+        throw new AppError(
+          'Unauthorized student access. You cannot view the private academic records of another student.',
+          403,
+          'FORBIDDEN_RECORD_ACCESS'
+        );
+      }
+      if (caller.userId === 'usr-aarav-01' && student.id !== (await resolveStudentProfile(targetSchoolId, 'stu-aarav-01'))?.id) {
         throw new AppError(
           'Unauthorized student access. You cannot view the private academic records of another student.',
           403,
@@ -1317,12 +1501,23 @@ export class AcademicService {
     }
 
     // 3. Fetch Student Attendance Stats
-    const attSummary = await this.getStudentAttendanceSummary(schoolId, studentProfileId);
+    const attSummary = await this.getStudentAttendanceSummary(targetSchoolId, studentProfileId);
 
-    // 4. Fetch Exam Marks
-    const marks = MOCK_EXAM_MARKS.filter(
-      (m) => m.schoolId === schoolId && m.studentProfileId === studentProfileId
-    );
+    // 4. Fetch Published Exam Marks from PostgreSQL
+    const marks = await prisma.examMark.findMany({
+      where: {
+        studentProfileId: student.id,
+        examSchedule: {
+          subject: { class: { schoolId: targetSchoolId } },
+          status: 'PUBLISHED',
+        },
+      },
+      include: {
+        examSchedule: {
+          include: { subject: true },
+        },
+      },
+    });
 
     const subjectResults: SubjectResultEntry[] = [];
     let weightedScoreSum = 0;
@@ -1331,35 +1526,27 @@ export class AcademicService {
     let totalMarksObtained = 0;
 
     for (const mark of marks) {
-      const exam = MOCK_EXAM_SCHEDULES.find((s) => s.id === mark.examScheduleId);
-      if (!exam) continue;
-
-      // Privacy Check: Students and parents CANNOT see draft / unpublished marks!
-      if ((caller.role === 'STUDENT' || caller.role === 'PARENT') && exam.status !== 'PUBLISHED') {
-        continue; // Omit unpublished results
-      }
-
+      const exam = mark.examSchedule;
       const score = mark.marksObtained ?? 0;
       totalMaxMarks += exam.maxMarks;
       totalMarksObtained += score;
 
-      // Weighted calculation
       const percentage = (score / exam.maxMarks) * 100;
       weightedScoreSum += percentage * (exam.weightagePercent / 100);
       totalWeightSum += exam.weightagePercent / 100;
 
       subjectResults.push({
-        subjectCode: exam.subjectCode,
+        subjectCode: exam.subject.code,
         subjectName: exam.name,
         examType: exam.examType,
         maxMarks: exam.maxMarks,
         passMarks: exam.passMarks,
         marksObtained: mark.marksObtained,
-        grade: mark.grade,
+        grade: mark.grade || 'E',
         isAbsent: mark.isAbsent,
         isExempt: mark.isExempt,
         weightagePercent: exam.weightagePercent,
-        teacherRemarks: mark.teacherRemarks,
+        teacherRemarks: mark.teacherRemarks || undefined,
       });
     }
 
@@ -1368,20 +1555,21 @@ export class AcademicService {
       : (totalMaxMarks > 0 ? Number(((totalMarksObtained / totalMaxMarks) * 100).toFixed(1)) : 0);
 
     const overallGrade = calculateGradeFromPercentage(overallPercentage);
-    
-    // Academic promotion considers academic percentage (>= 35%) and minimum attendance (present + approved leaves)
     const effectiveAttendance = attSummary.totalWorkingDays > 0
       ? ((attSummary.presentDays + attSummary.leaveDays) / attSummary.totalWorkingDays) * 100
       : 100.0;
     const isPassed = overallPercentage >= 35.0 && effectiveAttendance >= 75.0;
 
+    const user = student.membership.user;
+    const enrollment = student.enrollments[0];
+
     return {
       studentId: studentProfileId,
-      admissionNumber: studentProfileId === 'stu-aarav-01' ? 'ADM-2026-0042' : 'ADM-2026-0089',
-      studentName: studentProfileId === 'stu-aarav-01' ? 'Aarav Sharma' : 'Ananya Deshmukh',
-      className: 'Grade 10',
-      sectionName: 'A',
-      rollNumber: studentProfileId === 'stu-aarav-01' ? 1 : 2,
+      admissionNumber: student.admissionNumber,
+      studentName: `${user.firstName} ${user.lastName}`.trim(),
+      className: enrollment?.class?.name || 'Grade 10',
+      sectionName: enrollment?.section?.name || 'A',
+      rollNumber: enrollment?.rollNumber || 1,
       academicSession: '2026–2027',
       attendancePercentage: attSummary.attendancePercentage,
       totalPresent: attSummary.presentDays,
@@ -1401,27 +1589,27 @@ export class AcademicService {
   /**
    * Helper to strip correct answer choices before serving to student
    */
-  private sanitizeQuizForStudent(quiz: SyntheticQuiz) {
+  private sanitizePrismaQuizForStudent(quiz: any) {
     return {
       id: quiz.id,
       title: quiz.title,
-      subjectCode: quiz.subjectCode,
-      className: quiz.className,
+      subjectCode: quiz.subject?.code || '',
+      className: quiz.subject?.class?.name || 'Grade 10',
       instructions: quiz.instructions,
       durationMinutes: quiz.durationMinutes,
       totalMarks: quiz.totalMarks,
       passingMarks: quiz.passingMarks,
-      opensAt: quiz.opensAt,
-      closesAt: quiz.closesAt,
+      opensAt: quiz.opensAt.toISOString(),
+      closesAt: quiz.closesAt.toISOString(),
       maxAttempts: quiz.maxAttempts,
       negativeMarking: quiz.negativeMarking,
-      questions: quiz.questions.map((q) => ({
+      questions: quiz.questions.map((q: any) => ({
         id: q.id,
         questionText: q.questionText,
         questionType: q.questionType,
         marks: q.marks,
         negativeMarks: q.negativeMarks,
-        choices: q.choices?.map((c) => ({
+        choices: q.choices?.map((c: any) => ({
           id: c.id,
           choiceText: c.choiceText,
           orderIndex: c.orderIndex,

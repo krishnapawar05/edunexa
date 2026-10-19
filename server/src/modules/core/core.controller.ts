@@ -139,6 +139,16 @@ export class CoreSchoolController {
       next(err);
     }
   }
+
+  async submitAdmission(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const schoolId = req.schoolId || req.body.schoolId || '92318ca5-473c-4436-a7cd-6b6eaadac413';
+      const result = await coreSchoolService.submitAdmissionApplication(schoolId, req.body);
+      res.status(201).json({ success: true, data: result });
+    } catch (err) {
+      next(err);
+    }
+  }
 }
 
 export const coreSchoolController = new CoreSchoolController();

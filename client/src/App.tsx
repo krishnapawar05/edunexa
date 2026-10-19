@@ -1,124 +1,207 @@
-import React, { useState, useEffect } from 'react';
-import { Header } from './components/Header.js';
-import { Sidebar } from './components/Sidebar.js';
-import { SchoolIdentityModal } from './components/SchoolIdentityModal.js';
-import { PublicSchoolWebsite } from './modules/public/PublicSchoolWebsite.js';
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+
+// Layouts & Security Guards
+import { PublicLayout } from './modules/public/PublicLayout.js';
+import { ErpLayout } from './components/ErpLayout.js';
+import { ProtectedRoute } from './components/ProtectedRoute.js';
+import { NotFoundPage } from './components/NotFoundPage.js';
+
+// Standalone Public & Auth Pages
 import { LoginPage } from './modules/auth/LoginPage.js';
+import { RegisterPage } from './modules/auth/RegisterPage.js';
+import { PublicIdCardVerification } from './modules/public/PublicIdCardVerification.js';
+
+// Public School Website Subpages
+import { HomePage } from './modules/public/pages/HomePage.js';
+import { AboutPage } from './modules/public/pages/AboutPage.js';
+import { PrincipalMessagePage } from './modules/public/pages/PrincipalMessagePage.js';
+import { AcademicsPage } from './modules/public/pages/AcademicsPage.js';
+import { DepartmentsPage } from './modules/public/pages/DepartmentsPage.js';
+import { AdmissionsPage } from './modules/public/pages/AdmissionsPage.js';
+import { FacultyPage } from './modules/public/pages/FacultyPage.js';
+import { EventsPage } from './modules/public/pages/EventsPage.js';
+import { NewsPage } from './modules/public/pages/NewsPage.js';
+import { GalleryPage } from './modules/public/pages/GalleryPage.js';
+import { ExaminationInfoPage } from './modules/public/pages/ExaminationInfoPage.js';
+import { ContactPage } from './modules/public/pages/ContactPage.js';
+import { CareersPage } from './modules/public/pages/CareersPage.js';
+
+// ERP Role Dashboards & Pages
 import { SuperAdminDashboard } from './modules/superadmin/SuperAdminDashboard.js';
 import { SchoolAdminDashboard } from './modules/schooladmin/SchoolAdminDashboard.js';
+import { StudentDossierPage } from './modules/schooladmin/StudentDossierPage.js';
 import { TeacherDashboard } from './modules/teacher/TeacherDashboard.js';
 import { StudentDashboard } from './modules/student/StudentDashboard.js';
 import { ParentDashboard } from './modules/parent/ParentDashboard.js';
 import { ExaminationWorkflow } from './modules/examinations/ExaminationWorkflow.js';
 import { HrStaffDashboard } from './modules/hr/HrStaffDashboard.js';
 import { AccountsDashboard } from './modules/accounts/AccountsDashboard.js';
-import { PublicIdCardVerification } from './modules/public/PublicIdCardVerification.js';
-import { fetchServerHealth } from './services/api.js';
-import { HealthCheckData } from '@edunexa/shared';
 
 export const App: React.FC = () => {
-  // Navigation State across 8 PRD roles + PUBLIC + LOGIN + VERIFY_CARD
-  const [currentView, setCurrentView] = useState<string>('SCHOOL_ADMIN');
-  const [activeTab, setActiveTab] = useState<string>('overview');
-  const [serverHealth, setServerHealth] = useState<HealthCheckData | null>(null);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
-
-  // Poll server health on boot
-  const loadHealth = async () => {
-    const health = await fetchServerHealth();
-    setServerHealth(health);
-  };
-
-  useEffect(() => {
-    loadHealth();
-    const interval = setInterval(loadHealth, 15000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const handleRoleChange = (newRole: string) => {
-    setCurrentView(newRole);
-    setActiveTab('overview');
-    setIsMobileMenuOpen(false);
-  };
-
-  // If in Public Website mode, render the public school landing
-  if (currentView === 'PUBLIC') {
-    return (
-      <>
-        <PublicSchoolWebsite
-          onGoToLogin={() => setCurrentView('LOGIN')}
-          onGoToVerify={() => setCurrentView('VERIFY_CARD')}
-        />
-        <SchoolIdentityModal />
-      </>
-    );
-  }
-
-  // If in ID Card Verification mode, render the anti-tamper QR gateway
-  if (currentView === 'VERIFY_CARD') {
-    return (
-      <>
-        <PublicIdCardVerification
-          onBackToPublic={() => setCurrentView('PUBLIC')}
-        />
-        <SchoolIdentityModal />
-      </>
-    );
-  }
-
-  // If in Login mode, render the institutional login page
-  if (currentView === 'LOGIN') {
-    return (
-      <>
-        <LoginPage
-          onLoginSuccess={(role) => setCurrentView(role)}
-          onGoToPublic={() => setCurrentView('PUBLIC')}
-        />
-        <SchoolIdentityModal />
-      </>
-    );
-  }
-
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: 'var(--bg-app)' }}>
-      {/* Dynamic School Identity Configuration Modal (PRD Stage 1 Requirement) */}
-      <SchoolIdentityModal />
+    <BrowserRouter>
+      <Routes>
+        {/* ================================================================ */}
+        {/* 1. PUBLIC SCHOOL WEBSITE PAGES (Nested in PublicLayout)           */}
+        {/* ================================================================ */}
+        <Route element={<PublicLayout />}>
+          <Route index element={<HomePage />} />
+          <Route path="home" element={<HomePage />} />
+          <Route path="about" element={<AboutPage />} />
+          <Route path="principal-message" element={<PrincipalMessagePage />} />
+          <Route path="academics" element={<AcademicsPage />} />
+          <Route path="departments" element={<DepartmentsPage />} />
+          <Route path="admissions" element={<AdmissionsPage />} />
+          <Route path="faculty" element={<FacultyPage />} />
+          <Route path="events" element={<EventsPage />} />
+          <Route path="news" element={<NewsPage />} />
+          <Route path="gallery" element={<GalleryPage />} />
+          <Route path="examination-info" element={<ExaminationInfoPage />} />
+          <Route path="contact" element={<ContactPage />} />
+          <Route path="careers" element={<CareersPage />} />
+        </Route>
 
-      {/* Persistent Left Sidebar with Mobile Drawer support */}
-      <Sidebar
-        currentRole={currentView}
-        activeTab={activeTab}
-        onTabChange={(tab) => setActiveTab(tab)}
-        onLogout={() => setCurrentView('LOGIN')}
-        onGoPublic={() => setCurrentView('PUBLIC')}
-        isOpenMobile={isMobileMenuOpen}
-        onCloseMobile={() => setIsMobileMenuOpen(false)}
-      />
+        {/* ================================================================ */}
+        {/* 2. STANDALONE PUBLIC & AUTHENTICATION ROUTES                     */}
+        {/* ================================================================ */}
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/verify-id" element={<PublicIdCardVerification />} />
+        <Route path="/verify-id/:token" element={<PublicIdCardVerification />} />
 
-      {/* Main Content Area */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-        {/* Persistent Top Header */}
-        <Header
-          currentRole={currentView}
-          onRoleChange={handleRoleChange}
-          serverHealth={serverHealth}
-          onRefreshHealth={loadHealth}
-          onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-        />
+        {/* ================================================================ */}
+        {/* 3. ROLE-SPECIFIC ERP PAGE HIERARCHY                              */}
+        {/* ================================================================ */}
 
-        {/* Dashboard Workspaces (all 8 roles supported) */}
-        <main style={{ flex: 1, padding: 'var(--space-6)', overflowY: 'auto' }}>
-          {currentView === 'SUPER_ADMIN' && <SuperAdminDashboard />}
-          {currentView === 'SCHOOL_ADMIN' && <SchoolAdminDashboard />}
-          {currentView === 'TEACHER' && <TeacherDashboard />}
-          {currentView === 'STUDENT' && <StudentDashboard />}
-          {currentView === 'PARENT' && <ParentDashboard />}
-          {currentView === 'EXAM_COORDINATOR' && <ExaminationWorkflow />}
-          {currentView === 'HR_STAFF' && <HrStaffDashboard />}
-          {currentView === 'ACCOUNTS' && <AccountsDashboard />}
-        </main>
-      </div>
-    </div>
+        {/* Super Admin Workspace */}
+        <Route
+          element={
+            <ProtectedRoute allowedRoles={['SUPER_ADMIN']}>
+              <ErpLayout forcedRole="SUPER_ADMIN" />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="/superadmin" element={<SuperAdminDashboard />} />
+          <Route path="/superadmin/schools" element={<SuperAdminDashboard />} />
+          <Route path="/superadmin/subscriptions" element={<SuperAdminDashboard />} />
+          <Route path="/superadmin/audit" element={<SuperAdminDashboard />} />
+          <Route path="/superadmin/settings" element={<SuperAdminDashboard />} />
+        </Route>
+
+        {/* School Admin & Principal Workspace */}
+        <Route
+          element={
+            <ProtectedRoute allowedRoles={['SCHOOL_ADMIN', 'PRINCIPAL']}>
+              <ErpLayout forcedRole="SCHOOL_ADMIN" />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="/admin" element={<SchoolAdminDashboard initialTab="students" />} />
+          <Route path="/admin/students" element={<SchoolAdminDashboard initialTab="students" />} />
+          <Route path="/admin/students/:id" element={<StudentDossierPage />} />
+          <Route path="/admin/admissions" element={<SchoolAdminDashboard initialTab="admissions" />} />
+          <Route path="/admin/staff" element={<SchoolAdminDashboard initialTab="staff" />} />
+          <Route path="/admin/id-cards" element={<SchoolAdminDashboard initialTab="id-cards" />} />
+          <Route path="/admin/attendance" element={<SchoolAdminDashboard initialTab="students" />} />
+          <Route path="/admin/finance" element={<AccountsDashboard />} />
+          <Route path="/admin/notices" element={<ParentDashboard />} />
+        </Route>
+
+        {/* Teacher Workspace */}
+        <Route
+          element={
+            <ProtectedRoute allowedRoles={['TEACHER']}>
+              <ErpLayout forcedRole="TEACHER" />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="/teacher" element={<TeacherDashboard />} />
+          <Route path="/teacher/attendance" element={<TeacherDashboard />} />
+          <Route path="/teacher/quizzes" element={<TeacherDashboard />} />
+          <Route path="/teacher/examinations" element={<TeacherDashboard />} />
+          <Route path="/teacher/resources" element={<TeacherDashboard />} />
+        </Route>
+
+        {/* Student Workspace */}
+        <Route
+          element={
+            <ProtectedRoute allowedRoles={['STUDENT']}>
+              <ErpLayout forcedRole="STUDENT" />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="/student" element={<StudentDashboard />} />
+          <Route path="/student/id-card" element={<StudentDashboard />} />
+          <Route path="/student/quizzes" element={<StudentDashboard />} />
+          <Route path="/student/results" element={<StudentDashboard />} />
+          <Route path="/student/ai-tutor" element={<StudentDashboard />} />
+        </Route>
+
+        {/* Parent / Guardian Workspace */}
+        <Route
+          element={
+            <ProtectedRoute allowedRoles={['PARENT']}>
+              <ErpLayout forcedRole="PARENT" />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="/parent" element={<ParentDashboard />} />
+          <Route path="/parent/results" element={<ParentDashboard />} />
+          <Route path="/parent/attendance" element={<ParentDashboard />} />
+          <Route path="/parent/fees" element={<ParentDashboard />} />
+          <Route path="/parent/notices" element={<ParentDashboard />} />
+        </Route>
+
+        {/* Examination Coordinator Workspace */}
+        <Route
+          element={
+            <ProtectedRoute allowedRoles={['EXAM_COORDINATOR']}>
+              <ErpLayout forcedRole="EXAM_COORDINATOR" />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="/examinations" element={<ExaminationWorkflow />} />
+          <Route path="/examinations/schedules" element={<ExaminationWorkflow />} />
+          <Route path="/examinations/marks-audit" element={<ExaminationWorkflow />} />
+          <Route path="/examinations/grading" element={<ExaminationWorkflow />} />
+          <Route path="/examinations/publish" element={<ExaminationWorkflow />} />
+        </Route>
+
+        {/* HR & Staff Admin Workspace */}
+        <Route
+          element={
+            <ProtectedRoute allowedRoles={['HR_STAFF']}>
+              <ErpLayout forcedRole="HR_STAFF" />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="/hr" element={<HrStaffDashboard />} />
+          <Route path="/hr/employees" element={<HrStaffDashboard />} />
+          <Route path="/hr/leaves" element={<HrStaffDashboard />} />
+          <Route path="/hr/training" element={<HrStaffDashboard />} />
+        </Route>
+
+        {/* Accounts & Finance Workspace */}
+        <Route
+          element={
+            <ProtectedRoute allowedRoles={['ACCOUNTS']}>
+              <ErpLayout forcedRole="ACCOUNTS" />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="/accounts" element={<AccountsDashboard />} />
+          <Route path="/accounts/invoices" element={<AccountsDashboard />} />
+          <Route path="/accounts/structures" element={<AccountsDashboard />} />
+          <Route path="/accounts/reconciliation" element={<AccountsDashboard />} />
+        </Route>
+
+        {/* ================================================================ */}
+        {/* 4. 404 UNKNOWN ROUTE FALLBACK                                    */}
+        {/* ================================================================ */}
+        <Route path="*" element={<NotFoundPage />} />
+      </Routes>
+    </BrowserRouter>
   );
 };
 

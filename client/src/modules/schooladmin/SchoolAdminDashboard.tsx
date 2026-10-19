@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import {
   GraduationCap,
   Users,
@@ -21,12 +22,14 @@ import {
   AlertTriangle,
   ExternalLink,
   ShieldAlert,
+  RefreshCw,
 } from 'lucide-react';
 import { Badge } from '../../components/ui/Badge.js';
 import { Button } from '../../components/ui/Button.js';
 import { Modal } from '../../components/ui/Modal.js';
 import { Tabs } from '../../components/ui/Tabs.js';
 import { useSchoolBranding } from '../../context/SchoolBrandingContext.js';
+import { coreApi } from '../../services/api.js';
 
 interface StudentRecord {
   id: string;
@@ -34,30 +37,39 @@ interface StudentRecord {
   firstName: string;
   lastName: string;
   gender: string;
-  grade: string;
-  section: string;
+  className: string;
+  sectionName: string;
   rollNumber: number;
   bloodGroup: string;
   address: string;
-  attendanceRate: string;
-  feeStatus: 'PAID' | 'PARTIAL' | 'OVERDUE';
-  guardianName: string;
-  guardianPhone: string;
-  guardianEmail: string;
-  guardianRelationship: string;
-  status: 'ACTIVE' | 'GRADUATED' | 'TRANSFERRED';
+  status: string;
+  guardians: Array<{
+    name: string;
+    relationship: string;
+    phone: string;
+    email: string;
+  }>;
+  idCard?: {
+    id: string;
+    cardNumber: string;
+    verificationToken: string;
+    status: string;
+    issuedAt: string;
+    expiresAt: string | null;
+  } | null;
 }
 
 interface AdmissionApp {
   id: string;
   applicationNumber: string;
-  studentName: string;
+  studentFirstName: string;
+  studentLastName: string;
   applyingClass: string;
   dateOfBirth: string;
   guardianName: string;
   guardianPhone: string;
   guardianEmail: string;
-  status: 'SUBMITTED' | 'APPROVED' | 'REJECTED';
+  status: string;
   reviewNotes?: string;
   createdAt: string;
 }
@@ -65,201 +77,43 @@ interface AdmissionApp {
 interface StaffRecord {
   id: string;
   employeeId: string;
-  name: string;
-  department: string;
+  firstName: string;
+  lastName: string;
+  departmentName: string;
   designation: string;
   email: string;
   phone: string;
-  status: 'ACTIVE' | 'ON_LEAVE' | 'PROBATION';
+  employmentStatus: string;
   assignments: Array<{
     className: string;
     sectionName: string;
     subjectCode: string;
-    isLead: boolean;
+    isLeadTeacher: boolean;
   }>;
 }
 
-interface CardRecord {
-  id: string;
-  holderType: 'STUDENT' | 'STAFF';
-  holderName: string;
-  identifier: string;
-  cardNumber: string;
-  verificationToken: string;
-  status: 'ACTIVE' | 'REVOKED' | 'EXPIRED';
-  issuedAt: string;
-  expiresAt: string;
-  revocationReason?: string;
+interface SchoolAdminDashboardProps {
+  initialTab?: 'students' | 'admissions' | 'staff' | 'id-cards';
 }
 
-export const SchoolAdminDashboard: React.FC = () => {
+export const SchoolAdminDashboard: React.FC<SchoolAdminDashboardProps> = ({ initialTab }) => {
   const { branding } = useSchoolBranding();
-  const [activeTab, setActiveTab] = useState<'students' | 'admissions' | 'staff' | 'id-cards'>('students');
+  const [activeTab, setActiveTab] = useState<'students' | 'admissions' | 'staff' | 'id-cards'>(initialTab || 'students');
 
-  // SIS Students State
-  const [students, setStudents] = useState<StudentRecord[]>([
-    {
-      id: 'stu-aarav-01',
-      admissionNumber: 'ADM-2026-0042',
-      firstName: 'Aarav',
-      lastName: 'Sharma',
-      gender: 'Male',
-      grade: 'Grade 10',
-      section: 'A',
-      rollNumber: 1,
-      bloodGroup: 'O+',
-      address: 'Sector 14, Institutional Area, New Delhi',
-      attendanceRate: '96.4%',
-      feeStatus: 'PAID',
-      guardianName: 'Sunil Sharma',
-      guardianPhone: '+91 98450 11223',
-      guardianEmail: 'sunil.sharma@parent.apex.edu',
-      guardianRelationship: 'Father',
-      status: 'ACTIVE',
-    },
-    {
-      id: 'stu-ananya-02',
-      admissionNumber: 'ADM-2026-0043',
-      firstName: 'Ananya',
-      lastName: 'Deshmukh',
-      gender: 'Female',
-      grade: 'Grade 10',
-      section: 'A',
-      rollNumber: 2,
-      bloodGroup: 'B+',
-      address: 'Vasant Vihar, New Delhi',
-      attendanceRate: '98.1%',
-      feeStatus: 'PAID',
-      guardianName: 'Priya Deshmukh',
-      guardianPhone: '+91 98450 44556',
-      guardianEmail: 'priya.d@parent.apex.edu',
-      guardianRelationship: 'Mother',
-      status: 'ACTIVE',
-    },
-    {
-      id: 'stu-rohan-03',
-      admissionNumber: 'ADM-2026-0044',
-      firstName: 'Rohan',
-      lastName: 'Verma',
-      gender: 'Male',
-      grade: 'Grade 9',
-      section: 'B',
-      rollNumber: 14,
-      bloodGroup: 'A+',
-      address: 'Green Park Extension, New Delhi',
-      attendanceRate: '91.0%',
-      feeStatus: 'PARTIAL',
-      guardianName: 'Rajesh Verma',
-      guardianPhone: '+91 98450 77889',
-      guardianEmail: 'rajesh.v@example.com',
-      guardianRelationship: 'Father',
-      status: 'ACTIVE',
-    },
-    {
-      id: 'stu-maya-04',
-      admissionNumber: 'ADM-2026-0045',
-      firstName: 'Maya',
-      lastName: 'Sharma',
-      gender: 'Female',
-      grade: 'Grade 7',
-      section: 'B',
-      rollNumber: 5,
-      bloodGroup: 'O+',
-      address: 'Sector 14, Institutional Area, New Delhi',
-      attendanceRate: '97.2%',
-      feeStatus: 'PAID',
-      guardianName: 'Sunil Sharma',
-      guardianPhone: '+91 98450 11223',
-      guardianEmail: 'sunil.sharma@parent.apex.edu',
-      guardianRelationship: 'Father',
-      status: 'ACTIVE',
-    },
-  ]);
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
 
-  // Admissions Applications State
-  const [admissions, setAdmissions] = useState<AdmissionApp[]>([
-    {
-      id: 'adm-app-01',
-      applicationNumber: 'APP-2026-0091',
-      studentName: 'Meera Nambiar',
-      applyingClass: 'Grade 9',
-      dateOfBirth: '2011-05-18',
-      guardianName: 'Ramesh Nambiar',
-      guardianPhone: '+91 98450 12345',
-      guardianEmail: 'r.nambiar@example.com',
-      status: 'SUBMITTED',
-      createdAt: '2026-10-15',
-    },
-    {
-      id: 'adm-app-02',
-      applicationNumber: 'APP-2026-0092',
-      studentName: 'Kabir Singhania',
-      applyingClass: 'Grade 11',
-      dateOfBirth: '2009-11-04',
-      guardianName: 'Deepak Singhania',
-      guardianPhone: '+91 98110 56789',
-      guardianEmail: 'deepak.s@example.com',
-      status: 'SUBMITTED',
-      createdAt: '2026-10-16',
-    },
-  ]);
+  // Live Data States
+  const [students, setStudents] = useState<StudentRecord[]>([]);
+  const [admissions, setAdmissions] = useState<AdmissionApp[]>([]);
+  const [staffList, setStaffList] = useState<StaffRecord[]>([]);
+  const [academicStructure, setAcademicStructure] = useState<{ classes: any[]; departments: any[] }>({ classes: [], departments: [] });
 
-  // Staff & Faculty State
-  const [staffList, setStaffList] = useState<StaffRecord[]>([
-    {
-      id: 'staff-thorne-01',
-      employeeId: 'EMP-2026-0012',
-      name: 'Dr. Julian Thorne',
-      department: 'Science & Physics',
-      designation: 'Senior Faculty & Dept Head',
-      email: 'dr.thorne@apexacademy.edu',
-      phone: '+91 (11) 2840-9112',
-      status: 'ACTIVE',
-      assignments: [
-        { className: 'Grade 10', sectionName: 'A', subjectCode: 'PHY-10', isLead: true },
-        { className: 'Grade 10', sectionName: 'B', subjectCode: 'PHY-10', isLead: false },
-      ],
-    },
-    {
-      id: 'staff-vance-02',
-      employeeId: 'EMP-2026-0015',
-      name: 'Mrs. Rebecca Vance',
-      department: 'Mathematics',
-      designation: 'Secondary Mathematics Lead',
-      email: 'r.vance@apexacademy.edu',
-      phone: '+91 (11) 2840-9115',
-      status: 'ACTIVE',
-      assignments: [
-        { className: 'Grade 10', sectionName: 'A', subjectCode: 'MATH-10', isLead: true },
-      ],
-    },
-  ]);
-
-  // Virtual ID Cards State
-  const [idCards, setIdCards] = useState<CardRecord[]>([
-    {
-      id: 'card-aarav-01',
-      holderType: 'STUDENT',
-      holderName: 'Aarav Sharma',
-      identifier: 'ADM-2026-0042',
-      cardNumber: 'CR80-2026-0042',
-      verificationToken: 'v-tok-8f2c-49a1-9b7e-e214',
-      status: 'ACTIVE',
-      issuedAt: '2026-02-01',
-      expiresAt: '2027-03-31',
-    },
-    {
-      id: 'card-thorne-01',
-      holderType: 'STAFF',
-      holderName: 'Dr. Julian Thorne',
-      identifier: 'EMP-2026-0012',
-      cardNumber: 'CR80-2026-0012',
-      verificationToken: 'v-tok-7a1b-3c4d-5e6f-9912',
-      status: 'ACTIVE',
-      issuedAt: '2026-01-15',
-      expiresAt: '2028-06-30',
-    },
-  ]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Filtering & Search
   const [searchTerm, setSearchTerm] = useState('');
@@ -268,12 +122,12 @@ export const SchoolAdminDashboard: React.FC = () => {
   // Modals
   const [showAdmitModal, setShowAdmitModal] = useState(false);
   const [selectedDossier, setSelectedDossier] = useState<StudentRecord | null>(null);
-  const [showCardGenerateModal, setShowCardGenerateModal] = useState(false);
-  const [showDeactivateModal, setShowDeactivateModal] = useState<CardRecord | null>(null);
+  const [showDeactivateModal, setShowDeactivateModal] = useState<any | null>(null);
   const [deactivateReason, setDeactivateReason] = useState('Lost in transit');
-  const [previewCard, setPreviewCard] = useState<CardRecord | null>(null);
+  const [previewCard, setPreviewCard] = useState<any | null>(null);
   const [showAssignModal, setShowAssignModal] = useState<StaffRecord | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // New Student Form
   const [newStudent, setNewStudent] = useState({
@@ -281,8 +135,8 @@ export const SchoolAdminDashboard: React.FC = () => {
     lastName: '',
     admissionNumber: '',
     gender: 'Male',
-    grade: 'Grade 10',
-    section: 'A',
+    className: 'Grade 10',
+    sectionName: 'A',
     bloodGroup: 'O+',
     address: '',
     emergencyPhone: '',
@@ -305,175 +159,179 @@ export const SchoolAdminDashboard: React.FC = () => {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  // 1. Handle Enroll Student with Duplicate Admission Number Check
-  const handleEnrollStudent = (e: React.FormEvent) => {
-    e.preventDefault();
+  // Fetch all live records from PostgreSQL
+  const loadAllData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [studentsRes, admissionsRes, staffRes, structureRes] = await Promise.all([
+        coreApi.listStudents({ className: gradeFilter !== 'ALL' ? gradeFilter : undefined, query: searchTerm }),
+        coreApi.listAdmissions(),
+        coreApi.listStaff(),
+        coreApi.getAcademicStructure().catch(() => ({ classes: [], departments: [] })),
+      ]);
 
-    const admNum = newStudent.admissionNumber.trim() || `ADM-2026-00${students.length + 46}`;
-
-    // Duplicate check
-    const isDup = students.some((s) => s.admissionNumber.toLowerCase() === admNum.toLowerCase());
-    if (isDup) {
-      showToast(`Conflict: Admission number '${admNum}' already exists in this school.`);
-      return;
+      setStudents(studentsRes.items || []);
+      setAdmissions(admissionsRes || []);
+      setStaffList(staffRes.items || []);
+      setAcademicStructure({
+        classes: structureRes.classes || [],
+        departments: structureRes.departments || [],
+      });
+    } catch (err: any) {
+      setError(err.message || 'Failed to load school administration records.');
+    } finally {
+      setLoading(false);
     }
-
-    const created: StudentRecord = {
-      id: `stu-${Date.now()}`,
-      admissionNumber: admNum,
-      firstName: newStudent.firstName,
-      lastName: newStudent.lastName,
-      gender: newStudent.gender,
-      grade: newStudent.grade,
-      section: newStudent.section,
-      rollNumber: students.length + 1,
-      bloodGroup: newStudent.bloodGroup,
-      address: newStudent.address || 'Local School Area',
-      attendanceRate: '100%',
-      feeStatus: 'PAID',
-      guardianName: newStudent.guardianName,
-      guardianPhone: newStudent.guardianPhone || '+91 98000 00000',
-      guardianEmail: newStudent.guardianEmail || 'parent@example.com',
-      guardianRelationship: newStudent.guardianRelationship,
-      status: 'ACTIVE',
-    };
-
-    setStudents([created, ...students]);
-    setShowAdmitModal(false);
-    setNewStudent({
-      firstName: '',
-      lastName: '',
-      admissionNumber: '',
-      gender: 'Male',
-      grade: 'Grade 10',
-      section: 'A',
-      bloodGroup: 'O+',
-      address: '',
-      emergencyPhone: '',
-      guardianName: '',
-      guardianEmail: '',
-      guardianPhone: '',
-      guardianRelationship: 'Father',
-    });
-    showToast(`Student ${created.firstName} ${created.lastName} enrolled (${admNum}).`);
   };
 
-  // 2. Handle Approve Admission Application
-  const handleApproveApplication = (app: AdmissionApp) => {
-    const randomAdm = `ADM-2026-00${students.length + 50}`;
-    const nameParts = app.studentName.split(' ');
-    const firstName = nameParts[0];
-    const lastName = nameParts.slice(1).join(' ') || 'Candidate';
+  useEffect(() => {
+    loadAllData();
+  }, [gradeFilter]);
 
-    const enrolled: StudentRecord = {
-      id: `stu-${Date.now()}`,
-      admissionNumber: randomAdm,
-      firstName,
-      lastName,
-      gender: 'Female',
-      grade: app.applyingClass,
-      section: 'A',
-      rollNumber: students.length + 1,
-      bloodGroup: 'B+',
-      address: 'Residential Campus',
-      attendanceRate: '100%',
-      feeStatus: 'PAID',
-      guardianName: app.guardianName,
-      guardianPhone: app.guardianPhone,
-      guardianEmail: app.guardianEmail,
-      guardianRelationship: 'Parent',
-      status: 'ACTIVE',
-    };
+  // Handle Search on Submit or debounce
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    loadAllData();
+  };
 
-    setStudents([enrolled, ...students]);
-    setAdmissions((prev) =>
-      prev.map((a) => (a.id === app.id ? { ...a, status: 'APPROVED' } : a))
-    );
-    showToast(`Application ${app.applicationNumber} approved. Enrolled as ${randomAdm}.`);
+  // 1. Handle Enroll Student with PostgreSQL Persistence
+  const handleEnrollStudent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    try {
+      const payload = {
+        firstName: newStudent.firstName,
+        lastName: newStudent.lastName,
+        admissionNumber: newStudent.admissionNumber.trim() || undefined,
+        gender: newStudent.gender,
+        className: newStudent.className,
+        sectionName: newStudent.sectionName,
+        bloodGroup: newStudent.bloodGroup,
+        address: newStudent.address || 'Campus Residence',
+        emergencyPhone: newStudent.guardianPhone || '+91 98000 00000',
+        dateOfBirth: '2010-05-15',
+        guardianName: newStudent.guardianName,
+        guardianEmail: newStudent.guardianEmail || `${newStudent.firstName.toLowerCase()}@parent.apex.edu`,
+        guardianPhone: newStudent.guardianPhone || '+91 98000 00000',
+        guardianRelationship: newStudent.guardianRelationship,
+      };
+
+      const result = await coreApi.createStudent(payload);
+      showToast(`Student ${result.firstName} enrolled (${result.admissionNumber}).`);
+      setShowAdmitModal(false);
+      setNewStudent({
+        firstName: '',
+        lastName: '',
+        admissionNumber: '',
+        gender: 'Male',
+        className: 'Grade 10',
+        sectionName: 'A',
+        bloodGroup: 'O+',
+        address: '',
+        emergencyPhone: '',
+        guardianName: '',
+        guardianEmail: '',
+        guardianPhone: '',
+        guardianRelationship: 'Father',
+      });
+      await loadAllData();
+    } catch (err: any) {
+      alert(`Enrollment failed: ${err.message}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // 2. Handle Review Admission Application
+  const handleReviewApplication = async (app: AdmissionApp, decision: 'APPROVED' | 'REJECTED') => {
+    try {
+      await coreApi.reviewAdmission(app.id, {
+        decision,
+        reviewNotes: decision === 'APPROVED' ? 'Approved by Admissions Committee' : 'Application declined',
+        assignedClass: app.applyingClass,
+        assignedSection: 'A',
+      });
+      showToast(`Application ${app.applicationNumber} ${decision === 'APPROVED' ? 'approved & enrolled' : 'declined'}.`);
+      await loadAllData();
+    } catch (err: any) {
+      alert(`Review failed: ${err.message}`);
+    }
   };
 
   // 3. Handle Generate Virtual ID Card
-  const handleGenerateCard = (student: StudentRecord) => {
-    const token = `v-tok-${Math.random().toString(36).slice(2, 10)}-${Math.random().toString(36).slice(2, 6)}`;
-    const cardNum = `CR80-2026-00${idCards.length + 51}`;
-
-    const newCard: CardRecord = {
-      id: `card-${Date.now()}`,
-      holderType: 'STUDENT',
-      holderName: `${student.firstName} ${student.lastName}`,
-      identifier: student.admissionNumber,
-      cardNumber: cardNum,
-      verificationToken: token,
-      status: 'ACTIVE',
-      issuedAt: new Date().toISOString().split('T')[0],
-      expiresAt: '2027-03-31',
-    };
-
-    setIdCards([newCard, ...idCards]);
-    setShowCardGenerateModal(false);
-    setPreviewCard(newCard);
-    showToast(`Virtual ID Card issued for ${student.firstName} (${cardNum}).`);
+  const handleGenerateCard = async (student: StudentRecord) => {
+    try {
+      const card = await coreApi.generateIdCard({
+        holderType: 'STUDENT',
+        profileId: student.id,
+      });
+      showToast(`Virtual ID Card issued for ${student.firstName} (${card.cardNumber}).`);
+      setPreviewCard(card);
+      await loadAllData();
+    } catch (err: any) {
+      alert(`ID card generation failed: ${err.message}`);
+    }
   };
 
   // 4. Handle Deactivate / Revoke ID Card
-  const handleDeactivateCard = () => {
+  const handleDeactivateCard = async () => {
     if (!showDeactivateModal) return;
-
-    setIdCards((prev) =>
-      prev.map((c) =>
-        c.id === showDeactivateModal.id
-          ? {
-              ...c,
-              status: 'REVOKED',
-              revocationReason: deactivateReason,
-            }
-          : c
-      )
-    );
-
-    const revokedToken = showDeactivateModal.verificationToken;
-    setShowDeactivateModal(null);
-    showToast(`Card ${showDeactivateModal.cardNumber} deactivated. QR token now invalid.`);
+    try {
+      await coreApi.deactivateIdCard(showDeactivateModal.id, deactivateReason);
+      showToast(`Card ${showDeactivateModal.cardNumber} revoked. Public QR token deactivated.`);
+      setShowDeactivateModal(null);
+      await loadAllData();
+    } catch (err: any) {
+      alert(`Revocation failed: ${err.message}`);
+    }
   };
 
   // 5. Handle Teacher Assignment
-  const handleSaveAssignment = (e: React.FormEvent) => {
+  const handleSaveAssignment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!showAssignModal) return;
 
-    setStaffList((prev) =>
-      prev.map((s) => {
-        if (s.id === showAssignModal.id) {
-          return {
-            ...s,
-            assignments: [
-              ...s.assignments,
-              {
-                className: assignForm.className,
-                sectionName: assignForm.sectionName,
-                subjectCode: assignForm.subjectCode,
-                isLead: assignForm.isLead,
-              },
-            ],
-          };
-        }
-        return s;
-      })
-    );
-
-    setShowAssignModal(null);
-    showToast(`Assignment added for ${showAssignModal.name}.`);
+    try {
+      await coreApi.assignTeacher({
+        staffProfileId: showAssignModal.id,
+        className: assignForm.className,
+        sectionName: assignForm.sectionName,
+        subjectCode: assignForm.subjectCode,
+        isLeadTeacher: assignForm.isLead,
+      });
+      showToast(`Teaching duty assigned for ${showAssignModal.firstName} ${showAssignModal.lastName}.`);
+      setShowAssignModal(null);
+      await loadAllData();
+    } catch (err: any) {
+      alert(`Assignment failed: ${err.message}`);
+    }
   };
 
+  // Filter students locally for instant typing search
   const filteredStudents = students.filter((s) => {
-    const fullName = `${s.firstName} ${s.lastName}`.toLowerCase();
-    const matchesSearch =
-      fullName.includes(searchTerm.toLowerCase()) ||
-      s.admissionNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      s.guardianName.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesGrade = gradeFilter === 'ALL' || s.grade === gradeFilter;
+    const fullName = `${s.firstName || ''} ${s.lastName || ''}`.toLowerCase();
+    const adm = (s.admissionNumber || '').toLowerCase();
+    const q = searchTerm.toLowerCase();
+    const matchesSearch = fullName.includes(q) || adm.includes(q);
+    const matchesGrade = gradeFilter === 'ALL' || s.className === gradeFilter;
     return matchesSearch && matchesGrade;
   });
+
+  // Extract all issued ID cards from students & staff
+  const issuedCards = students
+    .filter((s) => s.idCard)
+    .map((s) => ({
+      id: s.idCard!.id,
+      holderType: 'STUDENT',
+      holderName: `${s.firstName} ${s.lastName}`,
+      identifier: s.admissionNumber,
+      cardNumber: s.idCard!.cardNumber,
+      verificationToken: s.idCard!.verificationToken,
+      status: s.idCard!.status,
+      issuedAt: s.idCard!.issuedAt ? new Date(s.idCard!.issuedAt).toLocaleDateString() : 'Active',
+      expiresAt: s.idCard!.expiresAt,
+    }));
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
@@ -506,16 +364,16 @@ export const SchoolAdminDashboard: React.FC = () => {
         <div>
           <h2>School Administrative Command & SIS</h2>
           <p style={{ color: 'var(--text-muted)' }}>
-            {branding.schoolName} • Academic Session 2026–2027
+            {branding.schoolName} • Academic Session 2026–2027 • PostgreSQL Persisted
           </p>
         </div>
         <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
           <Button
             variant="secondary"
-            icon={<Download size={15} />}
-            onClick={() => showToast('Exporting student directory as authenticated CSV...')}
+            icon={<RefreshCw size={15} className={loading ? 'animate-spin' : ''} />}
+            onClick={loadAllData}
           >
-            Export SIS (CSV)
+            Refresh
           </Button>
           <Button
             variant="primary"
@@ -531,29 +389,29 @@ export const SchoolAdminDashboard: React.FC = () => {
       <div className="ed-grid-4">
         <div className="ed-metric-tile">
           <span className="label">Enrolled Students</span>
-          <span className="value">{students.length + 1416}</span>
-          <span className="subtitle">Across Grades 1 through 12</span>
+          <span className="value">{loading ? '...' : students.length}</span>
+          <span className="subtitle">Persisted in PostgreSQL database</span>
         </div>
 
         <div className="ed-metric-tile">
-          <span className="label">Faculty Present Today</span>
-          <span className="value">108 / 114</span>
+          <span className="label">Faculty Members</span>
+          <span className="value">{loading ? '...' : staffList.length}</span>
           <span className="subtitle">
-            <CheckCircle2 size={13} style={{ color: 'var(--success-solid)' }} /> 94.7% Attendance
+            <CheckCircle2 size={13} style={{ color: 'var(--success-solid)' }} /> Assigned instructors & leads
           </span>
         </div>
 
         <div className="ed-metric-tile">
           <span className="label">Pending Admissions</span>
           <span className="value" style={{ color: 'var(--warning-solid)' }}>
-            {admissions.filter((a) => a.status === 'SUBMITTED').length}
+            {loading ? '...' : admissions.filter((a) => a.status === 'SUBMITTED').length}
           </span>
           <span className="subtitle">Review applications queue</span>
         </div>
 
         <div className="ed-metric-tile">
           <span className="label">Virtual ID Cards</span>
-          <span className="value">{idCards.filter((c) => c.status === 'ACTIVE').length + 1416} Active</span>
+          <span className="value">{loading ? '...' : issuedCards.filter((c) => c.status === 'ACTIVE').length} Active</span>
           <span className="subtitle">
             <CheckCircle2 size={13} style={{ color: 'var(--success-solid)' }} /> ISO CR80 Encrypted QR
           </span>
@@ -568,7 +426,7 @@ export const SchoolAdminDashboard: React.FC = () => {
           { id: 'students', label: 'Student Directory & SIS', icon: <GraduationCap size={15} />, badge: students.length },
           { id: 'admissions', label: 'Online Admissions Review', icon: <FileCheck size={15} />, badge: admissions.filter((a) => a.status === 'SUBMITTED').length },
           { id: 'staff', label: 'Faculty & Teacher Assignments', icon: <Users size={15} />, badge: staffList.length },
-          { id: 'id-cards', label: 'Virtual ID Cards & QR', icon: <IdCard size={15} />, badge: idCards.length },
+          { id: 'id-cards', label: 'Virtual ID Cards & QR', icon: <IdCard size={15} />, badge: issuedCards.length },
         ]}
       />
 
@@ -593,7 +451,7 @@ export const SchoolAdminDashboard: React.FC = () => {
               </span>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+            <form onSubmit={handleSearchSubmit} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
               <div style={{ position: 'relative' }}>
                 <Search size={14} style={{ position: 'absolute', left: '8px', top: '8px', color: 'var(--text-muted)' }} />
                 <input
@@ -608,79 +466,99 @@ export const SchoolAdminDashboard: React.FC = () => {
 
               <select
                 className="ed-select"
-                style={{ padding: '5px 8px', fontSize: '0.82rem', width: '130px' }}
+                style={{ padding: '5px 8px', fontSize: '0.82rem', width: '140px' }}
                 value={gradeFilter}
                 onChange={(e) => setGradeFilter(e.target.value)}
               >
                 <option value="ALL">All Grades</option>
-                <option value="Grade 7">Grade 7</option>
-                <option value="Grade 9">Grade 9</option>
-                <option value="Grade 10">Grade 10</option>
-                <option value="Grade 11">Grade 11</option>
+                {academicStructure.classes.map((c) => (
+                  <option key={c.id} value={c.name}>{c.name}</option>
+                ))}
               </select>
-            </div>
+            </form>
           </div>
 
           <div className="ed-table-container" style={{ border: 'none', borderRadius: 0 }}>
-            <table className="ed-table">
-              <thead>
-                <tr>
-                  <th>Student</th>
-                  <th>Admission No</th>
-                  <th>Class & Section</th>
-                  <th>Roll No</th>
-                  <th>Attendance</th>
-                  <th>Fee Status</th>
-                  <th>Primary Guardian</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredStudents.map((s) => (
-                  <tr key={s.id}>
-                    <td>
-                      <div style={{ fontWeight: 600 }}>{s.firstName} {s.lastName}</div>
-                      <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>{s.gender} • {s.bloodGroup}</div>
-                    </td>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.82rem', fontWeight: 600 }}>
-                      {s.admissionNumber}
-                    </td>
-                    <td>{s.grade}-{s.section}</td>
-                    <td style={{ fontWeight: 500 }}>#{s.rollNumber}</td>
-                    <td>
-                      <Badge variant="success">{s.attendanceRate}</Badge>
-                    </td>
-                    <td>
-                      {s.feeStatus === 'PAID' && <Badge variant="success">Paid</Badge>}
-                      {s.feeStatus === 'PARTIAL' && <Badge variant="warning">Partial</Badge>}
-                      {s.feeStatus === 'OVERDUE' && <Badge variant="danger">Overdue</Badge>}
-                    </td>
-                    <td>
-                      <div style={{ fontSize: '0.84rem', fontWeight: 500 }}>{s.guardianName}</div>
-                      <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>{s.guardianPhone}</div>
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', gap: '6px' }}>
-                        <button
-                          onClick={() => setSelectedDossier(s)}
-                          className="ed-btn ed-btn-secondary"
-                          style={{ padding: '4px 8px', fontSize: '0.76rem', display: 'flex', alignItems: 'center', gap: '4px' }}
-                        >
-                          <Eye size={12} /> Dossier
-                        </button>
-                        <button
-                          onClick={() => handleGenerateCard(s)}
-                          className="ed-btn ed-btn-primary"
-                          style={{ padding: '4px 8px', fontSize: '0.76rem', display: 'flex', alignItems: 'center', gap: '4px' }}
-                        >
-                          <IdCard size={12} /> ID Card
-                        </button>
-                      </div>
-                    </td>
+            {loading ? (
+              <div style={{ padding: 'var(--space-8)', textAlign: 'center', color: 'var(--text-muted)' }}>
+                Loading students from PostgreSQL...
+              </div>
+            ) : filteredStudents.length === 0 ? (
+              <div style={{ padding: 'var(--space-8)', textAlign: 'center' }}>
+                <GraduationCap size={36} style={{ margin: '0 auto var(--space-2)', opacity: 0.3 }} />
+                <p style={{ fontWeight: 600, color: 'var(--text-primary)' }}>No students found</p>
+                <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: 'var(--space-4)' }}>
+                  {students.length === 0 ? 'No students are currently enrolled in the database.' : 'No students match your filter criteria.'}
+                </p>
+                {students.length === 0 && (
+                  <Button variant="primary" icon={<Plus size={14} />} onClick={() => setShowAdmitModal(true)}>
+                    Enroll First Student
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <table className="ed-table">
+                <thead>
+                  <tr>
+                    <th>Student</th>
+                    <th>Admission No</th>
+                    <th>Class & Section</th>
+                    <th>Roll No</th>
+                    <th>Status</th>
+                    <th>Primary Guardian</th>
+                    <th>Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {filteredStudents.map((s) => {
+                    const primaryGuardian = s.guardians?.[0] || { name: 'Parent/Guardian', phone: '—' };
+                    return (
+                      <tr key={s.id}>
+                        <td>
+                          <Link
+                            to={`/admin/students/${s.id}`}
+                            style={{ fontWeight: 600, color: 'var(--primary-700)', textDecoration: 'none' }}
+                          >
+                            {s.firstName} {s.lastName}
+                          </Link>
+                          <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>{s.gender} • {s.bloodGroup || 'O+'}</div>
+                        </td>
+                        <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.82rem', fontWeight: 600 }}>
+                          {s.admissionNumber}
+                        </td>
+                        <td>{s.className}-{s.sectionName || 'A'}</td>
+                        <td style={{ fontWeight: 500 }}>#{s.rollNumber || 1}</td>
+                        <td>
+                          <Badge variant="success">{s.status || 'ACTIVE'}</Badge>
+                        </td>
+                        <td>
+                          <div style={{ fontSize: '0.84rem', fontWeight: 500 }}>{primaryGuardian.name}</div>
+                          <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>{primaryGuardian.phone}</div>
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            <button
+                              onClick={() => setSelectedDossier(s)}
+                              className="ed-btn ed-btn-secondary"
+                              style={{ padding: '4px 8px', fontSize: '0.76rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                            >
+                              <Eye size={12} /> Dossier
+                            </button>
+                            <button
+                              onClick={() => handleGenerateCard(s)}
+                              className="ed-btn ed-btn-primary"
+                              style={{ padding: '4px 8px', fontSize: '0.76rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                            >
+                              <IdCard size={12} /> ID Card
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
       )}
@@ -706,70 +584,73 @@ export const SchoolAdminDashboard: React.FC = () => {
           </div>
 
           <div className="ed-table-container" style={{ border: 'none', borderRadius: 0 }}>
-            <table className="ed-table">
-              <thead>
-                <tr>
-                  <th>Application No</th>
-                  <th>Candidate</th>
-                  <th>Applying Class</th>
-                  <th>Guardian Details</th>
-                  <th>Date Submitted</th>
-                  <th>Status</th>
-                  <th>Review Decision</th>
-                </tr>
-              </thead>
-              <tbody>
-                {admissions.map((app) => (
-                  <tr key={app.id}>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.82rem', fontWeight: 600 }}>
-                      {app.applicationNumber}
-                    </td>
-                    <td>
-                      <div style={{ fontWeight: 600 }}>{app.studentName}</div>
-                      <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>DOB: {app.dateOfBirth}</div>
-                    </td>
-                    <td style={{ fontWeight: 600 }}>{app.applyingClass}</td>
-                    <td>
-                      <div>{app.guardianName}</div>
-                      <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>{app.guardianPhone} • {app.guardianEmail}</div>
-                    </td>
-                    <td>{app.createdAt}</td>
-                    <td>
-                      {app.status === 'SUBMITTED' && <Badge variant="warning">Submitted</Badge>}
-                      {app.status === 'APPROVED' && <Badge variant="success">Approved & Enrolled</Badge>}
-                      {app.status === 'REJECTED' && <Badge variant="danger">Declined</Badge>}
-                    </td>
-                    <td>
-                      {app.status === 'SUBMITTED' ? (
-                        <div style={{ display: 'flex', gap: '6px' }}>
-                          <button
-                            onClick={() => handleApproveApplication(app)}
-                            className="ed-btn ed-btn-primary"
-                            style={{ padding: '4px 8px', fontSize: '0.76rem' }}
-                          >
-                            Approve & Enroll
-                          </button>
-                          <button
-                            onClick={() => {
-                              setAdmissions((prev) =>
-                                prev.map((a) => (a.id === app.id ? { ...a, status: 'REJECTED' } : a))
-                              );
-                              showToast(`Application ${app.applicationNumber} declined.`);
-                            }}
-                            className="ed-btn ed-btn-danger"
-                            style={{ padding: '4px 8px', fontSize: '0.76rem' }}
-                          >
-                            Decline
-                          </button>
-                        </div>
-                      ) : (
-                        <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Processed</span>
-                      )}
-                    </td>
+            {admissions.length === 0 ? (
+              <div style={{ padding: 'var(--space-8)', textAlign: 'center', color: 'var(--text-muted)' }}>
+                <FileCheck size={36} style={{ margin: '0 auto var(--space-2)', opacity: 0.3 }} />
+                <p style={{ fontWeight: 600, color: 'var(--text-primary)' }}>No admission applications</p>
+                <p style={{ fontSize: '0.82rem' }}>Applications submitted through the public website will appear here in real-time.</p>
+              </div>
+            ) : (
+              <table className="ed-table">
+                <thead>
+                  <tr>
+                    <th>Application No</th>
+                    <th>Candidate</th>
+                    <th>Applying Class</th>
+                    <th>Guardian Details</th>
+                    <th>Date Submitted</th>
+                    <th>Status</th>
+                    <th>Review Decision</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {admissions.map((app) => (
+                    <tr key={app.id}>
+                      <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.82rem', fontWeight: 600 }}>
+                        {app.applicationNumber}
+                      </td>
+                      <td>
+                        <div style={{ fontWeight: 600 }}>{app.studentFirstName} {app.studentLastName}</div>
+                        <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>DOB: {app.dateOfBirth}</div>
+                      </td>
+                      <td style={{ fontWeight: 600 }}>{app.applyingClass}</td>
+                      <td>
+                        <div>{app.guardianName}</div>
+                        <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>{app.guardianPhone} • {app.guardianEmail}</div>
+                      </td>
+                      <td>{app.createdAt ? new Date(app.createdAt).toLocaleDateString() : 'Recent'}</td>
+                      <td>
+                        {app.status === 'SUBMITTED' && <Badge variant="warning">Submitted</Badge>}
+                        {app.status === 'APPROVED' && <Badge variant="success">Approved & Enrolled</Badge>}
+                        {app.status === 'REJECTED' && <Badge variant="danger">Declined</Badge>}
+                      </td>
+                      <td>
+                        {app.status === 'SUBMITTED' ? (
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            <button
+                              onClick={() => handleReviewApplication(app, 'APPROVED')}
+                              className="ed-btn ed-btn-primary"
+                              style={{ padding: '4px 8px', fontSize: '0.76rem' }}
+                            >
+                              Approve & Enroll
+                            </button>
+                            <button
+                              onClick={() => handleReviewApplication(app, 'REJECTED')}
+                              className="ed-btn ed-btn-danger"
+                              style={{ padding: '4px 8px', fontSize: '0.76rem' }}
+                            >
+                              Decline
+                            </button>
+                          </div>
+                        ) : (
+                          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Processed</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
       )}
@@ -795,55 +676,61 @@ export const SchoolAdminDashboard: React.FC = () => {
           </div>
 
           <div className="ed-table-container" style={{ border: 'none', borderRadius: 0 }}>
-            <table className="ed-table">
-              <thead>
-                <tr>
-                  <th>Faculty Member</th>
-                  <th>EMP ID</th>
-                  <th>Department</th>
-                  <th>Designation</th>
-                  <th>Current Teaching Allocations</th>
-                  <th>Status</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {staffList.map((st) => (
-                  <tr key={st.id}>
-                    <td>
-                      <div style={{ fontWeight: 600 }}>{st.name}</div>
-                      <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>{st.email}</div>
-                    </td>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.82rem', fontWeight: 600 }}>
-                      {st.employeeId}
-                    </td>
-                    <td>{st.department}</td>
-                    <td>{st.designation}</td>
-                    <td>
-                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                        {st.assignments.map((a, i) => (
-                          <Badge key={i} variant="teal" style={{ fontSize: '0.72rem' }}>
-                            {a.className}-{a.sectionName} ({a.subjectCode}){a.isLead ? ' [Lead]' : ''}
-                          </Badge>
-                        ))}
-                      </div>
-                    </td>
-                    <td>
-                      <Badge variant="success">Active</Badge>
-                    </td>
-                    <td>
-                      <button
-                        onClick={() => setShowAssignModal(st)}
-                        className="ed-btn ed-btn-primary"
-                        style={{ padding: '4px 8px', fontSize: '0.76rem', display: 'flex', alignItems: 'center', gap: '4px' }}
-                      >
-                        <Plus size={12} /> Assign Class
-                      </button>
-                    </td>
+            {staffList.length === 0 ? (
+              <div style={{ padding: 'var(--space-8)', textAlign: 'center', color: 'var(--text-muted)' }}>
+                No faculty members registered in PostgreSQL.
+              </div>
+            ) : (
+              <table className="ed-table">
+                <thead>
+                  <tr>
+                    <th>Faculty Member</th>
+                    <th>EMP ID</th>
+                    <th>Department</th>
+                    <th>Designation</th>
+                    <th>Current Teaching Allocations</th>
+                    <th>Status</th>
+                    <th>Action</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {staffList.map((st) => (
+                    <tr key={st.id}>
+                      <td>
+                        <div style={{ fontWeight: 600 }}>{st.firstName} {st.lastName}</div>
+                        <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>{st.email}</div>
+                      </td>
+                      <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.82rem', fontWeight: 600 }}>
+                        {st.employeeId}
+                      </td>
+                      <td>{st.departmentName}</td>
+                      <td>{st.designation}</td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                          {(st.assignments || []).map((a, i) => (
+                            <Badge key={i} variant="teal" style={{ fontSize: '0.72rem' }}>
+                              {a.className}-{a.sectionName} ({a.subjectCode}){a.isLeadTeacher ? ' [Lead]' : ''}
+                            </Badge>
+                          ))}
+                        </div>
+                      </td>
+                      <td>
+                        <Badge variant="success">{st.employmentStatus || 'Active'}</Badge>
+                      </td>
+                      <td>
+                        <button
+                          onClick={() => setShowAssignModal(st)}
+                          className="ed-btn ed-btn-primary"
+                          style={{ padding: '4px 8px', fontSize: '0.76rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                        >
+                          <Plus size={12} /> Assign Class
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
       )}
@@ -869,66 +756,72 @@ export const SchoolAdminDashboard: React.FC = () => {
           </div>
 
           <div className="ed-table-container" style={{ border: 'none', borderRadius: 0 }}>
-            <table className="ed-table">
-              <thead>
-                <tr>
-                  <th>Cardholder</th>
-                  <th>Type</th>
-                  <th>Identifier</th>
-                  <th>Card Number</th>
-                  <th>Verification Token</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {idCards.map((card) => (
-                  <tr key={card.id}>
-                    <td style={{ fontWeight: 600 }}>{card.holderName}</td>
-                    <td>
-                      <Badge variant={card.holderType === 'STUDENT' ? 'info' : 'teal'}>
-                        {card.holderType}
-                      </Badge>
-                    </td>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.82rem' }}>{card.identifier}</td>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.82rem', fontWeight: 600 }}>
-                      {card.cardNumber}
-                    </td>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-                      {card.verificationToken}
-                    </td>
-                    <td>
-                      {card.status === 'ACTIVE' && <Badge variant="success">Active</Badge>}
-                      {card.status === 'REVOKED' && (
-                        <Badge variant="danger" icon={<ShieldAlert size={12} />}>
-                          Revoked
-                        </Badge>
-                      )}
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', gap: '6px' }}>
-                        <button
-                          onClick={() => setPreviewCard(card)}
-                          className="ed-btn ed-btn-secondary"
-                          style={{ padding: '4px 8px', fontSize: '0.76rem', display: 'flex', alignItems: 'center', gap: '4px' }}
-                        >
-                          <Eye size={12} /> ISO CR80 View
-                        </button>
-                        {card.status === 'ACTIVE' && (
-                          <button
-                            onClick={() => setShowDeactivateModal(card)}
-                            className="ed-btn ed-btn-danger"
-                            style={{ padding: '4px 8px', fontSize: '0.76rem' }}
-                          >
-                            Deactivate
-                          </button>
-                        )}
-                      </div>
-                    </td>
+            {issuedCards.length === 0 ? (
+              <div style={{ padding: 'var(--space-8)', textAlign: 'center', color: 'var(--text-muted)' }}>
+                <IdCard size={36} style={{ margin: '0 auto var(--space-2)', opacity: 0.3 }} />
+                <p style={{ fontWeight: 600, color: 'var(--text-primary)' }}>No ID cards issued yet</p>
+                <p style={{ fontSize: '0.82rem' }}>Generate an ID card for any student from the Student Directory tab.</p>
+              </div>
+            ) : (
+              <table className="ed-table">
+                <thead>
+                  <tr>
+                    <th>Cardholder</th>
+                    <th>Type</th>
+                    <th>Identifier</th>
+                    <th>Card Number</th>
+                    <th>Verification Token</th>
+                    <th>Status</th>
+                    <th>Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {issuedCards.map((card) => (
+                    <tr key={card.id}>
+                      <td style={{ fontWeight: 600 }}>{card.holderName}</td>
+                      <td>
+                        <Badge variant="info">STUDENT</Badge>
+                      </td>
+                      <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.82rem' }}>{card.identifier}</td>
+                      <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.82rem', fontWeight: 600 }}>
+                        {card.cardNumber}
+                      </td>
+                      <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                        {card.verificationToken}
+                      </td>
+                      <td>
+                        {card.status === 'ACTIVE' && <Badge variant="success">Active</Badge>}
+                        {card.status === 'REVOKED' && (
+                          <Badge variant="danger" icon={<ShieldAlert size={12} />}>
+                            Revoked
+                          </Badge>
+                        )}
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <button
+                            onClick={() => setPreviewCard(card)}
+                            className="ed-btn ed-btn-secondary"
+                            style={{ padding: '4px 8px', fontSize: '0.76rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                          >
+                            <Eye size={12} /> ISO CR80 View
+                          </button>
+                          {card.status === 'ACTIVE' && (
+                            <button
+                              onClick={() => setShowDeactivateModal(card)}
+                              className="ed-btn ed-btn-danger"
+                              style={{ padding: '4px 8px', fontSize: '0.76rem' }}
+                            >
+                              Deactivate
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
       )}
@@ -938,12 +831,12 @@ export const SchoolAdminDashboard: React.FC = () => {
         isOpen={showAdmitModal}
         onClose={() => setShowAdmitModal(false)}
         title="Enroll New Student (SIS Registration)"
-        subtitle="Generates student record, guardian links, and unique admission number"
+        subtitle="Generates student record, guardian links, and persists to PostgreSQL"
       >
         <form onSubmit={handleEnrollStudent} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
             <div className="ed-input-group" style={{ marginBottom: 0 }}>
-              <label className="ed-label">First Name</label>
+              <label className="ed-label">First Name *</label>
               <input
                 required
                 type="text"
@@ -954,7 +847,7 @@ export const SchoolAdminDashboard: React.FC = () => {
               />
             </div>
             <div className="ed-input-group" style={{ marginBottom: 0 }}>
-              <label className="ed-label">Last Name</label>
+              <label className="ed-label">Last Name *</label>
               <input
                 required
                 type="text"
@@ -968,11 +861,11 @@ export const SchoolAdminDashboard: React.FC = () => {
 
           <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 'var(--space-3)' }}>
             <div className="ed-input-group" style={{ marginBottom: 0 }}>
-              <label className="ed-label">Admission Number (Unique Scope)</label>
+              <label className="ed-label">Admission Number (Auto-assigned if empty)</label>
               <input
                 type="text"
                 className="ed-input"
-                placeholder="ADM-2026-XXXX (Leave blank to auto-generate)"
+                placeholder="ADM-2026-XXXX"
                 value={newStudent.admissionNumber}
                 onChange={(e) => setNewStudent({ ...newStudent, admissionNumber: e.target.value })}
               />
@@ -996,24 +889,31 @@ export const SchoolAdminDashboard: React.FC = () => {
               <label className="ed-label">Grade / Class</label>
               <select
                 className="ed-select"
-                value={newStudent.grade}
-                onChange={(e) => setNewStudent({ ...newStudent, grade: e.target.value })}
+                value={newStudent.className}
+                onChange={(e) => setNewStudent({ ...newStudent, className: e.target.value })}
               >
-                <option value="Grade 9">Grade 9</option>
-                <option value="Grade 10">Grade 10</option>
-                <option value="Grade 11">Grade 11</option>
+                {academicStructure.classes.length > 0 ? (
+                  academicStructure.classes.map((c) => (
+                    <option key={c.id} value={c.name}>{c.name}</option>
+                  ))
+                ) : (
+                  <>
+                    <option value="Grade 9">Grade 9</option>
+                    <option value="Grade 10">Grade 10</option>
+                    <option value="Grade 11">Grade 11</option>
+                  </>
+                )}
               </select>
             </div>
             <div className="ed-input-group" style={{ marginBottom: 0 }}>
               <label className="ed-label">Section</label>
               <select
                 className="ed-select"
-                value={newStudent.section}
-                onChange={(e) => setNewStudent({ ...newStudent, section: e.target.value })}
+                value={newStudent.sectionName}
+                onChange={(e) => setNewStudent({ ...newStudent, sectionName: e.target.value })}
               >
                 <option value="A">Section A</option>
                 <option value="B">Section B</option>
-                <option value="Science">Section Science</option>
               </select>
             </div>
           </div>
@@ -1023,7 +923,7 @@ export const SchoolAdminDashboard: React.FC = () => {
             <div style={{ fontWeight: 600, fontSize: '0.86rem', marginBottom: '8px' }}>Primary Guardian Relationship</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
               <div className="ed-input-group" style={{ marginBottom: 0 }}>
-                <label className="ed-label">Guardian Full Name</label>
+                <label className="ed-label">Guardian Full Name *</label>
                 <input
                   required
                   type="text"
@@ -1047,11 +947,11 @@ export const SchoolAdminDashboard: React.FC = () => {
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)', marginTop: 'var(--space-4)' }}>
-            <Button variant="secondary" type="button" onClick={() => setShowAdmitModal(false)}>
+            <Button variant="secondary" type="button" disabled={isSubmitting} onClick={() => setShowAdmitModal(false)}>
               Cancel
             </Button>
-            <Button variant="primary" type="submit">
-              Complete Admission
+            <Button variant="primary" type="submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Enrolling...' : 'Complete Admission'}
             </Button>
           </div>
         </form>
@@ -1086,7 +986,7 @@ export const SchoolAdminDashboard: React.FC = () => {
               <div>
                 <h3 style={{ margin: 0, fontSize: '1.15rem' }}>{selectedDossier.firstName} {selectedDossier.lastName}</h3>
                 <p style={{ margin: '2px 0 0', fontSize: '0.80rem', color: 'var(--text-muted)' }}>
-                  {selectedDossier.grade}-{selectedDossier.section} • Roll #{selectedDossier.rollNumber} • Blood: {selectedDossier.bloodGroup}
+                  {selectedDossier.className}-{selectedDossier.sectionName || 'A'} • Roll #{selectedDossier.rollNumber || 1} • Blood: {selectedDossier.bloodGroup || 'O+'}
                 </p>
               </div>
             </div>
@@ -1097,26 +997,32 @@ export const SchoolAdminDashboard: React.FC = () => {
                 <div style={{ fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{selectedDossier.admissionNumber}</div>
               </div>
               <div>
-                <span style={{ color: 'var(--text-muted)' }}>Attendance Rate:</span>
-                <div style={{ fontWeight: 600, color: 'var(--success-solid)' }}>{selectedDossier.attendanceRate}</div>
+                <span style={{ color: 'var(--text-muted)' }}>Enrollment Status:</span>
+                <div><Badge variant="success">{selectedDossier.status || 'ACTIVE'}</Badge></div>
               </div>
               <div>
                 <span style={{ color: 'var(--text-muted)' }}>Residential Address:</span>
-                <div>{selectedDossier.address}</div>
+                <div>{selectedDossier.address || 'Campus Residence'}</div>
               </div>
               <div>
-                <span style={{ color: 'var(--text-muted)' }}>Enrollment Status:</span>
-                <div><Badge variant="success">{selectedDossier.status}</Badge></div>
+                <span style={{ color: 'var(--text-muted)' }}>ID Card Status:</span>
+                <div>{selectedDossier.idCard ? <Badge variant="success">Issued ({selectedDossier.idCard.cardNumber})</Badge> : <Badge variant="neutral">Not Issued</Badge>}</div>
               </div>
             </div>
 
             <div style={{ borderTop: '1px solid var(--border-default)', paddingTop: 'var(--space-3)' }}>
               <h4 style={{ margin: '0 0 8px', fontSize: '0.90rem' }}>Authorized Guardian Information</h4>
-              <div style={{ padding: 'var(--space-3)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-sm)', fontSize: '0.84rem' }}>
-                <div style={{ fontWeight: 600 }}>{selectedDossier.guardianName} ({selectedDossier.guardianRelationship})</div>
-                <div style={{ color: 'var(--text-muted)', marginTop: '2px' }}>Phone: {selectedDossier.guardianPhone}</div>
-                <div style={{ color: 'var(--text-muted)' }}>Email: {selectedDossier.guardianEmail}</div>
-              </div>
+              {(selectedDossier.guardians || []).length > 0 ? (
+                selectedDossier.guardians.map((g, i) => (
+                  <div key={i} style={{ padding: 'var(--space-3)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-sm)', fontSize: '0.84rem', marginBottom: '6px' }}>
+                    <div style={{ fontWeight: 600 }}>{g.name} ({g.relationship})</div>
+                    <div style={{ color: 'var(--text-muted)', marginTop: '2px' }}>Phone: {g.phone}</div>
+                    <div style={{ color: 'var(--text-muted)' }}>Email: {g.email}</div>
+                  </div>
+                ))
+              ) : (
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>No guardian linked.</div>
+              )}
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 'var(--space-2)' }}>
@@ -1137,7 +1043,7 @@ export const SchoolAdminDashboard: React.FC = () => {
       >
         {previewCard && (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-4)' }}>
-            {/* Physical Card Mockup (CR80 standard 85.6 x 53.98 ratio) */}
+            {/* Physical Card Mockup */}
             <div
               style={{
                 width: '340px',
@@ -1174,12 +1080,12 @@ export const SchoolAdminDashboard: React.FC = () => {
               {/* Card Body */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '14px', margin: '6px 0' }}>
                 <div style={{ width: '56px', height: '56px', borderRadius: '8px', backgroundColor: '#334155', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '1.4rem', border: '1px solid rgba(255, 255, 255, 0.2)' }}>
-                  {previewCard.holderName[0]}
+                  {previewCard.holderName ? previewCard.holderName[0] : 'S'}
                 </div>
                 <div>
                   <div style={{ fontSize: '0.96rem', fontWeight: 700, letterSpacing: '-0.01em' }}>{previewCard.holderName}</div>
-                  <div style={{ fontSize: '0.70rem', color: '#38bdf8', fontFamily: 'var(--font-mono)' }}>{previewCard.identifier}</div>
-                  <div style={{ fontSize: '0.64rem', color: '#94a3b8', marginTop: '2px' }}>{previewCard.holderType} BADGE</div>
+                  <div style={{ fontSize: '0.70rem', color: '#38bdf8', fontFamily: 'var(--font-mono)' }}>{previewCard.identifierNumber || previewCard.identifier}</div>
+                  <div style={{ fontSize: '0.64rem', color: '#94a3b8', marginTop: '2px' }}>{previewCard.holderType || 'STUDENT'} BADGE</div>
                 </div>
               </div>
 
@@ -1187,7 +1093,7 @@ export const SchoolAdminDashboard: React.FC = () => {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderTop: '1px solid rgba(255, 255, 255, 0.1)', paddingTop: '6px' }}>
                 <div>
                   <div style={{ fontSize: '0.60rem', color: '#94a3b8' }}>CARD NO: {previewCard.cardNumber}</div>
-                  <div style={{ fontSize: '0.58rem', color: '#64748b', fontFamily: 'var(--font-mono)' }}>{previewCard.verificationToken.slice(0, 16)}...</div>
+                  <div style={{ fontSize: '0.58rem', color: '#64748b', fontFamily: 'var(--font-mono)' }}>{previewCard.verificationToken?.slice(0, 16)}...</div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: '#ffffff', padding: '3px', borderRadius: '4px', color: '#0F172A' }}>
                   <QrCode size={26} />
@@ -1196,7 +1102,7 @@ export const SchoolAdminDashboard: React.FC = () => {
             </div>
 
             <div style={{ fontSize: '0.80rem', color: 'var(--text-muted)', textAlign: 'center' }}>
-              QR Token: <code style={{ backgroundColor: 'var(--bg-subtle)', padding: '2px 6px', borderRadius: '4px' }}>{previewCard.verificationToken}</code>
+              QR Verification Token: <code style={{ backgroundColor: 'var(--bg-subtle)', padding: '2px 6px', borderRadius: '4px' }}>{previewCard.verificationToken}</code>
             </div>
 
             <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
@@ -1226,7 +1132,7 @@ export const SchoolAdminDashboard: React.FC = () => {
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
           <div style={{ padding: 'var(--space-3)', backgroundColor: 'var(--danger-bg)', border: '1px solid var(--danger-border)', borderRadius: 'var(--radius-sm)', color: 'var(--danger-text)', fontSize: '0.84rem' }}>
-            <strong>Warning:</strong> Deactivating this card immediately revokes the public verification QR token. The public verification page will reflect invalid status.
+            <strong>Warning:</strong> Deactivating this card immediately revokes the public verification QR token in PostgreSQL. Any scan will return invalid status.
           </div>
 
           <div className="ed-input-group" style={{ marginBottom: 0 }}>
@@ -1259,7 +1165,7 @@ export const SchoolAdminDashboard: React.FC = () => {
         isOpen={!!showAssignModal}
         onClose={() => setShowAssignModal(null)}
         title="Assign Teaching Duties"
-        subtitle={`Faculty: ${showAssignModal?.name} (${showAssignModal?.employeeId})`}
+        subtitle={`Faculty: ${showAssignModal?.firstName} ${showAssignModal?.lastName} (${showAssignModal?.employeeId})`}
       >
         <form onSubmit={handleSaveAssignment} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
@@ -1270,9 +1176,17 @@ export const SchoolAdminDashboard: React.FC = () => {
                 value={assignForm.className}
                 onChange={(e) => setAssignForm({ ...assignForm, className: e.target.value })}
               >
-                <option value="Grade 9">Grade 9</option>
-                <option value="Grade 10">Grade 10</option>
-                <option value="Grade 11">Grade 11</option>
+                {academicStructure.classes.length > 0 ? (
+                  academicStructure.classes.map((c) => (
+                    <option key={c.id} value={c.name}>{c.name}</option>
+                  ))
+                ) : (
+                  <>
+                    <option value="Grade 9">Grade 9</option>
+                    <option value="Grade 10">Grade 10</option>
+                    <option value="Grade 11">Grade 11</option>
+                  </>
+                )}
               </select>
             </div>
             <div className="ed-input-group" style={{ marginBottom: 0 }}>
@@ -1289,17 +1203,14 @@ export const SchoolAdminDashboard: React.FC = () => {
           </div>
 
           <div className="ed-input-group" style={{ marginBottom: 0 }}>
-            <label className="ed-label">Subject</label>
-            <select
-              className="ed-select"
+            <label className="ed-label">Subject Code</label>
+            <input
+              required
+              className="ed-input"
+              placeholder="e.g. PHY-10 or MATH-10"
               value={assignForm.subjectCode}
               onChange={(e) => setAssignForm({ ...assignForm, subjectCode: e.target.value })}
-            >
-              <option value="PHY-10">Physics (PHY-10)</option>
-              <option value="MATH-10">Mathematics (MATH-10)</option>
-              <option value="CHEM-10">Chemistry (CHEM-10)</option>
-              <option value="CS-10">Computer Science & AI (CS-10)</option>
-            </select>
+            />
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>

@@ -143,6 +143,7 @@ model School {
   subscriptions     Subscription[]
   auditLogs         AuditLog[]
   admissionApplications AdmissionApplication[]
+  notifications     Notification[]
 
   @@index([slug])
   @@index([status])
@@ -165,6 +166,7 @@ model User {
 
   memberships        UserMembership[]
   auditLogs          AuditLog[]
+  notifications      Notification[]
 
   @@index([email])
 }
@@ -671,6 +673,7 @@ model Assignment {
   assignedDate DateTime    @default(now())
   dueDate     DateTime
   maxMarks    Float?
+  attachmentUrl String?
 
   section     Section      @relation(fields: [sectionId], references: [id], onDelete: Cascade)
   submissions AssignmentSubmission[]
@@ -684,6 +687,9 @@ model AssignmentSubmission {
   studentProfileId String
   submissionText   String?
   fileUrl          String?
+  fileName         String?
+  fileSizeBytes    Int?
+  fileType         String?
   submittedAt      DateTime       @default(now())
   isLate           Boolean        @default(false)
   marksAwarded     Float?
@@ -702,6 +708,7 @@ model LearningResource {
   description String?
   fileUrl     String
   fileType    String
+  fileSizeBytes Int?
   topic       String?
   uploadedAt  DateTime @default(now())
 
@@ -716,7 +723,9 @@ model Notice {
   title       String
   content     String
   audience    EventAudience @default(ALL)
+  targetClass String?
   isUrgent    Boolean       @default(false)
+  createdByUserId String?
   publishedAt DateTime      @default(now())
   expiresAt   DateTime?
 
@@ -766,6 +775,7 @@ model FeeInvoice {
   discountApplied  Float            @default(0.0)
   dueDate          DateTime
   status           FeePaymentStatus @default(UNPAID)
+  auditTrail       Json?
 
   feeStructure     FeeStructure     @relation(fields: [feeStructureId], references: [id], onDelete: Cascade)
   student          StudentProfile   @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
@@ -785,10 +795,29 @@ model FeePayment {
   transactionRef String?
   isSimulated   Boolean      @default(true)
   collectedBy   String?
+  notes         String?
 
   invoice       FeeInvoice   @relation(fields: [feeInvoiceId], references: [id], onDelete: Cascade)
 
   @@index([receiptNumber])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  schoolId  String
+  userId    String
+  title     String
+  message   String
+  type      String   @default("INFO")
+  link      String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  school    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([schoolId, userId])
 }
 
 model AuditLog {

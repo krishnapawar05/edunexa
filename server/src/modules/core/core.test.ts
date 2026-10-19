@@ -1,10 +1,23 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import request from 'supertest';
 import { app } from '../../app.js';
+import { prisma } from '../../config/db.js';
 import { generateAccessToken } from '../../utils/crypto.js';
 import { PlatformRole } from '@edunexa/shared';
 
 describe('STAGE 4: Core School Management Test Suite', () => {
+  beforeAll(async () => {
+    await prisma.admissionApplication.updateMany({
+      where: {
+        OR: [{ id: 'adm-app-01' }, { applicationNumber: 'APP-2026-0091' }],
+      },
+      data: {
+        status: 'SUBMITTED',
+        reviewNotes: null,
+      },
+    });
+  });
+
   const schoolAdminTokenSchoolA = generateAccessToken({
     userId: 'usr-schooladmin-01',
     email: 'admin@apexacademy.edu',

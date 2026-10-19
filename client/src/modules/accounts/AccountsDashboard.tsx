@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   CreditCard,
   Receipt,
@@ -13,12 +13,15 @@ import {
   Printer,
   Download,
   FileSpreadsheet,
+  Loader2,
+  RefreshCw,
 } from 'lucide-react';
 import { Badge } from '../../components/ui/Badge.js';
 import { Button } from '../../components/ui/Button.js';
 import { Modal } from '../../components/ui/Modal.js';
 import { Tabs } from '../../components/ui/Tabs.js';
 import { useSchoolBranding } from '../../context/SchoolBrandingContext.js';
+import { operationsApi } from '../../services/api.js';
 
 interface InvoiceRecord {
   id: string;
@@ -30,76 +33,17 @@ interface InvoiceRecord {
   totalAmount: number;
   paidAmount: number;
   dueDate: string;
-  status: 'PAID' | 'PARTIAL' | 'OVERDUE';
+  status: 'PAID' | 'PARTIAL' | 'OVERDUE' | 'PENDING';
 }
-
-const INITIAL_INVOICES: InvoiceRecord[] = [
-  {
-    id: 'inv-01',
-    invoiceNo: 'INV-2026-0412',
-    studentName: 'Aarav Sharma',
-    admissionNo: 'ADM-2026-0042',
-    classGrade: 'Grade 10-A',
-    term: 'Term 2 (Oct–Dec 2026)',
-    totalAmount: 45000,
-    paidAmount: 45000,
-    dueDate: '2026-10-15',
-    status: 'PAID',
-  },
-  {
-    id: 'inv-02',
-    invoiceNo: 'INV-2026-0413',
-    studentName: 'Ananya Deshmukh',
-    admissionNo: 'ADM-2026-0089',
-    classGrade: 'Grade 10-A',
-    term: 'Term 2 (Oct–Dec 2026)',
-    totalAmount: 45000,
-    paidAmount: 20000,
-    dueDate: '2026-10-15',
-    status: 'PARTIAL',
-  },
-  {
-    id: 'inv-03',
-    invoiceNo: 'INV-2026-0414',
-    studentName: 'Rohan Verma',
-    admissionNo: 'ADM-2026-0104',
-    classGrade: 'Grade 9-B',
-    term: 'Term 2 (Oct–Dec 2026)',
-    totalAmount: 42000,
-    paidAmount: 0,
-    dueDate: '2026-10-10',
-    status: 'OVERDUE',
-  },
-  {
-    id: 'inv-04',
-    invoiceNo: 'INV-2026-0415',
-    studentName: 'Maya Sharma',
-    admissionNo: 'ADM-2026-0112',
-    classGrade: 'Grade 7-B',
-    term: 'Term 2 (Oct–Dec 2026)',
-    totalAmount: 38000,
-    paidAmount: 38000,
-    dueDate: '2026-10-15',
-    status: 'PAID',
-  },
-  {
-    id: 'inv-05',
-    invoiceNo: 'INV-2026-0416',
-    studentName: 'Ishaan Gupta',
-    admissionNo: 'ADM-2026-0155',
-    classGrade: 'Grade 11-A',
-    term: 'Term 2 (Oct–Dec 2026)',
-    totalAmount: 52000,
-    paidAmount: 26000,
-    dueDate: '2026-10-20',
-    status: 'PARTIAL',
-  },
-];
 
 export const AccountsDashboard: React.FC = () => {
   const { branding } = useSchoolBranding();
   const [activeTab, setActiveTab] = useState<'invoices' | 'structures' | 'reconciliation'>('invoices');
-  const [invoices, setInvoices] = useState<InvoiceRecord[]>(INITIAL_INVOICES);
+  const [invoices, setInvoices] = useState<InvoiceRecord[]>([]);
+  const [feeSummary, setFeeSummary] = useState<any>(null);
+  const [loadingData, setLoadingData] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
 
@@ -107,6 +51,7 @@ export const AccountsDashboard: React.FC = () => {
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceRecord | null>(null);
   const [paymentAmount, setPaymentAmount] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState('UPI');
+  const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
   const [recentReceipt, setRecentReceipt] = useState<{
     receiptNo: string;
     studentName: string;
@@ -122,37 +67,102 @@ export const AccountsDashboard: React.FC = () => {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
+  const loadFeeData = async () => {
+    try {
+      setLoadingData(true);
+      setErrorMsg(null);
+
+      // Load invoices from PostgreSQL
+      const invs = await operationsApi.listFeeInvoices();
+      if (invs) {
+        setInvoices(
+          invs.map((i: any) => ({
+            id: i.id,
+            invoiceNo: i.invoiceNumber,
+            studentName: i.studentName || 'Student',
+            admissionNo: i.studentProfileId || 'ADM-2026',
+            classGrade: i.className || 'Grade 10',
+            term: i.feeStructureHead || 'Term Tuition',
+            totalAmount: i.amountDue,
+            paidAmount: i.amountPaid,
+            dueDate: i.dueDate,
+            status: i.status === 'PAID' ? 'PAID' : (i.amountPaid > 0 ? 'PARTIAL' : 'OVERDUE'),
+          }))
+        );
+      }
+
+      // Load fee summary metrics from PostgreSQL
+      try {
+        const summary = await operationsApi.getFeeSummary();
+        setFeeSummary(summary);
+      } catch (err) {
+        console.warn('Fee summary notice:', err);
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to load fee ledger from PostgreSQL.');
+    } finally {
+      setLoadingData(false);
+    }
+  };
+
+  useEffect(() => {
+    loadFeeData();
+  }, []);
+
   const handleOpenPayment = (inv: InvoiceRecord) => {
     setSelectedInvoice(inv);
     setPaymentAmount(inv.totalAmount - inv.paidAmount);
   };
 
-  const handleRecordPayment = (e: React.FormEvent) => {
+  const handleRecordPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedInvoice) return;
 
-    const receiptNo = `REC-2026-${Math.floor(1000 + Math.random() * 9000)}`;
-    const newPaid = selectedInvoice.paidAmount + paymentAmount;
-    const newStatus = newPaid >= selectedInvoice.totalAmount ? 'PAID' : 'PARTIAL';
+    try {
+      setIsSubmittingPayment(true);
+      const receiptNo = `REC-2026-${Math.floor(1000 + Math.random() * 9000)}`;
 
-    setInvoices((prev) =>
-      prev.map((i) =>
-        i.id === selectedInvoice.id
-          ? { ...i, paidAmount: newPaid, status: newStatus }
-          : i
-      )
-    );
+      await operationsApi.recordFeePayment({
+        invoiceId: selectedInvoice.id,
+        amount: paymentAmount,
+        paymentMethod,
+        transactionReference: receiptNo,
+      });
 
-    setRecentReceipt({
-      receiptNo,
-      studentName: selectedInvoice.studentName,
-      amount: paymentAmount,
-      method: paymentMethod,
-      date: new Date().toLocaleDateString('en-GB'),
-    });
+      setRecentReceipt({
+        receiptNo,
+        studentName: selectedInvoice.studentName,
+        amount: paymentAmount,
+        method: paymentMethod,
+        date: new Date().toLocaleDateString('en-GB'),
+      });
 
-    setSelectedInvoice(null);
-    showToast(`Payment of ₹${paymentAmount.toLocaleString()} recorded. Receipt ${receiptNo} generated.`);
+      setSelectedInvoice(null);
+      showToast(`Payment of ₹${paymentAmount.toLocaleString()} recorded. Receipt ${receiptNo} issued.`);
+      await loadFeeData();
+    } catch (err: any) {
+      showToast('Payment recording failed: ' + err.message);
+    } finally {
+      setIsSubmittingPayment(false);
+    }
+  };
+
+  const handleExportCsv = async () => {
+    try {
+      showToast('Generating official fee ledger CSV export from database...');
+      const csvData = await operationsApi.exportFeeCsv();
+      const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `edunexa_fee_ledger_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      showToast('Fee ledger exported successfully.');
+    } catch (err: any) {
+      showToast('Export failed: ' + err.message);
+    }
   };
 
   const filteredInvoices = invoices.filter((i) => {
@@ -164,9 +174,10 @@ export const AccountsDashboard: React.FC = () => {
     return matchesSearch && matchesStatus;
   });
 
-  const totalInvoiced = invoices.reduce((acc, i) => acc + i.totalAmount, 0);
-  const totalCollected = invoices.reduce((acc, i) => acc + i.paidAmount, 0);
-  const totalOutstanding = totalInvoiced - totalCollected;
+  const totalInvoiced = feeSummary?.totalInvoiced ?? invoices.reduce((acc, i) => acc + i.totalAmount, 0);
+  const totalCollected = feeSummary?.totalCollected ?? invoices.reduce((acc, i) => acc + i.paidAmount, 0);
+  const totalOutstanding = feeSummary?.totalOutstanding ?? (totalInvoiced - totalCollected);
+  const realizationRate = totalInvoiced > 0 ? Math.round((totalCollected / totalInvoiced) * 100) : 100;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
@@ -205,52 +216,59 @@ export const AccountsDashboard: React.FC = () => {
         <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
           <Button
             variant="secondary"
-            icon={<Download size={15} />}
-            onClick={() => showToast('Fee ledger exported to institutional CSV format.')}
+            icon={<RefreshCw size={14} className={loadingData ? 'animate-spin' : ''} />}
+            onClick={loadFeeData}
+            disabled={loadingData}
           >
-            Export Ledger
+            Refresh
           </Button>
           <Button
-            variant="primary"
-            icon={<Plus size={15} />}
-            onClick={() => showToast('Batch invoicing engine opened for Term 3 (Jan–Mar 2027).')}
+            variant="secondary"
+            icon={<Download size={15} />}
+            onClick={handleExportCsv}
           >
-            Generate Term Invoices
+            Export CSV Ledger
           </Button>
         </div>
       </div>
 
-      {/* Operational Metric Tiles */}
+      {errorMsg && (
+        <div style={{ padding: '12px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--radius-sm)', color: '#dc2626', fontSize: '0.85rem' }}>
+          {errorMsg}
+        </div>
+      )}
+
+      {/* Operational Metric Tiles from PostgreSQL */}
       <div className="ed-grid-4">
         <div className="ed-metric-tile">
-          <span className="label">Total Invoiced (Term 2)</span>
-          <span className="value">₹{(totalInvoiced * 12).toLocaleString()}</span>
-          <span className="subtitle">Across 620 enrolled students</span>
+          <span className="label">Total Invoiced</span>
+          <span className="value">₹{loadingData ? '...' : totalInvoiced.toLocaleString()}</span>
+          <span className="subtitle">Persisted in Fee Ledger</span>
         </div>
         <div className="ed-metric-tile">
           <span className="label">Realized Revenue</span>
           <span className="value" style={{ color: 'var(--success-solid)' }}>
-            ₹{(totalCollected * 12).toLocaleString()}
+            ₹{loadingData ? '...' : totalCollected.toLocaleString()}
           </span>
           <span className="subtitle">
-            <CheckCircle2 size={13} /> {Math.round((totalCollected / totalInvoiced) * 100)}% realization rate
+            <CheckCircle2 size={13} /> {realizationRate}% realization rate
           </span>
         </div>
         <div className="ed-metric-tile">
           <span className="label">Outstanding Dues</span>
           <span className="value" style={{ color: 'var(--warning-solid)' }}>
-            ₹{(totalOutstanding * 12).toLocaleString()}
+            ₹{loadingData ? '...' : totalOutstanding.toLocaleString()}
           </span>
           <span className="subtitle">
-            <Clock size={13} /> 18 overdue accounts
+            <Clock size={13} /> {invoices.filter((i) => i.status !== 'PAID').length} pending invoices
           </span>
         </div>
         <div className="ed-metric-tile">
-          <span className="label">Payment Gateways</span>
+          <span className="label">Database Sync</span>
           <span className="value" style={{ color: 'var(--primary-700)' }}>
-            Online
+            PostgreSQL
           </span>
-          <span className="subtitle">UPI, Net Banking & NEFT active</span>
+          <span className="subtitle">Real Fee Ledger Engine</span>
         </div>
       </div>
 
@@ -316,78 +334,91 @@ export const AccountsDashboard: React.FC = () => {
 
           {/* Table */}
           <div className="ed-table-container" style={{ border: 'none', borderRadius: 0 }}>
-            <table className="ed-table">
-              <thead>
-                <tr>
-                  <th>Invoice No</th>
-                  <th>Student</th>
-                  <th>Grade</th>
-                  <th>Term</th>
-                  <th>Invoiced (₹)</th>
-                  <th>Paid (₹)</th>
-                  <th>Balance Due (₹)</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredInvoices.map((inv) => {
-                  const balance = inv.totalAmount - inv.paidAmount;
-                  return (
-                    <tr key={inv.id}>
-                      <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.82rem', fontWeight: 600 }}>
-                        {inv.invoiceNo}
-                      </td>
-                      <td>
-                        <div style={{ fontWeight: 600 }}>{inv.studentName}</div>
-                        <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>{inv.admissionNo}</div>
-                      </td>
-                      <td>{inv.classGrade}</td>
-                      <td style={{ fontSize: '0.80rem' }}>{inv.term}</td>
-                      <td style={{ fontWeight: 600 }}>₹{inv.totalAmount.toLocaleString()}</td>
-                      <td style={{ color: 'var(--success-solid)', fontWeight: 500 }}>
-                        ₹{inv.paidAmount.toLocaleString()}
-                      </td>
-                      <td style={{ fontWeight: 600, color: balance > 0 ? 'var(--danger-solid)' : 'var(--text-muted)' }}>
-                        ₹{balance.toLocaleString()}
-                      </td>
-                      <td>
-                        {inv.status === 'PAID' && <Badge variant="success">Paid in Full</Badge>}
-                        {inv.status === 'PARTIAL' && <Badge variant="warning">Partial</Badge>}
-                        {inv.status === 'OVERDUE' && <Badge variant="danger">Overdue</Badge>}
-                      </td>
-                      <td>
-                        {balance > 0 ? (
-                          <button
-                            onClick={() => handleOpenPayment(inv)}
-                            className="ed-btn ed-btn-primary"
-                            style={{ padding: '4px 8px', fontSize: '0.76rem' }}
-                          >
-                            Record Payment
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => {
-                              setRecentReceipt({
-                                receiptNo: `REC-2026-PAID`,
-                                studentName: inv.studentName,
-                                amount: inv.totalAmount,
-                                method: 'Net Banking',
-                                date: '2026-10-12',
-                              });
-                            }}
-                            className="ed-btn ed-btn-secondary"
-                            style={{ padding: '4px 8px', fontSize: '0.76rem', display: 'flex', alignItems: 'center', gap: '4px' }}
-                          >
-                            <Receipt size={12} /> View Receipt
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            {loadingData ? (
+              <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                <Loader2 size={24} className="animate-spin" style={{ margin: '0 auto 8px' }} />
+                <span>Loading fee invoices from database...</span>
+              </div>
+            ) : filteredInvoices.length === 0 ? (
+              <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                <Receipt size={36} style={{ margin: '0 auto 8px', opacity: 0.3 }} />
+                <p style={{ fontWeight: 600 }}>No Invoices Found</p>
+                <p style={{ fontSize: '0.8rem' }}>No fee invoice records match your criteria in the school ledger.</p>
+              </div>
+            ) : (
+              <table className="ed-table">
+                <thead>
+                  <tr>
+                    <th>Invoice No</th>
+                    <th>Student</th>
+                    <th>Grade</th>
+                    <th>Fee Head</th>
+                    <th>Invoiced (₹)</th>
+                    <th>Paid (₹)</th>
+                    <th>Balance Due (₹)</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredInvoices.map((inv) => {
+                    const balance = inv.totalAmount - inv.paidAmount;
+                    return (
+                      <tr key={inv.id}>
+                        <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.82rem', fontWeight: 600 }}>
+                          {inv.invoiceNo}
+                        </td>
+                        <td>
+                          <div style={{ fontWeight: 600 }}>{inv.studentName}</div>
+                          <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>{inv.admissionNo}</div>
+                        </td>
+                        <td>{inv.classGrade}</td>
+                        <td style={{ fontSize: '0.80rem' }}>{inv.term}</td>
+                        <td style={{ fontWeight: 600 }}>₹{inv.totalAmount.toLocaleString()}</td>
+                        <td style={{ color: 'var(--success-solid)', fontWeight: 500 }}>
+                          ₹{inv.paidAmount.toLocaleString()}
+                        </td>
+                        <td style={{ fontWeight: 600, color: balance > 0 ? 'var(--danger-solid)' : 'var(--text-muted)' }}>
+                          ₹{balance.toLocaleString()}
+                        </td>
+                        <td>
+                          {inv.status === 'PAID' && <Badge variant="success">Paid in Full</Badge>}
+                          {inv.status === 'PARTIAL' && <Badge variant="warning">Partial</Badge>}
+                          {inv.status === 'OVERDUE' && <Badge variant="danger">Overdue</Badge>}
+                        </td>
+                        <td>
+                          {balance > 0 ? (
+                            <button
+                              onClick={() => handleOpenPayment(inv)}
+                              className="ed-btn ed-btn-primary"
+                              style={{ padding: '4px 8px', fontSize: '0.76rem' }}
+                            >
+                              Record Payment
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                setRecentReceipt({
+                                  receiptNo: `REC-${inv.invoiceNo.replace('INV-', '')}`,
+                                  studentName: inv.studentName,
+                                  amount: inv.totalAmount,
+                                  method: 'Digital Clearing',
+                                  date: new Date().toLocaleDateString('en-GB'),
+                                });
+                              }}
+                              className="ed-btn ed-btn-secondary"
+                              style={{ padding: '4px 8px', fontSize: '0.76rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                            >
+                              <Receipt size={12} /> View Receipt
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
       )}
@@ -446,10 +477,10 @@ export const AccountsDashboard: React.FC = () => {
                 Real-time bank settlement sync with ICICI & HDFC institutional clearing accounts.
               </p>
             </div>
-            <Badge variant="success">All Settled (0 Discrepancies)</Badge>
+            <Badge variant="success">All Settled in PostgreSQL</Badge>
           </div>
           <div style={{ padding: 'var(--space-4)', backgroundColor: 'var(--bg-subtle)', borderRadius: 'var(--radius-sm)', fontSize: '0.85rem' }}>
-            Last sync completed 14 minutes ago. 142 digital transactions matched with bank statement.
+            All incoming tuition payments and online collections are reconciled against the school ledger in PostgreSQL.
           </div>
         </div>
       )}
@@ -500,10 +531,9 @@ export const AccountsDashboard: React.FC = () => {
               onChange={(e) => setPaymentMethod(e.target.value)}
             >
               <option value="UPI">UPI (Google Pay / PhonePe / Paytm)</option>
-              <option value="Net Banking">Net Banking / IMPS</option>
-              <option value="NEFT">Bank Wire / NEFT Transfer</option>
-              <option value="Credit/Debit Card">Credit / Debit Card</option>
-              <option value="Cash / Cheque">Institutional Cash Counter / Cheque</option>
+              <option value="NET_BANKING">Net Banking / Direct IMPS</option>
+              <option value="CASH">Institutional Cash Counter</option>
+              <option value="CHEQUE">Bank Draft / Cheque</option>
             </select>
           </div>
 
@@ -511,76 +541,48 @@ export const AccountsDashboard: React.FC = () => {
             <Button variant="secondary" type="button" onClick={() => setSelectedInvoice(null)}>
               Cancel
             </Button>
-            <Button variant="primary" type="submit">
-              Confirm & Issue Receipt
+            <Button variant="primary" type="submit" disabled={isSubmittingPayment}>
+              {isSubmittingPayment ? 'Recording to DB...' : 'Record Payment & Issue Receipt'}
             </Button>
           </div>
         </form>
       </Modal>
 
       {/* Modal: View Receipt */}
-      <Modal
-        isOpen={!!recentReceipt}
-        onClose={() => setRecentReceipt(null)}
-        title="Official Payment Receipt"
-        subtitle={branding.schoolName}
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-          <div
-            style={{
-              padding: 'var(--space-5)',
-              border: '1px solid var(--border-default)',
-              borderRadius: 'var(--radius-md)',
-              backgroundColor: 'var(--bg-subtle)',
-              fontFamily: 'var(--font-mono)',
-              fontSize: '0.84rem',
-            }}
-          >
-            <div style={{ textAlign: 'center', marginBottom: 'var(--space-3)' }}>
-              <div style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--text-primary)' }}>{branding.schoolName}</div>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{branding.address}</div>
-              <div style={{ fontWeight: 700, marginTop: '4px', color: 'var(--primary-700)' }}>
-                FEE PAYMENT RECEIPT #{recentReceipt?.receiptNo}
+      {recentReceipt && (
+        <Modal
+          isOpen={!!recentReceipt}
+          onClose={() => setRecentReceipt(null)}
+          title="Official Fee Receipt"
+          subtitle={`Receipt: ${recentReceipt.receiptNo}`}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+            <div style={{ textAlign: 'center', padding: '16px', backgroundColor: 'var(--bg-subtle)', borderRadius: 'var(--radius-sm)' }}>
+              <CheckCircle2 size={36} style={{ color: 'var(--success-solid)', margin: '0 auto 8px' }} />
+              <div style={{ fontWeight: 800, fontSize: '1.2rem', color: 'var(--primary-800)' }}>
+                ₹{recentReceipt.amount.toLocaleString()}.00
               </div>
+              <div style={{ fontSize: '0.80rem', color: 'var(--text-muted)' }}>Payment Confirmed & Verified</div>
             </div>
 
-            <div style={{ borderTop: '1px dashed var(--border-default)', paddingTop: 'var(--space-2)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>Date of Issue:</span>
-                <span>{recentReceipt?.date}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>Student Name:</span>
-                <span>{recentReceipt?.studentName}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>Payment Mode:</span>
-                <span>{recentReceipt?.method}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: '0.92rem', marginTop: '6px' }}>
-                <span>Amount Realized:</span>
-                <span style={{ color: 'var(--success-solid)' }}>₹{recentReceipt?.amount.toLocaleString()}</span>
-              </div>
+            <div style={{ fontSize: '0.84rem', lineHeight: 1.8 }}>
+              <div><strong>Student Name:</strong> {recentReceipt.studentName}</div>
+              <div><strong>Payment Method:</strong> {recentReceipt.method}</div>
+              <div><strong>Date of Transaction:</strong> {recentReceipt.date}</div>
+              <div><strong>Institutional Seal:</strong> Apex Academy Accounts Bureau</div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)', marginTop: 'var(--space-3)' }}>
+              <Button variant="secondary" onClick={() => setRecentReceipt(null)}>
+                Close
+              </Button>
+              <Button variant="primary" icon={<Printer size={14} />} onClick={() => window.print()}>
+                Print Official Receipt
+              </Button>
             </div>
           </div>
-
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)' }}>
-            <Button
-              variant="secondary"
-              icon={<Printer size={14} />}
-              onClick={() => {
-                showToast('Receipt queued for institutional printing.');
-                setRecentReceipt(null);
-              }}
-            >
-              Print Receipt
-            </Button>
-            <Button variant="primary" onClick={() => setRecentReceipt(null)}>
-              Done
-            </Button>
-          </div>
-        </div>
-      </Modal>
+        </Modal>
+      )}
     </div>
   );
 };

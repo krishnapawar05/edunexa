@@ -9,67 +9,488 @@ export function getApiUrl(endpoint: string): string {
   return `${base}/${cleanEndpoint}`;
 }
 
-export async function fetchServerHealth(): Promise<HealthCheckData | null> {
+// ============================================================================
+// AUTHENTICATION & SESSION MANAGEMENT
+// ============================================================================
+
+export interface StoredUser {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: string;
+  schoolId?: string;
+  studentProfileId?: string;
+  staffProfileId?: string;
+}
+
+export function getStoredAuthToken(role?: string): string {
+  // Check primary token
+  const stored = localStorage.getItem('edunexa_access_token') || localStorage.getItem('edunexa_token');
+  if (stored) return stored;
+  // Fallback demo tokens for initial unauthenticated boot
+  return role === 'TEACHER' ? 'demo-teacher-token' : 'demo-student-token';
+}
+
+export function setAuthSession(token: string, user: StoredUser): void {
+  localStorage.setItem('edunexa_access_token', token);
+  localStorage.setItem('edunexa_token', token);
+  localStorage.setItem('edunexa_user', JSON.stringify(user));
+}
+
+export function getStoredUser(): StoredUser | null {
   try {
-    const res = await fetch(getApiUrl('/api/health'));
-    if (!res.ok) {
-      throw new Error(`HTTP error! status: ${res.status}`);
-    }
-    const json: ApiResponse<HealthCheckData> = await res.json();
-    if (json.success) {
-      return json.data;
-    }
-    return null;
-  } catch (err) {
-    console.warn('Backend server connectivity check:', err);
+    const raw = localStorage.getItem('edunexa_user');
+    return raw ? JSON.parse(raw) : null;
+  } catch {
     return null;
   }
 }
 
-// Token helper: retrieves stored token or fallback demo teacher/admin token
-export function getStoredAuthToken(role?: string): string {
-  const stored = localStorage.getItem('edunexa_token');
-  if (stored) return stored;
-  // Fallback demo tokens for visual evaluation in dev mode
-  return role === 'TEACHER' ? 'demo-teacher-token' : 'demo-student-token';
+export function clearAuthSession(): void {
+  localStorage.removeItem('edunexa_access_token');
+  localStorage.removeItem('edunexa_token');
+  localStorage.removeItem('edunexa_user');
 }
 
-export async function fetchStudentReportCard(studentProfileId: string, token: string) {
-  const res = await fetch(getApiUrl(`/api/v1/academic/report-cards/${studentProfileId}`), {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-  });
-  return res.json();
-}
+export const DEMO_CREDENTIALS: Record<string, { email: string; pass: string }> = {
+  SUPER_ADMIN: { email: 'superadmin@edunexa.org', pass: 'DemoPass2026!' },
+  SCHOOL_ADMIN: { email: 'admin@apexacademy.edu', pass: 'DemoPass2026!' },
+  TEACHER: { email: 'dr.thorne@apexacademy.edu', pass: 'DemoPass2026!' },
+  STUDENT: { email: 'aarav.sharma@student.apex.edu', pass: 'DemoPass2026!' },
+  PARENT: { email: 'sunil.sharma@parent.apex.edu', pass: 'DemoPass2026!' },
+  EXAM_COORDINATOR: { email: 'exam.coordinator@apexacademy.edu', pass: 'DemoPass2026!' },
+  HR_STAFF: { email: 'hr.admin@apexacademy.edu', pass: 'DemoPass2026!' },
+  ACCOUNTS: { email: 'accounts@apexacademy.edu', pass: 'DemoPass2026!' },
+};
 
-export async function submitStudentAttendanceApi(payload: any, token: string) {
-  const res = await fetch(getApiUrl('/api/v1/academic/attendance/students'), {
+export async function loginApi(email: string, password: string):Promise<{ accessToken: string; user: StoredUser }> {
+  const res = await fetch(getApiUrl('/api/v1/auth/login'), {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
   });
-  return res.json();
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.error?.message || 'Login failed.');
+  }
+  setAuthSession(json.data.accessToken, json.data.user);
+  return json.data;
 }
 
-export async function submitQuizAttemptApi(quizId: string, answers: any[], token: string) {
-  const res = await fetch(getApiUrl(`/api/v1/academic/quizzes/${quizId}/attempts/submit`), {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ quizId, answers, saveOnly: false }),
-  });
-  return res.json();
+export async function demoLoginForRole(role: string): Promise<string> {
+  const creds = DEMO_CREDENTIALS[role];
+  if (!creds) {
+    return getStoredAuthToken(role);
+  }
+  try {
+    const data = await loginApi(creds.email, creds.pass);
+    return data.accessToken;
+  } catch (err) {
+    console.warn(`Demo login fallback for ${role}:`, err);
+    return getStoredAuthToken(role);
+  }
 }
 
 // ============================================================================
-// STAGE 7: EDUNEXA AI CLIENT HELPERS
+// TYPED FETCH WRAPPER
+// ============================================================================
+
+export class ApiError extends Error {
+  statusCode: number;
+  code?: string;
+  constructor(message: string, statusCode: number, code?: string) {
+    super(message);
+    this.name = 'ApiError';
+    this.statusCode = statusCode;
+    this.code = code;
+  }
+}
+
+export async function apiRequest<T>(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const token = getStoredAuthToken();
+  const headers = new Headers(options.headers || {});
+
+  if (!headers.has('Authorization') && token) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+  if (!headers.has('Content-Type') && options.body && !(options.body instanceof FormData)) {
+    headers.set('Content-Type', 'application/json');
+  }
+
+  const res = await fetch(getApiUrl(endpoint), {
+    ...options,
+    headers,
+  });
+
+  const contentType = res.headers.get('content-type') || '';
+  if (contentType.includes('text/csv')) {
+    return (await res.text()) as unknown as T;
+  }
+
+  let json: any;
+  try {
+    json = await res.json();
+  } catch {
+    throw new ApiError(`Server responded with HTTP ${res.status}`, res.status);
+  }
+
+  if (!res.ok || !json.success) {
+    const errMsg = json.error?.message || json.message || `Request failed with status ${res.status}`;
+    const errCode = json.error?.code;
+    throw new ApiError(errMsg, res.status, errCode);
+  }
+
+  return json.data;
+}
+
+// ============================================================================
+// SERVER HEALTH
+// ============================================================================
+
+export async function fetchServerHealth(): Promise<HealthCheckData | null> {
+  try {
+    const res = await fetch(getApiUrl('/api/health'));
+    if (!res.ok) return null;
+    const json: ApiResponse<HealthCheckData> = await res.json();
+    return json.success ? json.data : null;
+  } catch (err) {
+    return null;
+  }
+}
+
+// ============================================================================
+// 1. SUPER ADMIN APIS
+// ============================================================================
+
+export const superadminApi = {
+  listSchools: () => apiRequest<any[]>('/api/v1/superadmin/schools'),
+  onboardSchool: (data: any) =>
+    apiRequest<any>('/api/v1/superadmin/schools', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  toggleStatus: (id: string, status: string) =>
+    apiRequest<any>(`/api/v1/superadmin/schools/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    }),
+  getAuditLogs: () => apiRequest<any[]>('/api/v1/superadmin/audit-logs'),
+};
+
+// ============================================================================
+// 2. CORE APIS (Academic Structure, Students, Staff, ID Cards, Admissions)
+// ============================================================================
+
+export const coreApi = {
+  getAcademicStructure: () =>
+    apiRequest<{
+      sessions: any[];
+      departments: any[];
+      classes: any[];
+    }>('/api/v1/core/academic/structure'),
+
+  listStudents: (params: { className?: string; query?: string; page?: number; limit?: number } = {}) => {
+    const query = new URLSearchParams();
+    if (params.className) query.set('className', params.className);
+    if (params.query) query.set('query', params.query);
+    if (params.page) query.set('page', String(params.page));
+    if (params.limit) query.set('limit', String(params.limit));
+    return apiRequest<{ items: any[]; meta: any }>(`/api/v1/core/students?${query.toString()}`);
+  },
+
+  getStudentById: (studentId: string) =>
+    apiRequest<any>(`/api/v1/core/students/${studentId}`),
+
+  createStudent: (data: any) =>
+    apiRequest<any>('/api/v1/core/students', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  listStaff: (params: { department?: string; query?: string; page?: number; limit?: number } = {}) => {
+    const query = new URLSearchParams();
+    if (params.department) query.set('department', params.department);
+    if (params.query) query.set('query', params.query);
+    if (params.page) query.set('page', String(params.page));
+    if (params.limit) query.set('limit', String(params.limit));
+    return apiRequest<{ items: any[]; meta: any }>(`/api/v1/core/staff?${query.toString()}`);
+  },
+
+  createStaff: (data: any) =>
+    apiRequest<any>('/api/v1/core/staff', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  assignTeacher: (data: any) =>
+    apiRequest<any>('/api/v1/core/staff/assignments', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  generateIdCard: (data: { holderType: 'STUDENT' | 'STAFF'; profileId: string }) =>
+    apiRequest<any>('/api/v1/core/id-cards/generate', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  deactivateIdCard: (cardId: string, reason: string) =>
+    apiRequest<any>(`/api/v1/core/id-cards/${cardId}/deactivate`, {
+      method: 'PATCH',
+      body: JSON.stringify({ reason }),
+    }),
+
+  verifyIdCardPublic: (token: string) =>
+    apiRequest<any>(`/api/v1/core/id-cards/verify/${encodeURIComponent(token.trim())}`),
+
+  listAdmissions: (status?: string) => {
+    const url = status && status !== 'ALL' ? `/api/v1/core/admissions/applications?status=${status}` : '/api/v1/core/admissions/applications';
+    return apiRequest<any[]>(url);
+  },
+
+  reviewAdmission: (id: string, data: { decision: 'APPROVED' | 'REJECTED'; reviewNotes: string; assignedClass?: string; assignedSection?: string }) =>
+    apiRequest<any>(`/api/v1/core/admissions/applications/${id}/review`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  submitPublicAdmission: (data: any) =>
+    apiRequest<any>('/api/v1/core/admissions/apply', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+};
+
+// ============================================================================
+// 3. ACADEMIC APIS (Attendance, Quizzes, Examinations, Marks, Report Cards)
+// ============================================================================
+
+export const academicApi = {
+  recordStudentAttendance: (payload: { records: Array<{ studentProfileId: string; status: string; remarks?: string }>; date?: string; sectionId?: string }) =>
+    apiRequest<any>('/api/v1/academic/attendance/students', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  correctStudentAttendance: (recordId: string, status: string, reason: string) =>
+    apiRequest<any>('/api/v1/academic/attendance/students/correct', {
+      method: 'PATCH',
+      body: JSON.stringify({ recordId, status, reason }),
+    }),
+
+  getStudentAttendanceSummary: (studentProfileId: string) =>
+    apiRequest<{ totalDays: number; presentDays: number; absentDays: number; lateDays: number; approvedLeaves: number; attendancePercentage: number }>(
+      `/api/v1/academic/attendance/students/${studentProfileId}/summary`
+    ),
+
+  getClassAttendanceReport: (params: { className: string; sectionName: string; date?: string }) => {
+    const query = new URLSearchParams();
+    query.set('className', params.className);
+    query.set('sectionName', params.sectionName);
+    if (params.date) query.set('date', params.date);
+    return apiRequest<any>(`/api/v1/academic/attendance/class-report?${query.toString()}`);
+  },
+
+  recordStaffAttendance: (records: Array<{ staffProfileId: string; status: string; remarks?: string }>, date?: string) =>
+    apiRequest<any>('/api/v1/academic/attendance/staff', {
+      method: 'POST',
+      body: JSON.stringify({ records, date }),
+    }),
+
+  submitStaffLeave: (data: { leaveType: string; startDate: string; endDate: string; reason: string }) =>
+    apiRequest<any>('/api/v1/academic/attendance/staff/leave', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  reviewStaffLeave: (leaveId: string, status: 'APPROVED' | 'REJECTED', reviewNotes?: string) =>
+    apiRequest<any>(`/api/v1/academic/attendance/staff/leave/${leaveId}/review`, {
+      method: 'PATCH',
+      body: JSON.stringify({ decision: status, reviewNotes }),
+    }),
+
+  listStaffLeaves: (status?: string) => {
+    const url = status && status !== 'ALL' ? `/api/v1/academic/attendance/staff/leave?status=${status}` : '/api/v1/academic/attendance/staff/leave';
+    return apiRequest<any[]>(url);
+  },
+
+  listQuizzes: (params: { subjectCode?: string; className?: string; status?: string } = {}) => {
+    const query = new URLSearchParams();
+    if (params.subjectCode) query.set('subjectCode', params.subjectCode);
+    if (params.className) query.set('className', params.className);
+    if (params.status) query.set('status', params.status);
+    return apiRequest<any[]>(`/api/v1/academic/quizzes?${query.toString()}`);
+  },
+
+  createQuiz: (data: any) =>
+    apiRequest<any>('/api/v1/academic/quizzes', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  startQuizAttempt: (quizId: string) =>
+    apiRequest<any>(`/api/v1/academic/quizzes/${quizId}/attempts/start`, {
+      method: 'POST',
+    }),
+
+  submitQuizAttempt: (quizId: string, answers: any[], saveOnly: boolean = false) =>
+    apiRequest<any>(`/api/v1/academic/quizzes/${quizId}/attempts/submit`, {
+      method: 'POST',
+      body: JSON.stringify({ quizId, answers, saveOnly }),
+    }),
+
+  listExamSchedules: (params: { academicSessionId?: string; className?: string } = {}) => {
+    const query = new URLSearchParams();
+    if (params.academicSessionId) query.set('academicSessionId', params.academicSessionId);
+    if (params.className) query.set('className', params.className);
+    return apiRequest<any[]>(`/api/v1/academic/exams/schedules?${query.toString()}`);
+  },
+
+  createExamSchedule: (data: any) =>
+    apiRequest<any>('/api/v1/academic/exams/schedules', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  submitExamMarksBatch: (data: { examScheduleId: string; marks: Array<{ studentProfileId: string; marksObtained: number; isAbsent?: boolean; teacherRemarks?: string }> }) =>
+    apiRequest<any>('/api/v1/academic/exams/marks/batch', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  correctExamMark: (data: { markId: string; newMarks: number; rationale: string }) =>
+    apiRequest<any>('/api/v1/academic/exams/marks/correct', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  publishExamResults: (data: { examScheduleId: string; isPublished: boolean }) =>
+    apiRequest<any>('/api/v1/academic/exams/publish', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  getReportCard: (studentProfileId: string) =>
+    apiRequest<any>(`/api/v1/academic/report-cards/${studentProfileId}`),
+};
+
+// ============================================================================
+// 4. OPERATIONS APIS (Timetable, Assignments, Resources, Notices, Fees)
+// ============================================================================
+
+export const operationsApi = {
+  getTimetable: (params: { className?: string; sectionName?: string }) => {
+    const query = new URLSearchParams();
+    if (params.className) query.set('className', params.className);
+    if (params.sectionName) query.set('sectionName', params.sectionName);
+    return apiRequest<any[]>(`/api/v1/operations/timetables?${query.toString()}`);
+  },
+
+  createTimetableSlot: (data: any) =>
+    apiRequest<any>('/api/v1/operations/timetables', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  listAssignments: (params: { className?: string; sectionName?: string } = {}) => {
+    const query = new URLSearchParams();
+    if (params.className) query.set('className', params.className);
+    if (params.sectionName) query.set('sectionName', params.sectionName);
+    return apiRequest<any[]>(`/api/v1/operations/assignments?${query.toString()}`);
+  },
+
+  createAssignment: (data: any) =>
+    apiRequest<any>('/api/v1/operations/assignments', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  submitAssignment: (data: any) =>
+    apiRequest<any>('/api/v1/operations/assignments/submit', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  gradeAssignment: (data: { submissionId: string; marksAwarded: number; teacherFeedback?: string }) =>
+    apiRequest<any>('/api/v1/operations/assignments/grade', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  listResources: (params: { className?: string } = {}) => {
+    const query = new URLSearchParams();
+    if (params.className) query.set('className', params.className);
+    return apiRequest<any[]>(`/api/v1/operations/resources?${query.toString()}`);
+  },
+
+  publishResource: (data: any) =>
+    apiRequest<any>('/api/v1/operations/resources', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  listNotices: () => apiRequest<any[]>('/api/v1/operations/notices'),
+
+  broadcastNotice: (data: any) =>
+    apiRequest<any>('/api/v1/operations/notices', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  listEvents: () => apiRequest<any[]>('/api/v1/operations/events'),
+
+  listNotifications: () =>
+    apiRequest<{ unreadCount: number; notifications: any[] }>('/api/v1/operations/notifications'),
+
+  markAllNotificationsRead: () =>
+    apiRequest<any>('/api/v1/operations/notifications/read-all', {
+      method: 'PATCH',
+    }),
+
+  listFeeInvoices: (params: { studentProfileId?: string; status?: string } = {}) => {
+    const query = new URLSearchParams();
+    if (params.studentProfileId) query.set('studentProfileId', params.studentProfileId);
+    if (params.status) query.set('status', params.status);
+    return apiRequest<any[]>(`/api/v1/operations/fees/invoices?${query.toString()}`);
+  },
+
+  getFeeSummary: () =>
+    apiRequest<{
+      currency: string;
+      totalInvoiced: number;
+      totalCollected: number;
+      totalOutstanding: number;
+      totalConcessions: number;
+      collectionRatePercentage: number;
+    }>('/api/v1/operations/fees/summary'),
+
+  recordFeePayment: (data: { invoiceId: string; amount: number; paymentMethod: string; transactionReference?: string }) =>
+    apiRequest<any>('/api/v1/operations/fees/payments', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  applyFeeConcession: (data: { invoiceId: string; concessionAmount: number; reason: string }) =>
+    apiRequest<any>('/api/v1/operations/fees/concessions', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  recordFeeRefund: (data: { paymentId: string; refundAmount: number; reason: string }) =>
+    apiRequest<any>('/api/v1/operations/fees/refunds', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  exportFeeCsv: () => apiRequest<string>('/api/v1/operations/fees/export-csv'),
+};
+
+// ============================================================================
+// 5. AI ASSISTANT & QUIZ GENERATION APIS
 // ============================================================================
 
 export async function fetchAiStatusApi() {
@@ -90,10 +511,11 @@ export async function askSchoolAssistantApi(
   token: string = ''
 ) {
   try {
+    const authToken = token || getStoredAuthToken();
     const res = await fetch(getApiUrl('/api/v1/ai/assistant/ask'), {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${authToken}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ question, contextScope }),
@@ -109,10 +531,11 @@ export async function askSchoolAssistantApi(
 
 export async function generateQuizDraftApi(payload: any, token: string = '') {
   try {
+    const authToken = token || getStoredAuthToken();
     const res = await fetch(getApiUrl('/api/v1/ai/quiz/generate'), {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${authToken}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(payload),
@@ -128,10 +551,11 @@ export async function generateQuizDraftApi(payload: any, token: string = '') {
 
 export async function reviewQuizDraftApi(draftId: string, reviews: any[], token: string = '') {
   try {
+    const authToken = token || getStoredAuthToken();
     const res = await fetch(getApiUrl(`/api/v1/ai/quiz/drafts/${draftId}/review`), {
       method: 'PATCH',
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${authToken}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ reviews }),
@@ -144,5 +568,3 @@ export async function reviewQuizDraftApi(draftId: string, reviews: any[], token:
     };
   }
 }
-
-

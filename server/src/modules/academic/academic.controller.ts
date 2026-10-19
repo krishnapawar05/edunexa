@@ -150,6 +150,21 @@ export class AcademicController {
     }
   }
 
+  async listStaffLeaveRequests(req: Request, res: Response, next: NextFunction) {
+    try {
+      const schoolId = req.user!.schoolId!;
+      const { status } = req.query;
+      const result = await academicService.listStaffLeaveRequests(schoolId, status as string);
+      const response: ApiSuccessResponse<typeof result> = {
+        success: true,
+        data: result,
+      };
+      res.status(200).json(response);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   // ==========================================================================
   // 2. QUIZ CONTROLLERS
   // ==========================================================================
