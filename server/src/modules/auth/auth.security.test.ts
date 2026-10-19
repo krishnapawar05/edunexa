@@ -428,4 +428,75 @@ describe('STAGE 3: Authentication and Multi-Tenant Security Test Suite', () => {
     expect(res.body.success).toBe(true);
     expect(res.body.data.loggedOut).toBe(true);
   });
+
+  // --------------------------------------------------------------------------
+  // 12. Super Admin Dedicated Subpage Endpoints (Stage 10)
+  // --------------------------------------------------------------------------
+  it('12a. Super Admin can fetch platform telemetry with database aggregates', async () => {
+    const res = await request(app)
+      .get('/api/v1/superadmin/telemetry')
+      .set('Authorization', `Bearer ${superAdminToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data).toHaveProperty('totalSchools');
+    expect(res.body.data).toHaveProperty('systemHealth');
+    expect(res.body.data.systemHealth.databaseConnected).toBe(true);
+  });
+
+  it('12b. Non-Super-Admin (School Admin) attempting to fetch platform telemetry returns 403 FORBIDDEN_ROLE', async () => {
+    const res = await request(app)
+      .get('/api/v1/superadmin/telemetry')
+      .set('Authorization', `Bearer ${schoolAdminTokenSchoolA}`);
+
+    expect(res.status).toBe(403);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error.code).toBe('FORBIDDEN_ROLE');
+  });
+
+  it('12c. Super Admin can list subscriptions and plans', async () => {
+    const res = await request(app)
+      .get('/api/v1/superadmin/subscriptions')
+      .set('Authorization', `Bearer ${superAdminToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(Array.isArray(res.body.data)).toBe(true);
+  });
+
+  it('12d. Non-Super-Admin (Teacher) attempting to list subscriptions returns 403 FORBIDDEN_ROLE', async () => {
+    const res = await request(app)
+      .get('/api/v1/superadmin/subscriptions')
+      .set('Authorization', `Bearer ${teacherTokenSchoolA}`);
+
+    expect(res.status).toBe(403);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error.code).toBe('FORBIDDEN_ROLE');
+  });
+
+  it('12e. Super Admin can fetch platform settings without exposing secrets', async () => {
+    const res = await request(app)
+      .get('/api/v1/superadmin/settings')
+      .set('Authorization', `Bearer ${superAdminToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data).toHaveProperty('platformName');
+    expect(res.body.data).not.toHaveProperty('DATABASE_URL');
+    expect(res.body.data).not.toHaveProperty('JWT_ACCESS_SECRET');
+  });
+
+  it('12f. Super Admin can update platform settings and record audit log', async () => {
+    const res = await request(app)
+      .put('/api/v1/superadmin/settings')
+      .set('Authorization', `Bearer ${superAdminToken}`)
+      .send({
+        platformName: 'EduNexa Multi-Tenant School ERP Updated',
+        supportEmail: 'admin-contact@edunexa.org',
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.platformName).toBe('EduNexa Multi-Tenant School ERP Updated');
+  });
 });

@@ -145,7 +145,14 @@ export async function fetchServerHealth(): Promise<HealthCheckData | null> {
 // ============================================================================
 
 export const superadminApi = {
-  listSchools: () => apiRequest<any[]>('/api/v1/superadmin/schools'),
+  getTelemetry: () => apiRequest<any>('/api/v1/superadmin/telemetry'),
+  listSchools: (params: { query?: string; status?: string } = {}) => {
+    const q = new URLSearchParams();
+    if (params.query) q.set('query', params.query);
+    if (params.status && params.status !== 'ALL') q.set('status', params.status);
+    const qs = q.toString() ? `?${q.toString()}` : '';
+    return apiRequest<any[]>(`/api/v1/superadmin/schools${qs}`);
+  },
   onboardSchool: (data: any) =>
     apiRequest<any>('/api/v1/superadmin/schools', {
       method: 'POST',
@@ -156,7 +163,31 @@ export const superadminApi = {
       method: 'PATCH',
       body: JSON.stringify({ status }),
     }),
-  getAuditLogs: () => apiRequest<any[]>('/api/v1/superadmin/audit-logs'),
+  updateSchool: (id: string, data: any) =>
+    apiRequest<any>(`/api/v1/superadmin/schools/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  listSubscriptions: () => apiRequest<any[]>('/api/v1/superadmin/subscriptions'),
+  updateSubscription: (id: string, data: any) =>
+    apiRequest<any>(`/api/v1/superadmin/subscriptions/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  getAuditLogs: (params: { action?: string; schoolId?: string; limit?: number } = {}) => {
+    const q = new URLSearchParams();
+    if (params.action && params.action !== 'ALL') q.set('action', params.action);
+    if (params.schoolId && params.schoolId !== 'ALL') q.set('schoolId', params.schoolId);
+    if (params.limit) q.set('limit', String(params.limit));
+    const qs = q.toString() ? `?${q.toString()}` : '';
+    return apiRequest<any[]>(`/api/v1/superadmin/audit-logs${qs}`);
+  },
+  getSettings: () => apiRequest<any>('/api/v1/superadmin/settings'),
+  updateSettings: (data: any) =>
+    apiRequest<any>('/api/v1/superadmin/settings', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
 };
 
 // ============================================================================

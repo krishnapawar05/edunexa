@@ -28,7 +28,11 @@ import { ContactPage } from './modules/public/pages/ContactPage.js';
 import { CareersPage } from './modules/public/pages/CareersPage.js';
 
 // ERP Role Dashboards & Pages
-import { SuperAdminDashboard } from './modules/superadmin/SuperAdminDashboard.js';
+import { TelemetryDashboard } from './modules/superadmin/TelemetryDashboard.js';
+import { SchoolTenantsPage } from './modules/superadmin/SchoolTenantsPage.js';
+import { SubscriptionsPage } from './modules/superadmin/SubscriptionsPage.js';
+import { AuditLogsPage } from './modules/superadmin/AuditLogsPage.js';
+import { PlatformSettingsPage } from './modules/superadmin/PlatformSettingsPage.js';
 import { SchoolAdminDashboard } from './modules/schooladmin/SchoolAdminDashboard.js';
 import { StudentDossierPage } from './modules/schooladmin/StudentDossierPage.js';
 import { TeacherDashboard } from './modules/teacher/TeacherDashboard.js';
@@ -82,11 +86,12 @@ export const App: React.FC = () => {
             </ProtectedRoute>
           }
         >
-          <Route path="/superadmin" element={<SuperAdminDashboard />} />
-          <Route path="/superadmin/schools" element={<SuperAdminDashboard />} />
-          <Route path="/superadmin/subscriptions" element={<SuperAdminDashboard />} />
-          <Route path="/superadmin/audit" element={<SuperAdminDashboard />} />
-          <Route path="/superadmin/settings" element={<SuperAdminDashboard />} />
+          <Route path="/superadmin" element={<TelemetryDashboard />} />
+          <Route path="/superadmin/schools" element={<SchoolTenantsPage />} />
+          <Route path="/superadmin/subscriptions" element={<SubscriptionsPage />} />
+          <Route path="/superadmin/audit" element={<Navigate to="/superadmin/audit-logs" replace />} />
+          <Route path="/superadmin/audit-logs" element={<AuditLogsPage />} />
+          <Route path="/superadmin/settings" element={<PlatformSettingsPage />} />
         </Route>
 
         {/* School Admin & Principal Workspace */}

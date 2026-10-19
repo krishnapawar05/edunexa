@@ -58,7 +58,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           { id: 'overview', path: '/superadmin', label: 'Platform Telemetry', icon: LayoutDashboard },
           { id: 'schools', path: '/superadmin/schools', label: 'School Tenants', icon: Building2 },
           { id: 'subscriptions', path: '/superadmin/subscriptions', label: 'Subscriptions & Plans', icon: CreditCard },
-          { id: 'audit', path: '/superadmin/audit', label: 'Administrative Audit Logs', icon: Layers },
+          { id: 'audit', path: '/superadmin/audit-logs', label: 'Administrative Audit Logs', icon: Layers },
           { id: 'settings', path: '/superadmin/settings', label: 'Platform Settings', icon: Settings },
         ];
       case 'SCHOOL_ADMIN':
