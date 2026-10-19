@@ -1,4 +1,4 @@
-import { PrismaClient, PlatformRole, TenantStatus, StudentStatus, EmploymentStatus } from '@prisma/client';
+import { PrismaClient, PlatformRole, TenantStatus } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
@@ -17,7 +17,6 @@ async function main() {
       slug: 'apex-academy',
       code: 'APEX-2026',
       status: TenantStatus.ACTIVE,
-      subscriptionPlan: 'PRO_ENTERPRISE',
       address: 'Plot 42, Institutional Area, Knowledge Park III',
       city: 'New Delhi',
       state: 'Delhi',
@@ -25,70 +24,92 @@ async function main() {
       postalCode: '110001',
       phone: '+91 11 2659 1000',
       email: 'admin@apexacademy.edu',
-      website: 'https://apexacademy.edunexa.com',
+      websiteUrl: 'https://apexacademy.edunexa.com',
     },
   });
 
   console.log(`✓ School created/verified: ${school.name}`);
 
-  // 2. Create Users
+  // 2. Create Users & Memberships
   const usersData = [
     {
       email: 'admin@apexacademy.edu',
-      name: 'Dr. Alistair Vance',
+      firstName: 'Alistair',
+      lastName: 'Vance',
       role: PlatformRole.SCHOOL_ADMIN,
     },
     {
       email: 'julian.thorne@apexacademy.edu',
-      name: 'Dr. Julian Thorne',
+      firstName: 'Julian',
+      lastName: 'Thorne',
       role: PlatformRole.TEACHER,
     },
     {
       email: 'accounts@apexacademy.edu',
-      name: 'Priya Nambiar',
+      firstName: 'Priya',
+      lastName: 'Nambiar',
       role: PlatformRole.ACCOUNTS,
     },
     {
       email: 'aarav.sharma@apexacademy.edu',
-      name: 'Aarav Sharma',
+      firstName: 'Aarav',
+      lastName: 'Sharma',
       role: PlatformRole.STUDENT,
     },
     {
       email: 'ananya.deshmukh@apexacademy.edu',
-      name: 'Ananya Deshmukh',
+      firstName: 'Ananya',
+      lastName: 'Deshmukh',
       role: PlatformRole.STUDENT,
     },
     {
       email: 'vikram.sharma@gmail.com',
-      name: 'Vikram Sharma',
+      firstName: 'Vikram',
+      lastName: 'Sharma',
       role: PlatformRole.PARENT,
     },
   ];
 
   for (const u of usersData) {
-    await prisma.user.upsert({
+    const user = await prisma.user.upsert({
       where: { email: u.email },
       update: {},
       create: {
         email: u.email,
         passwordHash,
-        name: u.name,
-        role: u.role,
+        firstName: u.firstName,
+        lastName: u.lastName,
+      },
+    });
+
+    await prisma.userMembership.upsert({
+      where: {
+        userId_schoolId_role: {
+          userId: user.id,
+          schoolId: school.id,
+          role: u.role,
+        },
+      },
+      update: {},
+      create: {
+        userId: user.id,
         schoolId: school.id,
+        role: u.role,
+        isPrimary: true,
+        isActive: true,
       },
     });
   }
 
-  console.log(`✓ ${usersData.length} Users seeded.`);
+  console.log(`✓ ${usersData.length} Users & Memberships seeded.`);
 
   // 3. Create Academic Session
   const session = await prisma.academicSession.upsert({
-    where: { schoolId_code: { schoolId: school.id, code: 'AY-2026-2027' } },
+    where: { schoolId_name: { schoolId: school.id, name: 'Academic Year 2026–2027' } },
     update: {},
     create: {
       schoolId: school.id,
       name: 'Academic Year 2026–2027',
-      code: 'AY-2026-2027',
       startDate: new Date('2026-04-01'),
       endDate: new Date('2027-03-31'),
       isCurrent: true,
@@ -101,14 +122,15 @@ async function main() {
   const grades = ['Grade 9', 'Grade 10', 'Grade 11', 'Grade 12'];
   for (let i = 0; i < grades.length; i++) {
     const gradeName = grades[i];
+    const code = `G${9 + i}`;
     const cls = await prisma.class.upsert({
-      where: { schoolId_name: { schoolId: school.id, name: gradeName } },
+      where: { schoolId_code: { schoolId: school.id, code } },
       update: {},
       create: {
         schoolId: school.id,
         name: gradeName,
-        code: `G${9 + i}`,
-        orderIndex: i + 1,
+        code,
+        stage: 'Secondary',
       },
     });
 
