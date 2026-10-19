@@ -38,6 +38,18 @@ interface SidebarProps {
   onCloseMobile?: () => void;
 }
 
+const ROLE_LABELS: Record<string, string> = {
+  SUPER_ADMIN: 'Platform Super Admin',
+  SCHOOL_ADMIN: 'School Administrator',
+  PRINCIPAL: 'Principal',
+  TEACHER: 'Faculty / Teacher',
+  STUDENT: 'Student',
+  PARENT: 'Parent / Guardian',
+  HR_STAFF: 'HR / Staff Admin',
+  ACCOUNTS: 'Accounts Staff',
+  EXAM_COORDINATOR: 'Examination Coordinator',
+};
+
 export const Sidebar: React.FC<SidebarProps> = ({
   currentRole,
   activeTab,
@@ -373,44 +385,77 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </Link>
           )}
 
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '6px 4px',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {(() => {
+            const user = getStoredUser();
+            const initials = user
+              ? `${user.firstName?.[0] || ''}${user.lastName?.[0] || ''}`.toUpperCase() || 'U'
+              : currentRole.slice(0, 2);
+            const displayName = user
+              ? `${user.firstName} ${user.lastName}`.trim()
+              : 'Session Active';
+            const roleDisplay = ROLE_LABELS[currentRole] || currentRole;
+
+            return (
               <div
                 style={{
-                  width: '26px',
-                  height: '26px',
-                  borderRadius: '50%',
-                  backgroundColor: '#334155',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '0.72rem',
-                  fontWeight: 600,
-                  color: '#f8fafc',
+                  justifyContent: 'space-between',
+                  padding: '6px 4px',
                 }}
               >
-                {getStoredUser()?.firstName?.[0] || currentRole.slice(0, 2)}
-              </div>
-              <div style={{ overflow: 'hidden' }}>
-                <div style={{ fontSize: '0.76rem', fontWeight: 600, color: '#f8fafc', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                  {getStoredUser() ? `${getStoredUser()?.firstName} ${getStoredUser()?.lastName}`.trim() : 'Session Active'}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                  <div
+                    style={{
+                      width: '28px',
+                      height: '28px',
+                      borderRadius: '50%',
+                      backgroundColor: 'rgba(255, 255, 255, 0.12)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      color: '#f8fafc',
+                      flexShrink: 0,
+                    }}
+                  >
+                    {initials}
+                  </div>
+                  <div style={{ overflow: 'hidden', minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontSize: '0.78rem',
+                        fontWeight: 600,
+                        color: '#f8fafc',
+                        whiteSpace: 'nowrap',
+                        textOverflow: 'ellipsis',
+                        overflow: 'hidden',
+                      }}
+                      title={displayName}
+                    >
+                      {displayName}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: '0.66rem',
+                        color: '#94a3b8',
+                        whiteSpace: 'nowrap',
+                        textOverflow: 'ellipsis',
+                        overflow: 'hidden',
+                      }}
+                      title={roleDisplay}
+                    >
+                      {roleDisplay}
+                    </div>
+                  </div>
                 </div>
-                <div style={{ fontSize: '0.66rem', color: '#94a3b8' }}>{currentRole}</div>
-              </div>
-            </div>
-            <button
-              onClick={handleLogout}
-              data-testid="sidebar-logout-btn"
-              aria-label="Log out of authenticated session"
-              title="Log out of authenticated session"
-              style={{
+                <button
+                  onClick={handleLogout}
+                  data-testid="sidebar-logout-btn"
+                  aria-label="Log out of authenticated session"
+                  title="Log out of authenticated session"
+                  style={{
                 background: 'transparent',
                 border: 'none',
                 color: '#94a3b8',
@@ -433,7 +478,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <LogOut size={16} />
             </button>
-          </div>
+              </div>
+            );
+          })()}
         </div>
       </aside>
     </>

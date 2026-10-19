@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Search,
   Bell,
@@ -8,7 +7,6 @@ import {
   RefreshCw,
   Sliders,
   Menu,
-  ShieldCheck,
 } from 'lucide-react';
 import { HealthCheckData } from '@edunexa/shared';
 import { useSchoolBranding } from '../context/SchoolBrandingContext.js';
@@ -22,18 +20,6 @@ interface HeaderProps {
   onToggleMobileMenu?: () => void;
 }
 
-const ROLE_LABELS: Record<string, string> = {
-  SUPER_ADMIN: 'Platform Super Admin',
-  SCHOOL_ADMIN: 'School Administrator',
-  PRINCIPAL: 'Principal',
-  TEACHER: 'Faculty / Teacher',
-  STUDENT: 'Student',
-  PARENT: 'Parent / Guardian',
-  HR_STAFF: 'HR / Staff Admin',
-  ACCOUNTS: 'Accounts Staff',
-  EXAM_COORDINATOR: 'Examination Coordinator',
-};
-
 export const Header: React.FC<HeaderProps> = ({
   currentRole,
   serverHealth,
@@ -41,19 +27,12 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleMobileMenu,
 }) => {
   const { branding, setIsCustomizing } = useSchoolBranding();
-  const navigate = useNavigate();
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState<number>(0);
 
   const user = getStoredUser();
   const activeRole = user?.role || currentRole;
-  const roleLabel = ROLE_LABELS[activeRole] || activeRole;
-  const schoolLabel = activeRole === 'SUPER_ADMIN' ? 'Multi-Tenant Authority' : branding.shortName;
-  const userName = user ? `${user.firstName} ${user.lastName}`.trim() : 'Authenticated User';
-  const userInitials = user
-    ? `${user.firstName?.[0] || ''}${user.lastName?.[0] || ''}`.toUpperCase() || 'U'
-    : 'U';
 
   const loadNotifications = async () => {
     try {
@@ -284,62 +263,6 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Global Light / Dark / System Theme Switcher */}
         <ThemeSwitcher />
-
-        {/* Verified Authenticated User Identity (Role-Isolated, Read-Only) */}
-        <div
-          data-testid="header-user-badge"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--space-2)',
-            padding: '4px 10px',
-            backgroundColor: 'var(--bg-subtle)',
-            border: '1px solid var(--border-default)',
-            borderRadius: 'var(--radius-sm)',
-          }}
-        >
-          <div
-            style={{
-              width: '28px',
-              height: '28px',
-              borderRadius: '50%',
-              backgroundColor: 'var(--primary-100)',
-              color: 'var(--primary-800)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 700,
-              fontSize: '0.78rem',
-            }}
-          >
-            {userInitials}
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.1 }}>
-                {userName}
-              </span>
-              <span title="Cryptographically Verified Session" style={{ display: 'inline-flex', alignItems: 'center' }}>
-                <ShieldCheck size={13} style={{ color: 'var(--primary-600)' }} />
-              </span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span
-                style={{
-                  fontSize: '0.68rem',
-                  fontWeight: 600,
-                  color: 'var(--primary-700)',
-                  backgroundColor: 'var(--primary-50)',
-                  padding: '1px 5px',
-                  borderRadius: '3px',
-                }}
-              >
-                {roleLabel}
-              </span>
-              <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{schoolLabel}</span>
-            </div>
-          </div>
-        </div>
       </div>
     </header>
   );
