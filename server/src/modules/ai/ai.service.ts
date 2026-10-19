@@ -430,7 +430,7 @@ Respond ONLY with valid JSON. Do not wrap in markdown backticks or commentary.`;
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout for complex LLM generation
 
     try {
       const response = await fetch(endpoint, {
@@ -476,7 +476,7 @@ Respond ONLY with valid JSON. Do not wrap in markdown backticks or commentary.`;
     } catch (error: any) {
       clearTimeout(timeoutId);
       if (error.name === 'AbortError') {
-        const err: any = new Error('AI provider request timed out after 8000ms.');
+        const err: any = new Error('AI provider request timed out after 30000ms.');
         err.statusCode = 504;
         err.code = 'AI_PROVIDER_TIMEOUT';
         throw err;
