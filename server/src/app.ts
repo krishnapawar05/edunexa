@@ -13,6 +13,7 @@ import securityTestRouter from './modules/test-fixtures/security-test.routes.js'
 import coreRouter from './modules/core/core.routes.js';
 import academicRouter from './modules/academic/academic.routes.js';
 import operationsRouter from './modules/operations/operations.routes.js';
+import aiRouter from './modules/ai/ai.routes.js';
 
 export function createApp(): express.Application {
   const app = express();
@@ -68,6 +69,7 @@ export function createApp(): express.Application {
   app.use('/api/v1/core', coreRouter);
   app.use('/api/v1/academic', academicRouter);
   app.use('/api/v1/operations', operationsRouter);
+  app.use('/api/v1/ai', aiRouter);
   app.use('/api/v1/security-test', securityTestRouter);
 
   // Full-Stack Monolith Serving: Serve compiled frontend SPA if client/dist exists

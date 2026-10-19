@@ -68,3 +68,81 @@ export async function submitQuizAttemptApi(quizId: string, answers: any[], token
   return res.json();
 }
 
+// ============================================================================
+// STAGE 7: EDUNEXA AI CLIENT HELPERS
+// ============================================================================
+
+export async function fetchAiStatusApi() {
+  try {
+    const res = await fetch(getApiUrl('/api/v1/ai/status'));
+    return await res.json();
+  } catch (err) {
+    return {
+      success: false,
+      error: { code: 'NETWORK_ERROR', message: 'Unable to connect to EduNexa AI service.' },
+    };
+  }
+}
+
+export async function askSchoolAssistantApi(
+  question: string,
+  contextScope: string = 'GENERAL',
+  token: string = ''
+) {
+  try {
+    const res = await fetch(getApiUrl('/api/v1/ai/assistant/ask'), {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ question, contextScope }),
+    });
+    return await res.json();
+  } catch (err: any) {
+    return {
+      success: false,
+      error: { code: 'NETWORK_ERROR', message: err.message || 'Connection failed' },
+    };
+  }
+}
+
+export async function generateQuizDraftApi(payload: any, token: string = '') {
+  try {
+    const res = await fetch(getApiUrl('/api/v1/ai/quiz/generate'), {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+    return await res.json();
+  } catch (err: any) {
+    return {
+      success: false,
+      error: { code: 'NETWORK_ERROR', message: err.message || 'Connection failed' },
+    };
+  }
+}
+
+export async function reviewQuizDraftApi(draftId: string, reviews: any[], token: string = '') {
+  try {
+    const res = await fetch(getApiUrl(`/api/v1/ai/quiz/drafts/${draftId}/review`), {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ reviews }),
+    });
+    return await res.json();
+  } catch (err: any) {
+    return {
+      success: false,
+      error: { code: 'NETWORK_ERROR', message: err.message || 'Connection failed' },
+    };
+  }
+}
+
+

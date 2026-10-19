@@ -42,16 +42,18 @@ export function errorHandler(
   }
 
   // Handle Known Domain/Application Errors
-  if (err instanceof AppError) {
+  if (err instanceof AppError || (err as any).statusCode) {
+    const statusCode = (err as any).statusCode || (err as any).status || 400;
+    const code = (err as any).code || 'APPLICATION_ERROR';
     const errorResponse: ApiErrorResponse = {
       success: false,
       error: {
-        code: err.code,
+        code,
         message: err.message,
-        details: err.details,
+        details: (err as any).details,
       },
     };
-    res.status(err.statusCode).json(errorResponse);
+    res.status(statusCode).json(errorResponse);
     return;
   }
 

@@ -639,4 +639,101 @@ export interface FinancialSummaryReport {
   }>;
 }
 
+// ============================================================================
+// STAGE 7: EDUNEXA AI CONTRACTS & SCHEMAS
+// ============================================================================
+
+export interface AiProviderStatusResponse {
+  isConfigured: boolean;
+  provider: string;
+  model: string;
+  message: string;
+  supportedFeatures: {
+    schoolInformationAssistant: boolean;
+    aiQuizGeneration: boolean;
+  };
+}
+
+export const SchoolInfoContextScope = {
+  GENERAL: 'GENERAL',
+  ADMISSIONS: 'ADMISSIONS',
+  POLICIES: 'POLICIES',
+  EVENTS: 'EVENTS',
+  TIMETABLES: 'TIMETABLES',
+} as const;
+
+export type SchoolInfoContextScopeType = (typeof SchoolInfoContextScope)[keyof typeof SchoolInfoContextScope];
+
+export const SchoolInfoQuerySchema = z.object({
+  question: z.string().min(3, 'Question must be at least 3 characters').max(500, 'Question cannot exceed 500 characters'),
+  contextScope: z.enum(['GENERAL', 'ADMISSIONS', 'POLICIES', 'EVENTS', 'TIMETABLES']).default('GENERAL'),
+});
+
+export type SchoolInfoQueryDTO = z.infer<typeof SchoolInfoQuerySchema>;
+
+export interface SchoolInfoAnswerResponse {
+  question: string;
+  answer: string;
+  groundedSources: string[];
+  isMissingInformation: boolean;
+  confidence: 'HIGH' | 'MEDIUM' | 'LOW' | 'UNKNOWN';
+  timestamp: string;
+  disclaimer: string;
+  model: string;
+}
+
+export const GenerateQuizDraftSchema = z.object({
+  studyMaterial: z.string().min(20, 'Study material must be at least 20 characters').max(15000, 'Study material cannot exceed 15000 characters'),
+  subject: z.string().min(2, 'Subject name required'),
+  gradeLevel: z.string().min(1, 'Grade level required'),
+  questionCount: z.number().int().min(1).max(10).default(3),
+  difficulty: z.enum(['EASY', 'MEDIUM', 'HARD']).default('MEDIUM'),
+});
+
+export type GenerateQuizDraftDTO = z.infer<typeof GenerateQuizDraftSchema>;
+
+export interface AiGeneratedQuestion {
+  id: string;
+  questionText: string;
+  questionType: 'MULTIPLE_CHOICE' | 'SHORT_ANSWER' | 'TRUE_FALSE';
+  options?: string[];
+  correctAnswer: string;
+  explanation: string;
+  suggestedDifficulty: 'EASY' | 'MEDIUM' | 'HARD';
+  isAiGenerated: true;
+  reviewStatus: 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED';
+  teacherFeedback?: string;
+}
+
+export const ReviewAiQuestionSchema = z.object({
+  questionId: z.string().min(1),
+  reviewStatus: z.enum(['APPROVED', 'REJECTED']),
+  editedQuestionText: z.string().optional(),
+  editedOptions: z.array(z.string()).optional(),
+  editedCorrectAnswer: z.string().optional(),
+  teacherFeedback: z.string().optional(),
+});
+
+export type ReviewAiQuestionDTO = z.infer<typeof ReviewAiQuestionSchema>;
+
+export const ReviewAiQuizDraftSchema = z.object({
+  reviews: z.array(ReviewAiQuestionSchema).min(1, 'At least one question review required'),
+});
+
+export type ReviewAiQuizDraftDTO = z.infer<typeof ReviewAiQuizDraftSchema>;
+
+export interface AiQuizDraftResponse {
+  draftId: string;
+  schoolId: string;
+  teacherId: string;
+  subject: string;
+  gradeLevel: string;
+  questions: AiGeneratedQuestion[];
+  createdAt: string;
+  status: 'DRAFT_PENDING_APPROVAL' | 'PARTIALLY_APPROVED' | 'FULLY_APPROVED';
+  disclaimer: string;
+  model: string;
+}
+
+
 

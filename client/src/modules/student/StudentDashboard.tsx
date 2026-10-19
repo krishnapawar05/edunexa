@@ -11,12 +11,18 @@ import {
   AlertTriangle,
   Send,
   ExternalLink,
+  ShieldAlert,
 } from 'lucide-react';
+import { askSchoolAssistantApi, fetchAiStatusApi } from '../../services/api.js';
 
 export const StudentDashboard: React.FC = () => {
   const [showQrModal, setShowQrModal] = useState(false);
   const [aiQuestion, setAiQuestion] = useState('');
   const [aiAnswer, setAiAnswer] = useState<string | null>(null);
+  const [aiSources, setAiSources] = useState<string[]>([]);
+  const [aiMissingInfo, setAiMissingInfo] = useState<boolean>(false);
+  const [aiUnconfigured, setAiUnconfigured] = useState<boolean>(false);
+  const [aiDisclaimer, setAiDisclaimer] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
 
   // Active Quiz Countdown Simulation
@@ -41,23 +47,38 @@ export const StudentDashboard: React.FC = () => {
     verificationToken: 'v-tok-8f2c-49a1-9b7e-e214',
   };
 
-  const handleAiAsk = (e: React.FormEvent) => {
+  const handleAiAsk = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!aiQuestion.trim()) return;
 
     setAiLoading(true);
-    setTimeout(() => {
-      setAiLoading(false);
-      if (aiQuestion.toLowerCase().includes('exam') || aiQuestion.toLowerCase().includes('cheat')) {
+    setAiAnswer(null);
+    setAiSources([]);
+    setAiMissingInfo(false);
+    setAiUnconfigured(false);
+
+    try {
+      const token = localStorage.getItem('edunexa_token') || 'demo-token';
+      const res = await askSchoolAssistantApi(aiQuestion.trim(), 'GENERAL', token);
+
+      if (res.success && res.data) {
+        setAiAnswer(res.data.answer);
+        setAiSources(res.data.groundedSources || []);
+        setAiMissingInfo(!!res.data.isMissingInformation);
+        setAiDisclaimer(res.data.disclaimer);
+      } else if (res.error?.code === 'AI_PROVIDER_NOT_CONFIGURED') {
+        setAiUnconfigured(true);
         setAiAnswer(
-          "I am configured strictly to explain fundamental learning concepts and provide guided practice. I do not provide direct solutions to live examinations or tests. How can I explain the underlying concept instead?"
+          'AI Provider is not configured on the server. Please set AI_PROVIDER_API_KEY in server/.env to enable live grounded school information assistance.'
         );
       } else {
-        setAiAnswer(
-          `According to the curriculum: ${aiQuestion.trim()} is governed by core scientific principles. In Faraday's law, any change in the magnetic environment of a coil of wire will cause a voltage (emf) to be 'induced' in the coil. Would you like a step-by-step example problem?`
-        );
+        setAiAnswer(res.error?.message || 'Unable to retrieve answer. Please try again or visit administration.');
       }
-    }, 600);
+    } catch (err: any) {
+      setAiAnswer('Connection error to AI service: ' + err.message);
+    } finally {
+      setAiLoading(false);
+    }
   };
 
   return (
@@ -259,49 +280,96 @@ export const StudentDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* AI Learning Assistant Drawer */}
+        {/* AI School Information & Policies Assistant */}
         <div className="ed-card">
           <div className="ed-card-header">
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <Sparkles size={16} style={{ color: 'var(--primary-600)' }} />
-              <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>AI Personalized Learning Assistant</span>
+              <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>School Information & Policies Assistant</span>
             </div>
-            <span className="ed-badge ed-badge-info">Curriculum Aligned</span>
+            <span className="ed-badge ed-badge-info">Grounded AI</span>
           </div>
           <div className="ed-card-body">
-            <form onSubmit={handleAiAsk} style={{ display: 'flex', gap: 'var(--space-2)' }}>
-              <input
-                className="ed-input"
-                placeholder="Ask a question about physics, math, or study concepts..."
-                value={aiQuestion}
-                onChange={(e) => setAiQuestion(e.target.value)}
-              />
-              <button
-                type="submit"
-                disabled={aiLoading}
-                className="ed-btn ed-btn-primary"
-                style={{ minWidth: '90px' }}
-              >
-                {aiLoading ? 'Thinking...' : 'Explain'}
-              </button>
+            <form onSubmit={handleAiAsk} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+              <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                <input
+                  className="ed-input"
+                  placeholder="Ask about admissions, attendance policy, code of conduct, fees, or events..."
+                  value={aiQuestion}
+                  onChange={(e) => setAiQuestion(e.target.value)}
+                />
+                <button
+                  type="submit"
+                  disabled={aiLoading}
+                  className="ed-btn ed-btn-primary"
+                  style={{ minWidth: '90px' }}
+                >
+                  {aiLoading ? 'Searching...' : 'Ask AI'}
+                </button>
+              </div>
             </form>
 
-            {aiAnswer && (
+            {/* Unconfigured State Banner */}
+            {aiUnconfigured && (
               <div
                 style={{
                   marginTop: 'var(--space-3)',
                   padding: '10px 12px',
-                  backgroundColor: 'var(--bg-subtle)',
-                  border: '1px solid var(--border-default)',
+                  backgroundColor: '#fffbeb',
+                  border: '1px solid #fde68a',
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: '0.82rem',
+                  color: '#92400e',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '8px',
+                }}
+              >
+                <ShieldAlert size={16} style={{ marginTop: '2px', flexShrink: 0 }} />
+                <div>
+                  <div style={{ fontWeight: 600 }}>AI Provider Unconfigured</div>
+                  <div>To enable the live School Information Assistant, please set <code>AI_PROVIDER_API_KEY</code> in <code>server/.env</code>. Synthetic grounded responses are verified in test suite.</div>
+                </div>
+              </div>
+            )}
+
+            {/* Answer Display */}
+            {aiAnswer && !aiUnconfigured && (
+              <div
+                style={{
+                  marginTop: 'var(--space-3)',
+                  padding: '12px 14px',
+                  backgroundColor: aiMissingInfo ? '#fffbeb' : 'var(--bg-subtle)',
+                  border: `1px solid ${aiMissingInfo ? '#fde68a' : 'var(--border-default)'}`,
                   borderRadius: 'var(--radius-sm)',
                   fontSize: '0.84rem',
                   lineHeight: 1.5,
                 }}
               >
-                <div style={{ fontWeight: 600, color: 'var(--primary-700)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <Sparkles size={13} /> Explanation & Concept Breakdown:
+                <div style={{ fontWeight: 600, color: aiMissingInfo ? '#92400e' : 'var(--primary-700)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  {aiMissingInfo ? <AlertTriangle size={14} /> : <Sparkles size={14} />}
+                  {aiMissingInfo ? 'Information Not Found in Approved Records:' : 'Institutional Assistant Answer:'}
                 </div>
-                {aiAnswer}
+                <div style={{ color: 'var(--text-primary)' }}>{aiAnswer}</div>
+
+                {/* Grounded Sources */}
+                {aiSources.length > 0 && (
+                  <div style={{ marginTop: 'var(--space-2)', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600 }}>Grounded Sources:</span>
+                    {aiSources.map((source, idx) => (
+                      <span key={idx} className="ed-badge ed-badge-neutral" style={{ fontSize: '0.70rem' }}>
+                        {source}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* AI Safety Disclaimer */}
+                {aiDisclaimer && (
+                  <div style={{ marginTop: '8px', fontSize: '0.70rem', color: 'var(--text-muted)', borderTop: '1px dashed var(--border-default)', paddingTop: '6px' }}>
+                    ⚠️ {aiDisclaimer}
+                  </div>
+                )}
               </div>
             )}
           </div>
