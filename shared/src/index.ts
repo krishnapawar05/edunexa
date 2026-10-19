@@ -469,3 +469,174 @@ export interface StudentReportCard {
   generatedAt: string;
 }
 
+// ============================================================================
+// STAGE 6: OPERATIONS, COMMUNICATIONS & FINANCIAL CONTRACTS
+// ============================================================================
+
+export const EventAudience = {
+  ALL: 'ALL',
+  STUDENTS_ONLY: 'STUDENTS_ONLY',
+  PARENTS_ONLY: 'PARENTS_ONLY',
+  STAFF_ONLY: 'STAFF_ONLY',
+  SPECIFIC_CLASS: 'SPECIFIC_CLASS',
+} as const;
+
+export type EventAudienceType = (typeof EventAudience)[keyof typeof EventAudience];
+
+export const FeePaymentStatus = {
+  UNPAID: 'UNPAID',
+  PARTIALLY_PAID: 'PARTIALLY_PAID',
+  PAID: 'PAID',
+  OVERDUE: 'OVERDUE',
+  REFUNDED: 'REFUNDED',
+} as const;
+
+export type FeePaymentStatusType = (typeof FeePaymentStatus)[keyof typeof FeePaymentStatus];
+
+// Timetable Slot Schema
+export const CreateTimetableSlotSchema = z.object({
+  className: z.string().min(1),
+  sectionName: z.string().min(1),
+  dayOfWeek: z.number().int().min(1).max(7), // 1 = Monday, 6 = Saturday
+  startTime: z.string().regex(/^\d{2}:\d{2}$/, 'Format must be HH:MM'),
+  endTime: z.string().regex(/^\d{2}:\d{2}$/, 'Format must be HH:MM'),
+  subjectName: z.string().min(2),
+  roomNumber: z.string().min(1),
+  teacherName: z.string().min(2),
+});
+
+export type CreateTimetableSlotDTO = z.infer<typeof CreateTimetableSlotSchema>;
+
+// Assignment Schemas
+export const CreateAssignmentSchema = z.object({
+  className: z.string().min(1),
+  sectionName: z.string().min(1),
+  subjectCode: z.string().min(2),
+  title: z.string().min(3),
+  description: z.string().min(5),
+  dueDate: z.string().min(10, 'Due date is required'),
+  maxMarks: z.number().positive().default(20),
+  attachmentUrl: z.string().url().optional().or(z.literal('')),
+});
+
+export type CreateAssignmentDTO = z.infer<typeof CreateAssignmentSchema>;
+
+export const SubmitAssignmentSchema = z.object({
+  assignmentId: z.string().min(1),
+  studentProfileId: z.string().min(1),
+  submissionText: z.string().optional(),
+  fileUrl: z.string().min(3, 'Valid file or attachment URL is required'),
+  fileName: z.string().min(1),
+  fileSizeBytes: z.number().positive(),
+  fileType: z.enum(['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'image/png', 'image/jpeg']),
+});
+
+export type SubmitAssignmentDTO = z.infer<typeof SubmitAssignmentSchema>;
+
+export const GradeAssignmentSchema = z.object({
+  submissionId: z.string().min(1),
+  marksAwarded: z.number().min(0),
+  feedback: z.string().min(2),
+});
+
+export type GradeAssignmentDTO = z.infer<typeof GradeAssignmentSchema>;
+
+// Learning Resources Schema
+export const CreateLearningResourceSchema = z.object({
+  subjectCode: z.string().min(2),
+  className: z.string().min(1),
+  title: z.string().min(3),
+  description: z.string().optional(),
+  topic: z.string().min(2),
+  fileUrl: z.string().min(3),
+  fileType: z.enum(['PDF', 'DOCUMENT', 'VIDEO', 'PRESENTATION', 'LINK']),
+  fileSizeBytes: z.number().max(50 * 1024 * 1024, 'Resource cannot exceed 50 MB'),
+});
+
+export type CreateLearningResourceDTO = z.infer<typeof CreateLearningResourceSchema>;
+
+// Notices & School Events
+export const CreateNoticeSchema = z.object({
+  title: z.string().min(3),
+  content: z.string().min(10),
+  audience: z.enum(['ALL', 'STUDENTS_ONLY', 'PARENTS_ONLY', 'STAFF_ONLY', 'SPECIFIC_CLASS']),
+  targetClass: z.string().optional(),
+  isUrgent: z.boolean().default(false),
+  expiresAt: z.string().optional(),
+});
+
+export type CreateNoticeDTO = z.infer<typeof CreateNoticeSchema>;
+
+export const CreateSchoolEventSchema = z.object({
+  title: z.string().min(3),
+  description: z.string().min(5),
+  venue: z.string().min(2),
+  startDate: z.string().min(10),
+  endDate: z.string().min(10),
+  audience: z.enum(['ALL', 'STUDENTS_ONLY', 'PARENTS_ONLY', 'STAFF_ONLY', 'SPECIFIC_CLASS']),
+  isPublic: z.boolean().default(false),
+});
+
+export type CreateSchoolEventDTO = z.infer<typeof CreateSchoolEventSchema>;
+
+// Financial & Fee Management Schemas
+export const CreateFeeStructureSchema = z.object({
+  className: z.string().min(1),
+  feeHead: z.string().min(2), // e.g. Tuition Fee, Science Lab, ICT & AI Fee
+  amount: z.number().positive('Fee amount must be positive'),
+  frequency: z.enum(['ANNUAL', 'TERM', 'MONTHLY']),
+});
+
+export type CreateFeeStructureDTO = z.infer<typeof CreateFeeStructureSchema>;
+
+export const RecordFeePaymentSchema = z.object({
+  invoiceId: z.string().min(1),
+  amountPaid: z.number().positive('Payment amount must be greater than zero'),
+  paymentMethod: z.enum(['UPI', 'NET_BANKING', 'CREDIT_CARD', 'CHEQUE', 'CASH']),
+  transactionRef: z.string().min(3, 'Transaction reference required'),
+  isSimulated: z.boolean().default(true), // Explicitly labeled simulated payment
+  notes: z.string().optional(),
+});
+
+export type RecordFeePaymentDTO = z.infer<typeof RecordFeePaymentSchema>;
+
+export const ApplyFeeConcessionSchema = z.object({
+  invoiceId: z.string().min(1),
+  concessionAmount: z.number().positive(),
+  reason: z.string().min(5, 'Auditable rationale required for fee concession'),
+});
+
+export type ApplyFeeConcessionDTO = z.infer<typeof ApplyFeeConcessionSchema>;
+
+export const RecordFeeRefundSchema = z.object({
+  invoiceId: z.string().min(1),
+  refundAmount: z.number().positive(),
+  reason: z.string().min(5, 'Auditable reason required for fee refund'),
+});
+
+export type RecordFeeRefundDTO = z.infer<typeof RecordFeeRefundSchema>;
+
+// Financial Summary Report Contract
+export interface FinancialSummaryReport {
+  schoolId: string;
+  totalInvoiced: number;
+  totalCollected: number;
+  totalOutstanding: number;
+  totalConcessions: number;
+  totalRefunded: number;
+  collectionRatePercentage: number;
+  invoicesCount: number;
+  paidInvoicesCount: number;
+  partialInvoicesCount: number;
+  overdueInvoicesCount: number;
+  recentTransactions: Array<{
+    receiptNo: string;
+    studentName: string;
+    amount: number;
+    method: string;
+    date: string;
+    isSimulated: boolean;
+  }>;
+}
+
+

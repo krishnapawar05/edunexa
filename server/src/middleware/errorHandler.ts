@@ -24,13 +24,14 @@ export function errorHandler(
   next: NextFunction
 ): void {
   // Handle Zod Validation Errors
-  if (err instanceof ZodError) {
+  if (err instanceof ZodError || (err as any).name === 'ZodError') {
+    const zodErr = err as ZodError;
     const errorResponse: ApiErrorResponse = {
       success: false,
       error: {
         code: 'VALIDATION_ERROR',
         message: 'Invalid request data provided.',
-        details: err.errors.map((e) => ({
+        details: (zodErr.errors || []).map((e) => ({
           field: e.path.join('.'),
           message: e.message,
         })),
