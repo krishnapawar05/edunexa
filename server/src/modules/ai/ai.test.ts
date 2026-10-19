@@ -26,11 +26,12 @@ describe('STAGE 7: EduNexa AI Features Test Suite', () => {
   afterEach(() => {
     // Reset any test provider overrides
     aiService.setTestProviderOverride(null);
+    aiService.setForceUnconfigured(false);
   });
 
   describe('1. AI Provider Status & Configuration Transparency', () => {
     it('1a. Returns honest status when no AI provider API key is configured', async () => {
-      aiService.setTestProviderOverride(null);
+      aiService.setForceUnconfigured(true);
 
       const res = await request(app).get('/api/v1/ai/status');
 
@@ -42,7 +43,7 @@ describe('STAGE 7: EduNexa AI Features Test Suite', () => {
     });
 
     it('1b. School Information Assistant rejects execution with 503 if provider unconfigured', async () => {
-      aiService.setTestProviderOverride(null);
+      aiService.setForceUnconfigured(true);
 
       const res = await request(app)
         .post('/api/v1/ai/assistant/ask')
@@ -59,7 +60,7 @@ describe('STAGE 7: EduNexa AI Features Test Suite', () => {
     });
 
     it('1c. Quiz generation rejects execution with 503 if provider unconfigured', async () => {
-      aiService.setTestProviderOverride(null);
+      aiService.setForceUnconfigured(true);
 
       const res = await request(app)
         .post('/api/v1/ai/quiz/generate')

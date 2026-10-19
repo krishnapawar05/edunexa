@@ -41,7 +41,7 @@ const envSchema = z.object({
     return 'edunexa_production_grade_refresh_secret_1234567890_secure_key';
   }),
   AI_PROVIDER_API_KEY: z.string().optional().transform((val) => (val ? val.trim() : '')),
-  AI_PROVIDER_MODEL: z.string().optional().transform((val) => (val && val.trim() ? val.trim() : 'gemini-2.0-flash')),
+  AI_PROVIDER_MODEL: z.string().optional().transform((val) => (val && val.trim() ? val.trim() : 'gemini-3.8-flash')),
   LOG_LEVEL: z.string().optional().transform((val) => {
     if (!val || !val.trim()) return 'info';
     const lower = val.trim().toLowerCase();

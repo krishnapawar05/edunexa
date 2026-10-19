@@ -96,6 +96,7 @@ export class AiService {
 
   // Test provider hook: allows tests to inject mock responses or force errors
   private testProviderOverride: ((prompt: string) => Promise<string>) | null = null;
+  private forceUnconfigured: boolean = false;
 
   /**
    * Set custom provider override for deterministic unit testing
@@ -105,9 +106,17 @@ export class AiService {
   }
 
   /**
+   * Force unconfigured state for testing unconfigured scenarios
+   */
+  public setForceUnconfigured(force: boolean) {
+    this.forceUnconfigured = force;
+  }
+
+  /**
    * Check if AI provider API key is configured
    */
   public isProviderConfigured(): boolean {
+    if (this.forceUnconfigured) return false;
     return !!(this.testProviderOverride || (env.aiProviderApiKey && env.aiProviderApiKey.trim().length > 0));
   }
 
@@ -119,7 +128,7 @@ export class AiService {
     return {
       isConfigured: configured,
       provider: configured ? 'Google Gemini' : 'None (Unconfigured)',
-      model: env.aiProviderModel || 'gemini-2.0-flash',
+      model: env.aiProviderModel || 'gemini-3.8-flash',
       message: configured
         ? 'AI provider is configured and available for grounded school assistance and quiz draft generation.'
         : 'AI provider is not configured. Please configure AI_PROVIDER_API_KEY in the server environment to enable live AI features.',
@@ -195,7 +204,7 @@ export class AiService {
         timestamp: new Date().toISOString(),
         disclaimer:
           'AI-generated response grounded strictly in approved institutional policies. Verify critical academic decisions with administration.',
-        model: env.aiProviderModel || 'gemini-2.0-flash',
+        model: env.aiProviderModel || 'gemini-3.8-flash',
       };
     }
 
@@ -227,7 +236,7 @@ RULES:
       timestamp: new Date().toISOString(),
       disclaimer:
         'AI-generated response grounded strictly in approved institutional policies. Verify critical academic decisions with administration.',
-      model: env.aiProviderModel || 'gemini-2.0-flash',
+      model: env.aiProviderModel || 'gemini-3.8-flash',
     };
   }
 
@@ -327,7 +336,7 @@ Respond ONLY with valid JSON. Do not wrap in markdown backticks or commentary.`;
       createdAt: new Date().toISOString(),
       status: 'DRAFT_PENDING_APPROVAL',
       disclaimer: 'AI-generated draft questions require teacher review and approval before publication to students.',
-      model: env.aiProviderModel || 'gemini-2.0-flash',
+      model: env.aiProviderModel || 'gemini-3.8-flash',
     };
 
     this.drafts.set(draftId, draftRecord);
@@ -417,7 +426,7 @@ Respond ONLY with valid JSON. Do not wrap in markdown backticks or commentary.`;
       throw err;
     }
 
-    const model = env.aiProviderModel || 'gemini-2.0-flash';
+    const model = env.aiProviderModel || 'gemini-3.8-flash';
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
     const controller = new AbortController();
