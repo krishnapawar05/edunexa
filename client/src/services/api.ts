@@ -24,12 +24,9 @@ export interface StoredUser {
   staffProfileId?: string;
 }
 
-export function getStoredAuthToken(role?: string): string {
-  // Check primary token
+export function getStoredAuthToken(_role?: string): string {
   const stored = localStorage.getItem('edunexa_access_token') || localStorage.getItem('edunexa_token');
-  if (stored) return stored;
-  // Fallback demo tokens for initial unauthenticated boot
-  return role === 'TEACHER' ? 'demo-teacher-token' : 'demo-student-token';
+  return stored || '';
 }
 
 export function setAuthSession(token: string, user: StoredUser): void {
@@ -53,18 +50,7 @@ export function clearAuthSession(): void {
   localStorage.removeItem('edunexa_user');
 }
 
-export const DEMO_CREDENTIALS: Record<string, { email: string; pass: string }> = {
-  SUPER_ADMIN: { email: 'superadmin@edunexa.org', pass: 'DemoPass2026!' },
-  SCHOOL_ADMIN: { email: 'admin@apexacademy.edu', pass: 'DemoPass2026!' },
-  TEACHER: { email: 'dr.thorne@apexacademy.edu', pass: 'DemoPass2026!' },
-  STUDENT: { email: 'aarav.sharma@student.apex.edu', pass: 'DemoPass2026!' },
-  PARENT: { email: 'sunil.sharma@parent.apex.edu', pass: 'DemoPass2026!' },
-  EXAM_COORDINATOR: { email: 'exam.coordinator@apexacademy.edu', pass: 'DemoPass2026!' },
-  HR_STAFF: { email: 'hr.admin@apexacademy.edu', pass: 'DemoPass2026!' },
-  ACCOUNTS: { email: 'accounts@apexacademy.edu', pass: 'DemoPass2026!' },
-};
-
-export async function loginApi(email: string, password: string):Promise<{ accessToken: string; user: StoredUser }> {
+export async function loginApi(email: string, password: string): Promise<{ accessToken: string; user: StoredUser }> {
   const res = await fetch(getApiUrl('/api/v1/auth/login'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -76,20 +62,6 @@ export async function loginApi(email: string, password: string):Promise<{ access
   }
   setAuthSession(json.data.accessToken, json.data.user);
   return json.data;
-}
-
-export async function demoLoginForRole(role: string): Promise<string> {
-  const creds = DEMO_CREDENTIALS[role];
-  if (!creds) {
-    return getStoredAuthToken(role);
-  }
-  try {
-    const data = await loginApi(creds.email, creds.pass);
-    return data.accessToken;
-  } catch (err) {
-    console.warn(`Demo login fallback for ${role}:`, err);
-    return getStoredAuthToken(role);
-  }
 }
 
 // ============================================================================

@@ -1,40 +1,59 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Search,
   Bell,
-  Shield,
-  ChevronDown,
   CheckCircle2,
   AlertTriangle,
   RefreshCw,
   Sliders,
   Menu,
-  Building2,
+  LogOut,
+  ShieldCheck,
 } from 'lucide-react';
 import { HealthCheckData } from '@edunexa/shared';
 import { useSchoolBranding } from '../context/SchoolBrandingContext.js';
-import { demoLoginForRole, operationsApi } from '../services/api.js';
+import { operationsApi, getStoredUser, clearAuthSession } from '../services/api.js';
 
 interface HeaderProps {
   currentRole: string;
-  onRoleChange: (role: string) => void;
   serverHealth: HealthCheckData | null;
   onRefreshHealth: () => void;
   onToggleMobileMenu?: () => void;
 }
 
+const ROLE_LABELS: Record<string, string> = {
+  SUPER_ADMIN: 'Platform Super Admin',
+  SCHOOL_ADMIN: 'School Administrator',
+  PRINCIPAL: 'Principal',
+  TEACHER: 'Faculty / Teacher',
+  STUDENT: 'Student',
+  PARENT: 'Parent / Guardian',
+  HR_STAFF: 'HR / Staff Admin',
+  ACCOUNTS: 'Accounts Staff',
+  EXAM_COORDINATOR: 'Examination Coordinator',
+};
+
 export const Header: React.FC<HeaderProps> = ({
   currentRole,
-  onRoleChange,
   serverHealth,
   onRefreshHealth,
   onToggleMobileMenu,
 }) => {
   const { branding, setIsCustomizing } = useSchoolBranding();
-  const [showRoleMenu, setShowRoleMenu] = useState(false);
+  const navigate = useNavigate();
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState<number>(0);
+
+  const user = getStoredUser();
+  const activeRole = user?.role || currentRole;
+  const roleLabel = ROLE_LABELS[activeRole] || activeRole;
+  const schoolLabel = activeRole === 'SUPER_ADMIN' ? 'Multi-Tenant Authority' : branding.shortName;
+  const userName = user ? `${user.firstName} ${user.lastName}`.trim() : 'Authenticated User';
+  const userInitials = user
+    ? `${user.firstName?.[0] || ''}${user.lastName?.[0] || ''}`.toUpperCase() || 'U'
+    : 'U';
 
   const loadNotifications = async () => {
     try {
@@ -48,7 +67,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   React.useEffect(() => {
     loadNotifications();
-  }, [currentRole]);
+  }, [activeRole]);
 
   const handleMarkAllRead = async () => {
     try {
@@ -60,20 +79,10 @@ export const Header: React.FC<HeaderProps> = ({
     }
   };
 
-  const roles = [
-    { id: 'SUPER_ADMIN', label: 'Platform Super Admin', school: 'Multi-Tenant Authority' },
-    { id: 'SCHOOL_ADMIN', label: 'School Admin / Principal', school: branding.shortName },
-    { id: 'TEACHER', label: 'Teacher (Dr. Thorne)', school: 'Grade 10 Physics' },
-    { id: 'STUDENT', label: 'Student (Aarav Sharma)', school: `Grade 10-A (#ADM-2026-042)` },
-    { id: 'PARENT', label: 'Parent / Guardian', school: 'Children: Aarav & Maya' },
-    { id: 'EXAM_COORDINATOR', label: 'Examination Coordinator', school: 'Exam Workspace & Audit' },
-    { id: 'HR_STAFF', label: 'HR / Staff Admin', school: 'Faculty & Leave Registry' },
-    { id: 'ACCOUNTS', label: 'Accounts Staff', school: 'Fee Ledger & Invoicing' },
-    { id: 'PUBLIC', label: 'Public School Website', school: `${branding.shortName} Portal` },
-    { id: 'VERIFY_CARD', label: 'Public ID Card Verification', school: 'Anti-Tamper QR Gateway' },
-  ];
-
-  const currentRoleObj = roles.find((r) => r.id === currentRole) || roles[1];
+  const handleSignOut = () => {
+    clearAuthSession();
+    navigate('/login', { replace: true });
+  };
 
   return (
     <header
@@ -135,25 +144,27 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* Right Controls: Brand Customizer, Health Badge, Role Switcher, Alerts, Profile */}
+      {/* Right Controls: Brand Customizer, Health Badge, Alerts, Verified Profile, Sign Out */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-        {/* School Identity Customizer Button */}
-        <button
-          onClick={() => setIsCustomizing(true)}
-          className="ed-btn ed-btn-secondary"
-          title="Configure School Name, Theme & Identity (PRD Stage 1 Requirement)"
-          style={{
-            padding: '4px 10px',
-            fontSize: '0.78rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            borderColor: 'var(--border-default)',
-          }}
-        >
-          <Sliders size={13} style={{ color: 'var(--primary-700)' }} />
-          <span>Branding: <strong>{branding.shortName}</strong></span>
-        </button>
+        {/* School Identity Customizer Button (for Admin / School-level users) */}
+        {activeRole !== 'STUDENT' && activeRole !== 'PARENT' && (
+          <button
+            onClick={() => setIsCustomizing(true)}
+            className="ed-btn ed-btn-secondary"
+            title="Configure School Name, Theme & Identity (PRD Stage 1 Requirement)"
+            style={{
+              padding: '4px 10px',
+              fontSize: '0.78rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              borderColor: 'var(--border-default)',
+            }}
+          >
+            <Sliders size={13} style={{ color: 'var(--primary-700)' }} />
+            <span>Branding: <strong>{branding.shortName}</strong></span>
+          </button>
+        )}
 
         {/* Backend Status Live Badge */}
         <div
@@ -276,113 +287,80 @@ export const Header: React.FC<HeaderProps> = ({
           )}
         </div>
 
-        {/* Role Fast-Switcher Menu */}
-        <div style={{ position: 'relative' }}>
-          <button
-            onClick={() => setShowRoleMenu(!showRoleMenu)}
+        {/* Verified Authenticated User Identity (Role-Isolated, Read-Only) */}
+        <div
+          data-testid="header-user-badge"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--space-2)',
+            padding: '4px 10px',
+            backgroundColor: 'var(--bg-subtle)',
+            border: '1px solid var(--border-default)',
+            borderRadius: 'var(--radius-sm)',
+          }}
+        >
+          <div
             style={{
+              width: '28px',
+              height: '28px',
+              borderRadius: '50%',
+              backgroundColor: 'var(--primary-100)',
+              color: 'var(--primary-800)',
               display: 'flex',
               alignItems: 'center',
-              gap: 'var(--space-2)',
-              padding: '4px 10px',
-              backgroundColor: 'var(--bg-subtle)',
-              border: '1px solid var(--border-default)',
-              borderRadius: 'var(--radius-sm)',
-              cursor: 'pointer',
-              textAlign: 'left',
+              justifyContent: 'center',
+              fontWeight: 700,
+              fontSize: '0.78rem',
             }}
           >
-            <div
-              style={{
-                width: '26px',
-                height: '26px',
-                borderRadius: '50%',
-                backgroundColor: 'var(--primary-50)',
-                color: 'var(--primary-700)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontWeight: 700,
-                fontSize: '0.80rem',
-              }}
-            >
-              {currentRoleObj.label[0]}
+            {userInitials}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.1 }}>
+                {userName}
+              </span>
+              <span title="Cryptographically Verified Session" style={{ display: 'inline-flex', alignItems: 'center' }}>
+                <ShieldCheck size={13} style={{ color: 'var(--primary-600)' }} />
+              </span>
             </div>
-            <div>
-              <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.1 }}>
-                {currentRoleObj.label}
-              </div>
-              <div style={{ fontSize: '0.70rem', color: 'var(--text-muted)' }}>{currentRoleObj.school}</div>
-            </div>
-            <ChevronDown size={14} style={{ color: 'var(--text-muted)', marginLeft: '4px' }} />
-          </button>
-
-          {showRoleMenu && (
-            <div
-              style={{
-                position: 'absolute',
-                right: 0,
-                top: 'calc(100% + 6px)',
-                width: '280px',
-                backgroundColor: '#ffffff',
-                border: '1px solid #cbd5e1',
-                borderRadius: 'var(--radius-md)',
-                boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
-                padding: '8px',
-                zIndex: 100,
-                maxHeight: '440px',
-                overflowY: 'auto',
-              }}
-            >
-              <div
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span
                 style={{
-                  fontSize: '0.72rem',
+                  fontSize: '0.68rem',
                   fontWeight: 600,
-                  textTransform: 'uppercase',
-                  color: 'var(--text-muted)',
-                  padding: '6px 8px',
+                  color: 'var(--primary-700)',
+                  backgroundColor: 'var(--primary-50)',
+                  padding: '1px 5px',
+                  borderRadius: '3px',
                 }}
               >
-                Switch User Role (8 PRD Roles)
-              </div>
-              {roles.map((r) => (
-                <button
-                  key={r.id}
-                  onClick={async () => {
-                    if (r.id !== 'PUBLIC' && r.id !== 'VERIFY_CARD') {
-                      await demoLoginForRole(r.id);
-                    }
-                    onRoleChange(r.id);
-                    setShowRoleMenu(false);
-                  }}
-                  style={{
-                    width: '100%',
-                    textAlign: 'left',
-                    padding: '8px 10px',
-                    borderRadius: 'var(--radius-sm)',
-                    border: 'none',
-                    backgroundColor: r.id === currentRole ? 'var(--primary-50)' : 'transparent',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '2px',
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: '0.82rem',
-                      fontWeight: r.id === currentRole ? 700 : 500,
-                      color: r.id === currentRole ? 'var(--primary-700)' : 'var(--text-primary)',
-                    }}
-                  >
-                    {r.label}
-                  </span>
-                  <span style={{ fontSize: '0.70rem', color: 'var(--text-muted)' }}>{r.school}</span>
-                </button>
-              ))}
+                {roleLabel}
+              </span>
+              <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{schoolLabel}</span>
             </div>
-          )}
+          </div>
         </div>
+
+        {/* Explicit Sign Out Button */}
+        <button
+          onClick={handleSignOut}
+          className="ed-btn ed-btn-secondary"
+          title="Sign out of authenticated session"
+          style={{
+            padding: '5px 10px',
+            fontSize: '0.78rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '5px',
+            borderColor: 'var(--border-default)',
+            color: 'var(--danger-text, #dc2626)',
+          }}
+        >
+          <LogOut size={13} />
+          <span>Sign Out</span>
+        </button>
       </div>
     </header>
   );

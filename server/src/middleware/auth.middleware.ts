@@ -43,20 +43,6 @@ export function authenticateUser(req: Request, res: Response, next: NextFunction
 
   const token = authHeader.split(' ')[1];
 
-  // Dev mode demo fallback for UI inspection
-  if (token.startsWith('demo-')) {
-    const isTeacher = token.includes('teacher');
-    const role = isTeacher ? PlatformRole.TEACHER : PlatformRole.STUDENT;
-    req.user = {
-      userId: isTeacher ? 'usr-teacher-01' : 'usr-student-01',
-      email: isTeacher ? 'dr.thorne@apexacademy.edu' : 'aarav.sharma@apexacademy.edu',
-      schoolId: 'school-apex-01',
-      role,
-    };
-    req.schoolId = 'school-apex-01';
-    return next();
-  }
-
   try {
     const payload = verifyAccessToken(token);
     req.user = payload;

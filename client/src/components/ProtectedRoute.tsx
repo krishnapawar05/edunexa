@@ -25,6 +25,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles, ch
       const roleLandingPages: Record<string, string> = {
         SUPER_ADMIN: '/superadmin',
         SCHOOL_ADMIN: '/admin',
+        PRINCIPAL: '/admin',
         TEACHER: '/teacher',
         STUDENT: '/student',
         PARENT: '/parent',

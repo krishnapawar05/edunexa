@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { Shield, Lock, Mail, ArrowRight, CheckCircle2, School } from 'lucide-react';
+import { Lock, Mail, ArrowRight, ShieldCheck } from 'lucide-react';
 import { useSchoolBranding } from '../../context/SchoolBrandingContext.js';
-import { getApiUrl } from '../../services/api.js';
+import { getApiUrl, setAuthSession } from '../../services/api.js';
 
 interface LoginPageProps {
   onLoginSuccess?: (role: string) => void;
@@ -14,40 +14,21 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGoToPubl
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [email, setEmail] = useState('admin@apexacademy.edu');
-  const [password, setPassword] = useState('••••••••••••');
-  const [selectedRole, setSelectedRole] = useState('SCHOOL_ADMIN');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-
-  const demoAccounts = [
-    { role: 'SUPER_ADMIN', label: 'Super Admin', email: 'superadmin@edunexa.org', badge: 'Multi-Tenant' },
-    { role: 'SCHOOL_ADMIN', label: 'School Admin', email: 'admin@apexacademy.edu', badge: 'Apex Academy' },
-    { role: 'TEACHER', label: 'Faculty / Teacher', email: 'dr.thorne@apexacademy.edu', badge: 'Grade 10' },
-    { role: 'STUDENT', label: 'Student Profile', email: 'aarav.sharma@student.apex.edu', badge: 'Grade 10-A' },
-    { role: 'PARENT', label: 'Parent / Guardian', email: 'sunil.sharma@parent.apex.edu', badge: '2 Children' },
-    { role: 'EXAM_COORDINATOR', label: 'Exam Coordinator', email: 'exam.coordinator@apexacademy.edu', badge: 'Assessments' },
-    { role: 'HR_STAFF', label: 'HR / Staff Admin', email: 'hr.admin@apexacademy.edu', badge: 'Workforce' },
-    { role: 'ACCOUNTS', label: 'Accounts Staff', email: 'accounts@apexacademy.edu', badge: 'Finance' },
-  ];
-
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const roleToRouteMap: Record<string, string> = {
     SUPER_ADMIN: '/superadmin',
     SCHOOL_ADMIN: '/admin',
+    PRINCIPAL: '/admin',
     TEACHER: '/teacher',
     STUDENT: '/student',
     PARENT: '/parent',
     EXAM_COORDINATOR: '/examinations',
     HR_STAFF: '/hr',
     ACCOUNTS: '/accounts',
-  };
-
-  const handleSelectDemo = (acc: typeof demoAccounts[0]) => {
-    setSelectedRole(acc.role);
-    setEmail(acc.email);
-    setPassword('DemoPass2026!');
-    setErrorMessage(null);
   };
 
   const handleFormSubmit = async (e: React.FormEvent) => {
@@ -59,25 +40,25 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGoToPubl
       const res = await fetch(getApiUrl('/api/v1/auth/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: email.trim(), password }),
       });
 
       const data = await res.json();
 
       if (!res.ok || !data.success) {
-        throw new Error(data.error?.message || 'Authentication failed. Please check credentials.');
+        throw new Error(data.error?.message || 'Authentication failed. Please check your institutional credentials.');
       }
 
       // Store verified token and session
-      localStorage.setItem('edunexa_access_token', data.data.accessToken);
-      localStorage.setItem('edunexa_user', JSON.stringify(data.data.user));
+      setAuthSession(data.data.accessToken, data.data.user);
 
       const userRole = data.data.user.role;
       if (onLoginSuccess) {
         onLoginSuccess(userRole);
       } else {
-        const from = (location.state as any)?.from?.pathname || roleToRouteMap[userRole] || '/admin';
-        navigate(from, { replace: true });
+        const from = (location.state as any)?.from?.pathname;
+        const targetRoute = from || roleToRouteMap[userRole] || '/admin';
+        navigate(targetRoute, { replace: true });
       }
     } catch (err: any) {
       setErrorMessage(err.message || 'Unable to connect to authentication server.');
@@ -103,8 +84,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGoToPubl
         <div style={{ textAlign: 'center', marginBottom: 'var(--space-6)' }}>
           <div
             style={{
-              width: '44px',
-              height: '44px',
+              width: '48px',
+              height: '48px',
               backgroundColor: branding.primaryAccent,
               borderRadius: 'var(--radius-sm)',
               display: 'inline-flex',
@@ -125,67 +106,24 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGoToPubl
           </p>
         </div>
 
-        {/* Demo Fast-Switcher Card */}
-        <div
-          className="ed-card"
-          style={{
-            marginBottom: 'var(--space-4)',
-            backgroundColor: '#ffffff',
-            border: '1px solid var(--border-default)',
-            padding: 'var(--space-3) var(--space-4)',
-          }}
-        >
-          <div
-            style={{
-              fontSize: '0.74rem',
-              fontWeight: 700,
-              textTransform: 'uppercase',
-              letterSpacing: '0.04em',
-              color: 'var(--text-muted)',
-              marginBottom: 'var(--space-2)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-            }}
-          >
-            <span>One-Click Role Demonstration</span>
-            <span style={{ color: 'var(--primary-600)', fontWeight: 600 }}>Synthetic Sandbox</span>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-            {demoAccounts.map((acc) => {
-              const isSelected = selectedRole === acc.role;
-              return (
-                <button
-                  key={acc.role}
-                  type="button"
-                  onClick={() => handleSelectDemo(acc)}
-                  style={{
-                    padding: '8px 10px',
-                    borderRadius: 'var(--radius-sm)',
-                    border: isSelected ? '1px solid var(--primary-600)' : '1px solid var(--border-default)',
-                    backgroundColor: isSelected ? 'var(--primary-50)' : 'var(--bg-subtle)',
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: '0.78rem',
-                      fontWeight: 600,
-                      color: isSelected ? 'var(--primary-700)' : 'var(--text-primary)',
-                    }}
-                  >
-                    {acc.label}
-                  </div>
-                  <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{acc.badge}</div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
         {/* Login Form */}
         <div className="ed-card ed-card-body" style={{ backgroundColor: '#ffffff', boxShadow: 'var(--shadow-md)' }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              marginBottom: 'var(--space-4)',
+              paddingBottom: 'var(--space-3)',
+              borderBottom: '1px solid var(--border-default)',
+            }}
+          >
+            <ShieldCheck size={18} style={{ color: 'var(--primary-600)' }} />
+            <span style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+              Institutional Single Sign-On
+            </span>
+          </div>
+
           <form onSubmit={handleFormSubmit}>
             <div className="ed-input-group">
               <label className="ed-label">Institutional Email</label>
@@ -199,8 +137,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGoToPubl
                   type="email"
                   className="ed-input"
                   style={{ paddingLeft: '34px' }}
+                  placeholder="name@school.edu"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  autoComplete="username"
                 />
               </div>
             </div>
@@ -217,17 +157,27 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGoToPubl
                   type="password"
                   className="ed-input"
                   style={{ paddingLeft: '34px' }}
+                  placeholder="••••••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="current-password"
                 />
               </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)', fontSize: '0.8rem' }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: 'var(--space-4)',
+                fontSize: '0.8rem',
+              }}
+            >
               <label style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-muted)', cursor: 'pointer' }}>
                 <input type="checkbox" defaultChecked /> Remember terminal session
               </label>
-              <a href="#reset" onClick={(e) => e.preventDefault()} style={{ fontSize: '0.78rem' }}>
+              <a href="#reset" onClick={(e) => e.preventDefault()} style={{ fontSize: '0.78rem', color: 'var(--primary-600)' }}>
                 Forgot Password?
               </a>
             </div>

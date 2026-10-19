@@ -78,7 +78,7 @@ export const App: React.FC = () => {
         <Route
           element={
             <ProtectedRoute allowedRoles={['SUPER_ADMIN']}>
-              <ErpLayout forcedRole="SUPER_ADMIN" />
+              <ErpLayout />
             </ProtectedRoute>
           }
         >
@@ -93,7 +93,7 @@ export const App: React.FC = () => {
         <Route
           element={
             <ProtectedRoute allowedRoles={['SCHOOL_ADMIN', 'PRINCIPAL']}>
-              <ErpLayout forcedRole="SCHOOL_ADMIN" />
+              <ErpLayout />
             </ProtectedRoute>
           }
         >
@@ -112,7 +112,7 @@ export const App: React.FC = () => {
         <Route
           element={
             <ProtectedRoute allowedRoles={['TEACHER']}>
-              <ErpLayout forcedRole="TEACHER" />
+              <ErpLayout />
             </ProtectedRoute>
           }
         >
@@ -127,7 +127,7 @@ export const App: React.FC = () => {
         <Route
           element={
             <ProtectedRoute allowedRoles={['STUDENT']}>
-              <ErpLayout forcedRole="STUDENT" />
+              <ErpLayout />
             </ProtectedRoute>
           }
         >
@@ -142,7 +142,7 @@ export const App: React.FC = () => {
         <Route
           element={
             <ProtectedRoute allowedRoles={['PARENT']}>
-              <ErpLayout forcedRole="PARENT" />
+              <ErpLayout />
             </ProtectedRoute>
           }
         >
@@ -157,7 +157,7 @@ export const App: React.FC = () => {
         <Route
           element={
             <ProtectedRoute allowedRoles={['EXAM_COORDINATOR']}>
-              <ErpLayout forcedRole="EXAM_COORDINATOR" />
+              <ErpLayout />
             </ProtectedRoute>
           }
         >
@@ -172,7 +172,7 @@ export const App: React.FC = () => {
         <Route
           element={
             <ProtectedRoute allowedRoles={['HR_STAFF']}>
-              <ErpLayout forcedRole="HR_STAFF" />
+              <ErpLayout />
             </ProtectedRoute>
           }
         >
@@ -186,7 +186,7 @@ export const App: React.FC = () => {
         <Route
           element={
             <ProtectedRoute allowedRoles={['ACCOUNTS']}>
-              <ErpLayout forcedRole="ACCOUNTS" />
+              <ErpLayout />
             </ProtectedRoute>
           }
         >

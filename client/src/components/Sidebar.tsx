@@ -26,6 +26,7 @@ import {
   X,
 } from 'lucide-react';
 import { useSchoolBranding } from '../context/SchoolBrandingContext.js';
+import { getStoredUser, clearAuthSession } from '../services/api.js';
 
 interface SidebarProps {
   currentRole: string;
@@ -69,6 +70,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
           { id: 'id-cards', path: '/admin/id-cards', label: 'Virtual ID Cards & QR', icon: IdCard },
           { id: 'attendance', path: '/admin/attendance', label: 'Daily Attendance', icon: CalendarCheck },
           { id: 'finance', path: '/admin/finance', label: 'Fees & Invoices', icon: CreditCard },
+          { id: 'notices', path: '/admin/notices', label: 'Events & Notices', icon: Bell },
+        ];
+      case 'PRINCIPAL':
+        return [
+          { id: 'overview', path: '/admin', label: 'Academic Overview', icon: LayoutDashboard },
+          { id: 'students', path: '/admin/students', label: 'Student Directory & SIS', icon: GraduationCap },
+          { id: 'admissions', path: '/admin/admissions', label: 'Admissions Review Queue', icon: FileCheck },
+          { id: 'staff', path: '/admin/staff', label: 'Faculty & HR', icon: Users },
+          { id: 'attendance', path: '/admin/attendance', label: 'Daily Attendance', icon: CalendarCheck },
           { id: 'notices', path: '/admin/notices', label: 'Events & Notices', icon: Bell },
         ];
       case 'TEACHER':
@@ -130,9 +140,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     if (onLogout) {
       onLogout();
     } else {
-      localStorage.removeItem('edunexa_access_token');
-      localStorage.removeItem('edunexa_token');
-      localStorage.removeItem('edunexa_user');
+      clearAuthSession();
       navigate('/login');
     }
   };
@@ -388,11 +396,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   color: '#f8fafc',
                 }}
               >
-                {currentRole.slice(0, 2)}
+                {getStoredUser()?.firstName?.[0] || currentRole.slice(0, 2)}
               </div>
-              <div>
-                <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#f8fafc' }}>
-                  Session Active
+              <div style={{ overflow: 'hidden' }}>
+                <div style={{ fontSize: '0.76rem', fontWeight: 600, color: '#f8fafc', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                  {getStoredUser() ? `${getStoredUser()?.firstName} ${getStoredUser()?.lastName}`.trim() : 'Session Active'}
                 </div>
                 <div style={{ fontSize: '0.66rem', color: '#94a3b8' }}>{currentRole}</div>
               </div>

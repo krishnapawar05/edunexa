@@ -19,6 +19,14 @@ describe('STAGE 3: Authentication and Multi-Tenant Security Test Suite', () => {
     role: PlatformRole.SCHOOL_ADMIN,
   });
 
+  const principalTokenSchoolA = generateAccessToken({
+    userId: 'usr-principal-01',
+    email: 'principal@apexacademy.edu',
+    schoolId: 'sch-apex-01',
+    staffProfileId: 'staff-principal-01',
+    role: PlatformRole.PRINCIPAL,
+  });
+
   const teacherTokenSchoolA = generateAccessToken({
     userId: 'usr-teacher-01',
     email: 'dr.thorne@apexacademy.edu',
@@ -78,6 +86,85 @@ describe('STAGE 3: Authentication and Multi-Tenant Security Test Suite', () => {
     const res = await request(app)
       .get('/api/v1/superadmin/schools')
       .set('Authorization', `Bearer ${studentTokenA}`);
+
+    expect(res.status).toBe(403);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error.code).toBe('FORBIDDEN_ROLE');
+  });
+
+  it('2c. Student attempting to access School Admin student enrollment API should return 403 FORBIDDEN_ROLE', async () => {
+    const res = await request(app)
+      .post('/api/v1/core/students')
+      .set('Authorization', `Bearer ${studentTokenA}`)
+      .send({
+        firstName: 'Hacked',
+        lastName: 'Student',
+        classId: 'cls-10',
+        sectionId: 'sec-10a',
+      });
+
+    expect(res.status).toBe(403);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error.code).toBe('FORBIDDEN_ROLE');
+  });
+
+  it('2d. Student attempting to access Teacher attendance recording API should return 403 FORBIDDEN_ROLE', async () => {
+    const res = await request(app)
+      .post('/api/v1/academic/attendance/students')
+      .set('Authorization', `Bearer ${studentTokenA}`)
+      .send({
+        classId: 'cls-10',
+        sectionId: 'sec-10a',
+        date: '2026-10-19',
+        records: [],
+      });
+
+    expect(res.status).toBe(403);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error.code).toBe('FORBIDDEN_ROLE');
+  });
+
+  it('2e. Teacher attempting to access School Admin student creation API should return 403 FORBIDDEN_ROLE', async () => {
+    const res = await request(app)
+      .post('/api/v1/core/students')
+      .set('Authorization', `Bearer ${teacherTokenSchoolA}`)
+      .send({
+        firstName: 'Unauthorized',
+        lastName: 'Addition',
+        classId: 'cls-10',
+        sectionId: 'sec-10a',
+      });
+
+    expect(res.status).toBe(403);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error.code).toBe('FORBIDDEN_ROLE');
+  });
+
+  it('2f. Principal attempting to access Platform Super Admin API should return 403 FORBIDDEN_ROLE', async () => {
+    const res = await request(app)
+      .get('/api/v1/superadmin/schools')
+      .set('Authorization', `Bearer ${principalTokenSchoolA}`);
+
+    expect(res.status).toBe(403);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error.code).toBe('FORBIDDEN_ROLE');
+  });
+
+  it('2g. School Admin attempting to access Platform Super Admin API should return 403 FORBIDDEN_ROLE', async () => {
+    const res = await request(app)
+      .get('/api/v1/superadmin/schools')
+      .set('Authorization', `Bearer ${schoolAdminTokenSchoolA}`);
+
+    expect(res.status).toBe(403);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error.code).toBe('FORBIDDEN_ROLE');
+  });
+
+  it('2h. Tampering request body or query parameter with role=SUPER_ADMIN does not elevate privileges', async () => {
+    const res = await request(app)
+      .get('/api/v1/superadmin/schools?role=SUPER_ADMIN')
+      .set('Authorization', `Bearer ${studentTokenA}`)
+      .send({ role: 'SUPER_ADMIN' });
 
     expect(res.status).toBe(403);
     expect(res.body.success).toBe(false);
