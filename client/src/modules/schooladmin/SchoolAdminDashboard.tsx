@@ -133,6 +133,8 @@ export const SchoolAdminDashboard: React.FC<SchoolAdminDashboardProps> = ({ init
   const [newStudent, setNewStudent] = useState({
     firstName: '',
     lastName: '',
+    email: '',
+    dateOfBirth: '2010-05-15',
     admissionNumber: '',
     gender: 'Male',
     className: 'Grade 10',
@@ -200,29 +202,50 @@ export const SchoolAdminDashboard: React.FC<SchoolAdminDashboardProps> = ({ init
     e.preventDefault();
     setIsSubmitting(true);
     try {
+      const cleanFirst = newStudent.firstName.trim().toLowerCase().replace(/[^a-z0-9]/g, '') || 'student';
+      const cleanLast = newStudent.lastName.trim().toLowerCase().replace(/[^a-z0-9]/g, '') || 'apex';
+      const rand = Math.floor(1000 + Math.random() * 9000);
+
+      const admissionNum = newStudent.admissionNumber.trim()
+        ? newStudent.admissionNumber.trim()
+        : `ADM-2026-${rand}`;
+
+      const studentEmail = newStudent.email?.trim()
+        ? newStudent.email.trim()
+        : `${cleanFirst}.${cleanLast}.${rand}@student.apex.edu`;
+
+      const guardianPhone = newStudent.guardianPhone?.trim() || '+91 98000 00000';
+
+      const guardianEmail = newStudent.guardianEmail?.trim()
+        ? newStudent.guardianEmail.trim()
+        : `${cleanFirst}.parent.${rand}@parent.apex.edu`;
+
       const payload = {
-        firstName: newStudent.firstName,
-        lastName: newStudent.lastName,
-        admissionNumber: newStudent.admissionNumber.trim() || undefined,
-        gender: newStudent.gender,
-        className: newStudent.className,
-        sectionName: newStudent.sectionName,
-        bloodGroup: newStudent.bloodGroup,
-        address: newStudent.address || 'Campus Residence',
-        emergencyPhone: newStudent.guardianPhone || '+91 98000 00000',
-        dateOfBirth: '2010-05-15',
-        guardianName: newStudent.guardianName,
-        guardianEmail: newStudent.guardianEmail || `${newStudent.firstName.toLowerCase()}@parent.apex.edu`,
-        guardianPhone: newStudent.guardianPhone || '+91 98000 00000',
-        guardianRelationship: newStudent.guardianRelationship,
+        firstName: newStudent.firstName.trim(),
+        lastName: newStudent.lastName.trim(),
+        email: studentEmail,
+        admissionNumber: admissionNum,
+        gender: newStudent.gender || 'Male',
+        className: newStudent.className || 'Grade 10',
+        sectionName: newStudent.sectionName || 'Section A',
+        bloodGroup: newStudent.bloodGroup || 'O+',
+        address: newStudent.address?.trim() || 'Campus Residence, Apex Academy',
+        emergencyPhone: guardianPhone,
+        dateOfBirth: newStudent.dateOfBirth || '2010-05-15',
+        guardianName: newStudent.guardianName.trim(),
+        guardianEmail: guardianEmail,
+        guardianPhone: guardianPhone,
+        guardianRelationship: newStudent.guardianRelationship || 'Father',
       };
 
       const result = await coreApi.createStudent(payload);
-      showToast(`Student ${result.firstName} enrolled (${result.admissionNumber}).`);
+      showToast(`Student ${result.firstName} ${result.lastName} enrolled successfully with ID #${result.admissionNumber}!`);
       setShowAdmitModal(false);
       setNewStudent({
         firstName: '',
         lastName: '',
+        email: '',
+        dateOfBirth: '2010-05-15',
         admissionNumber: '',
         gender: 'Male',
         className: 'Grade 10',
@@ -918,10 +941,32 @@ export const SchoolAdminDashboard: React.FC<SchoolAdminDashboardProps> = ({ init
             </div>
           </div>
 
+          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: 'var(--space-3)' }}>
+            <div className="ed-input-group" style={{ marginBottom: 0 }}>
+              <label className="ed-label">Student Email (Auto-generated if empty)</label>
+              <input
+                type="email"
+                className="ed-input"
+                placeholder="e.g. firstname.lastname@student.apex.edu"
+                value={newStudent.email}
+                onChange={(e) => setNewStudent({ ...newStudent, email: e.target.value })}
+              />
+            </div>
+            <div className="ed-input-group" style={{ marginBottom: 0 }}>
+              <label className="ed-label">Date of Birth</label>
+              <input
+                type="date"
+                className="ed-input"
+                value={newStudent.dateOfBirth}
+                onChange={(e) => setNewStudent({ ...newStudent, dateOfBirth: e.target.value })}
+              />
+            </div>
+          </div>
+
           {/* Guardian Information */}
           <div style={{ borderTop: '1px solid var(--border-default)', paddingTop: 'var(--space-3)' }}>
             <div style={{ fontWeight: 600, fontSize: '0.86rem', marginBottom: '8px' }}>Primary Guardian Relationship</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)', marginBottom: 'var(--space-3)' }}>
               <div className="ed-input-group" style={{ marginBottom: 0 }}>
                 <label className="ed-label">Guardian Full Name *</label>
                 <input
@@ -942,6 +987,30 @@ export const SchoolAdminDashboard: React.FC<SchoolAdminDashboardProps> = ({ init
                   value={newStudent.guardianPhone}
                   onChange={(e) => setNewStudent({ ...newStudent, guardianPhone: e.target.value })}
                 />
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: 'var(--space-3)' }}>
+              <div className="ed-input-group" style={{ marginBottom: 0 }}>
+                <label className="ed-label">Guardian Email (Auto-generated if empty)</label>
+                <input
+                  type="email"
+                  className="ed-input"
+                  placeholder="e.g. parent@example.com"
+                  value={newStudent.guardianEmail}
+                  onChange={(e) => setNewStudent({ ...newStudent, guardianEmail: e.target.value })}
+                />
+              </div>
+              <div className="ed-input-group" style={{ marginBottom: 0 }}>
+                <label className="ed-label">Relationship</label>
+                <select
+                  className="ed-select"
+                  value={newStudent.guardianRelationship}
+                  onChange={(e) => setNewStudent({ ...newStudent, guardianRelationship: e.target.value })}
+                >
+                  <option value="Father">Father</option>
+                  <option value="Mother">Mother</option>
+                  <option value="Guardian">Legal Guardian</option>
+                </select>
               </div>
             </div>
           </div>

@@ -139,7 +139,13 @@ export async function apiRequest<T>(
   }
 
   if (!res.ok || !json.success) {
-    const errMsg = json.error?.message || json.message || `Request failed with status ${res.status}`;
+    const details = json.error?.details;
+    const detailText = Array.isArray(details) && details.length > 0
+      ? details.map((d: any) => d.message ? `${d.field ? d.field + ': ' : ''}${d.message}` : JSON.stringify(d)).join(', ')
+      : '';
+    const errMsg = detailText
+      ? `${json.error?.message || 'Validation error'} (${detailText})`
+      : (json.error?.message || json.message || `Request failed with status ${res.status}`);
     const errCode = json.error?.code;
     throw new ApiError(errMsg, res.status, errCode);
   }

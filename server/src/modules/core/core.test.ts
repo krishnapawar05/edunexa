@@ -138,6 +138,28 @@ describe('STAGE 4: Core School Management Test Suite', () => {
     expect(res.body.error.code).toBe('DUPLICATE_ADMISSION_NUMBER');
   });
 
+  it('3c. School Admin can enroll student with omitted email and auto-assigned admission number', async () => {
+    const res = await request(app)
+      .post('/api/v1/core/students')
+      .set('Authorization', `Bearer ${schoolAdminTokenSchoolA}`)
+      .send({
+        firstName: 'Krishna',
+        lastName: 'Pawar',
+        gender: 'Male',
+        className: 'Grade 10',
+        sectionName: 'A',
+        guardianName: 'jkj kjkwj',
+        guardianPhone: '+91323232323',
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.firstName).toBe('Krishna');
+    expect(res.body.data.lastName).toBe('Pawar');
+    expect(res.body.data.admissionNumber).toMatch(/^ADM-2026-\d{3,6}$/);
+    expect(res.body.data.email).toContain('krishna.pawar');
+  });
+
   // --------------------------------------------------------------------------
   // 4. Student Profile & Guardian Dossier Retrieval
   // --------------------------------------------------------------------------

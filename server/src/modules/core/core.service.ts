@@ -377,17 +377,53 @@ export class CoreSchoolService {
       throw new AppError('Tenant school not found.', 404, 'SCHOOL_NOT_FOUND');
     }
 
+    const cleanFirst = data.firstName.toLowerCase().replace(/[^a-z0-9]/g, '') || 'student';
+    const cleanLast = data.lastName.toLowerCase().replace(/[^a-z0-9]/g, '') || 'apex';
+    const rand = Math.floor(1000 + Math.random() * 9000);
+
+    const admissionNumber = (data.admissionNumber && data.admissionNumber.trim().length > 0)
+      ? data.admissionNumber.trim()
+      : `ADM-2026-${rand}`;
+
+    const studentEmail = (data.email && data.email.trim().length > 0)
+      ? data.email.trim()
+      : `${cleanFirst}.${cleanLast}.${rand}@student.apex.edu`;
+
+    const emergencyPhone = (data.emergencyPhone && data.emergencyPhone.trim().length > 0)
+      ? data.emergencyPhone.trim()
+      : (data.guardianPhone && data.guardianPhone.trim().length > 0 ? data.guardianPhone.trim() : '+91 98000 00000');
+
+    const address = (data.address && data.address.trim().length > 0)
+      ? data.address.trim()
+      : 'Campus Residence, Apex Academy';
+
+    const dateOfBirth = (data.dateOfBirth && data.dateOfBirth.trim().length > 0)
+      ? new Date(data.dateOfBirth)
+      : new Date('2010-05-15');
+
+    const guardianRelationship = (data.guardianRelationship && data.guardianRelationship.trim().length > 0)
+      ? data.guardianRelationship.trim()
+      : 'Parent';
+
+    const guardianEmail = (data.guardianEmail && data.guardianEmail.trim().length > 0)
+      ? data.guardianEmail.trim()
+      : `${cleanFirst}.guardian.${rand}@parent.apex.edu`;
+
+    const guardianPhone = (data.guardianPhone && data.guardianPhone.trim().length > 0)
+      ? data.guardianPhone.trim()
+      : emergencyPhone;
+
     // 1. Prevent duplicate admission number within the school tenant scope
     const existing = await prisma.studentProfile.findFirst({
       where: {
-        admissionNumber: { equals: data.admissionNumber, mode: 'insensitive' },
+        admissionNumber: { equals: admissionNumber, mode: 'insensitive' },
         membership: { schoolId: school.id },
       },
     });
 
     if (existing) {
       throw new AppError(
-        `Admission number '${data.admissionNumber}' is already registered in this school. Duplicate admission numbers are strictly forbidden.`,
+        `Admission number '${admissionNumber}' is already registered in this school. Duplicate admission numbers are strictly forbidden.`,
         409,
         'DUPLICATE_ADMISSION_NUMBER'
       );
@@ -396,14 +432,14 @@ export class CoreSchoolService {
     // 2. Execute transactional creation
     return prisma.$transaction(async (tx) => {
       // Find or create User
-      let user = await tx.user.findUnique({ where: { email: data.email } });
+      let user = await tx.user.findUnique({ where: { email: studentEmail } });
       if (!user) {
         user = await tx.user.create({
           data: {
-            email: data.email,
+            email: studentEmail,
             firstName: data.firstName,
             lastName: data.lastName,
-            phone: data.emergencyPhone,
+            phone: emergencyPhone,
             passwordHash: '$2a$10$wT3wK.sXFjDgnnLd8mY3xebvOQ6B18qTq8u20eSgb/rZeqm5zD78m', // DemoPass2026!
           },
         });
@@ -441,12 +477,12 @@ export class CoreSchoolService {
         studentProfile = await tx.studentProfile.create({
           data: {
             membershipId: membership.id,
-            admissionNumber: data.admissionNumber,
-            gender: data.gender,
-            dateOfBirth: new Date(data.dateOfBirth),
+            admissionNumber,
+            gender: data.gender || 'Male',
+            dateOfBirth,
             bloodGroup: data.bloodGroup || 'O+',
-            address: data.address,
-            emergencyPhone: data.emergencyPhone,
+            address,
+            emergencyPhone,
             status: StudentStatus.ACTIVE,
           },
         });
@@ -518,16 +554,16 @@ export class CoreSchoolService {
 
       // Handle Guardian if provided
       const guardians: Array<{ name: string; relationship: string; email: string; phone: string }> = [];
-      if (data.guardianEmail) {
-        let guardianUser = await tx.user.findUnique({ where: { email: data.guardianEmail } });
+      if (guardianEmail) {
+        let guardianUser = await tx.user.findUnique({ where: { email: guardianEmail } });
         if (!guardianUser) {
           const names = (data.guardianName || 'Guardian').split(' ');
           guardianUser = await tx.user.create({
             data: {
-              email: data.guardianEmail,
+              email: guardianEmail,
               firstName: names[0] || 'Guardian',
               lastName: names.slice(1).join(' ') || 'Parent',
-              phone: data.guardianPhone || data.emergencyPhone,
+              phone: guardianPhone,
               passwordHash: '$2a$10$wT3wK.sXFjDgnnLd8mY3xebvOQ6B18qTq8u20eSgb/rZeqm5zD78m',
             },
           });
@@ -555,16 +591,16 @@ export class CoreSchoolService {
           data: {
             parentMembershipId: parentMembership.id,
             studentProfileId: studentProfile.id,
-            relationship: data.guardianRelationship || 'Guardian',
+            relationship: guardianRelationship,
             isPrimaryContact: true,
           },
         });
 
         guardians.push({
-          name: data.guardianName,
-          relationship: data.guardianRelationship,
-          email: data.guardianEmail,
-          phone: data.guardianPhone,
+          name: data.guardianName || 'Guardian',
+          relationship: guardianRelationship,
+          email: guardianEmail,
+          phone: guardianPhone,
         });
       }
 
@@ -577,7 +613,7 @@ export class CoreSchoolService {
           entityType: 'StudentProfile',
           entityId: studentProfile.id,
           details: {
-            admissionNumber: data.admissionNumber,
+            admissionNumber,
             className: data.className,
             sectionName: data.sectionName,
           },
@@ -587,15 +623,15 @@ export class CoreSchoolService {
       return {
         id: studentProfile.id,
         schoolId: school.id,
-        admissionNumber: data.admissionNumber,
+        admissionNumber,
         firstName: data.firstName,
         lastName: data.lastName,
-        email: data.email,
-        gender: data.gender,
-        dateOfBirth: data.dateOfBirth,
+        email: studentEmail,
+        gender: data.gender || 'Male',
+        dateOfBirth: dateOfBirth.toISOString().split('T')[0],
         bloodGroup: data.bloodGroup || 'O+',
-        address: data.address,
-        emergencyPhone: data.emergencyPhone,
+        address,
+        emergencyPhone,
         className: data.className,
         sectionName: data.sectionName,
         rollNumber: data.rollNumber || 1,
