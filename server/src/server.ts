@@ -12,6 +12,17 @@ const server = app.listen(env.port, HOST, () => {
   console.log(`====================================================`);
 });
 
+server.on('error', (err: any) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`\n[EduNexa Server Error]: Port ${env.port} is already in use by another process.`);
+    console.error(`To free port ${env.port} on Windows, run:\n  Get-NetTCPConnection -LocalPort ${env.port} | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }\n`);
+    process.exit(1);
+  } else {
+    console.error('[EduNexa Server Error]:', err);
+    process.exit(1);
+  }
+});
+
 // Graceful shutdown
 const shutdown = (signal: string) => {
   console.log(`Received ${signal}. Shutting down gracefully...`);
