@@ -296,6 +296,36 @@ export const coreApi = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+
+  getSchoolOverviewStats: () =>
+    apiRequest<{
+      schoolId: string;
+      students: { total: number; active: number };
+      staff: { total: number; active: number };
+      admissions: { pendingReview: number };
+      idCards: { activeCount: number };
+      attendance: { markedToday: number; present: number; absent: number; late: number; percentage: number };
+      finance: { totalInvoiced: number; totalCollected: number; totalOutstanding: number; collectionRate: number };
+      upcomingEvents: Array<{ id: string; title: string; description: string; venue?: string; startDate: string; endDate: string; audience: string }>;
+      recentNotices: Array<{ id: string; title: string; content: string; audience: string; isUrgent: boolean; publishedAt: string }>;
+    }>('/api/v1/core/school/overview-stats'),
+
+  updateStudent: (studentId: string, data: any) =>
+    apiRequest<any>(`/api/v1/core/students/${studentId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  deleteStudent: (studentId: string) =>
+    apiRequest<any>(`/api/v1/core/students/${studentId}`, {
+      method: 'DELETE',
+    }),
+
+  updateStaffStatus: (staffId: string, status: string) =>
+    apiRequest<any>(`/api/v1/core/staff/${staffId}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    }),
 };
 
 // ============================================================================
@@ -475,6 +505,12 @@ export const operationsApi = {
     }),
 
   listEvents: () => apiRequest<any[]>('/api/v1/operations/events'),
+
+  createSchoolEvent: (data: any) =>
+    apiRequest<any>('/api/v1/operations/events', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 
   listNotifications: () =>
     apiRequest<{ unreadCount: number; notifications: any[] }>('/api/v1/operations/notifications'),

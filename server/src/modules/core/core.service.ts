@@ -1310,6 +1310,222 @@ export class CoreSchoolService {
       enrolledStudent,
     };
   }
+
+  /**
+   * Get Consolidated School Overview Stats from PostgreSQL
+   */
+  async getSchoolOverviewStats(schoolIdOrIdentifier: string) {
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    const targetSchoolId = school ? school.id : schoolIdOrIdentifier;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const [
+      totalStudents,
+      activeStudents,
+      totalStaff,
+      activeStaff,
+      pendingAdmissions,
+      activeCards,
+      attendanceTodayRecords,
+      feeInvoices,
+      upcomingEvents,
+      recentNotices,
+    ] = await Promise.all([
+      prisma.studentProfile.count({ where: { membership: { schoolId: targetSchoolId } } }),
+      prisma.studentProfile.count({ where: { membership: { schoolId: targetSchoolId }, status: StudentStatus.ACTIVE } }),
+      prisma.staffProfile.count({ where: { membership: { schoolId: targetSchoolId } } }),
+      prisma.staffProfile.count({ where: { membership: { schoolId: targetSchoolId }, employmentStatus: EmploymentStatus.ACTIVE } }),
+      prisma.admissionApplication.count({ where: { schoolId: targetSchoolId, status: ApplicationStatus.SUBMITTED } }),
+      prisma.virtualIdCard.count({
+        where: {
+          status: CardStatus.ACTIVE,
+          OR: [
+            { student: { membership: { schoolId: targetSchoolId } } },
+            { staff: { membership: { schoolId: targetSchoolId } } },
+          ],
+        },
+      }),
+      prisma.attendanceRecord.findMany({
+        where: {
+          date: today,
+          student: { membership: { schoolId: targetSchoolId } },
+        },
+        select: { status: true },
+      }),
+      prisma.feeInvoice.findMany({
+        where: {
+          feeStructure: { schoolId: targetSchoolId },
+        },
+        select: { amountDue: true, amountPaid: true, status: true },
+      }),
+      prisma.schoolEvent.findMany({
+        where: { schoolId: targetSchoolId, startDate: { gte: today } },
+        orderBy: { startDate: 'asc' },
+        take: 5,
+      }),
+      prisma.notice.findMany({
+        where: { schoolId: targetSchoolId },
+        orderBy: { publishedAt: 'desc' },
+        take: 5,
+      }),
+    ]);
+
+    const totalAttendanceMarked = attendanceTodayRecords.length;
+    const presentToday = attendanceTodayRecords.filter((r) => r.status === 'PRESENT').length;
+    const absentToday = attendanceTodayRecords.filter((r) => r.status === 'ABSENT').length;
+    const lateToday = attendanceTodayRecords.filter((r) => r.status === 'LATE').length;
+    const attendancePercentage = totalAttendanceMarked > 0 ? Math.round((presentToday / totalAttendanceMarked) * 100) : 0;
+
+    let totalInvoiced = 0;
+    let totalCollected = 0;
+    let totalOutstanding = 0;
+    for (const inv of feeInvoices) {
+      totalInvoiced += inv.amountDue;
+      totalCollected += inv.amountPaid;
+      totalOutstanding += Math.max(0, inv.amountDue - inv.amountPaid);
+    }
+    const feeCollectionRate = totalInvoiced > 0 ? Math.round((totalCollected / totalInvoiced) * 100) : 0;
+
+    return {
+      schoolId: targetSchoolId,
+      students: {
+        total: totalStudents,
+        active: activeStudents,
+      },
+      staff: {
+        total: totalStaff,
+        active: activeStaff,
+      },
+      admissions: {
+        pendingReview: pendingAdmissions,
+      },
+      idCards: {
+        activeCount: activeCards,
+      },
+      attendance: {
+        markedToday: totalAttendanceMarked,
+        present: presentToday,
+        absent: absentToday,
+        late: lateToday,
+        percentage: attendancePercentage,
+      },
+      finance: {
+        totalInvoiced,
+        totalCollected,
+        totalOutstanding,
+        collectionRate: feeCollectionRate,
+      },
+      upcomingEvents: upcomingEvents.map((e) => ({
+        id: e.id,
+        title: e.title,
+        description: e.description,
+        venue: e.venue,
+        startDate: e.startDate.toISOString(),
+        endDate: e.endDate.toISOString(),
+        audience: e.audience,
+      })),
+      recentNotices: recentNotices.map((n) => ({
+        id: n.id,
+        title: n.title,
+        content: n.content,
+        audience: n.audience,
+        isUrgent: n.isUrgent,
+        publishedAt: n.publishedAt.toISOString(),
+      })),
+    };
+  }
+
+  /**
+   * Update Student Profile and Status
+   */
+  async updateStudent(schoolIdOrIdentifier: string, studentId: string, data: any) {
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    const targetSchoolId = school ? school.id : schoolIdOrIdentifier;
+
+    const student = await resolveStudentProfile(targetSchoolId, studentId);
+    if (!student) {
+      throw new AppError(`Student '${studentId}' not found in this school.`, 404, 'RECORD_NOT_FOUND');
+    }
+
+    return prisma.$transaction(async (tx) => {
+      if (data.firstName || data.lastName || data.email) {
+        await tx.user.update({
+          where: { id: student.membership.userId },
+          data: {
+            ...(data.firstName && { firstName: data.firstName }),
+            ...(data.lastName && { lastName: data.lastName }),
+            ...(data.email && { email: data.email }),
+          },
+        });
+      }
+
+      const updated = await tx.studentProfile.update({
+        where: { id: student.id },
+        data: {
+          ...(data.gender && { gender: data.gender }),
+          ...(data.bloodGroup && { bloodGroup: data.bloodGroup }),
+          ...(data.address && { address: data.address }),
+          ...(data.emergencyPhone && { emergencyPhone: data.emergencyPhone }),
+          ...(data.status && { status: data.status as StudentStatus }),
+        },
+      });
+
+      return {
+        id: updated.id,
+        admissionNumber: updated.admissionNumber,
+        status: updated.status,
+      };
+    });
+  }
+
+  /**
+   * Deactivate or Delete Student Record
+   */
+  async deleteStudent(schoolIdOrIdentifier: string, studentId: string) {
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    const targetSchoolId = school ? school.id : schoolIdOrIdentifier;
+
+    const student = await resolveStudentProfile(targetSchoolId, studentId);
+    if (!student) {
+      throw new AppError(`Student '${studentId}' not found in this school.`, 404, 'RECORD_NOT_FOUND');
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.virtualIdCard.deleteMany({ where: { studentProfileId: student.id } });
+      await tx.studentEnrollment.deleteMany({ where: { studentProfileId: student.id } });
+      await tx.parentStudentLink.deleteMany({ where: { studentProfileId: student.id } });
+      await tx.studentProfile.delete({ where: { id: student.id } });
+      await tx.userMembership.delete({ where: { id: student.membershipId } });
+    });
+
+    return { success: true, deletedStudentId: studentId };
+  }
+
+  /**
+   * Update Staff Employment Status
+   */
+  async updateStaffStatus(schoolIdOrIdentifier: string, staffId: string, status: EmploymentStatus) {
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    const targetSchoolId = school ? school.id : schoolIdOrIdentifier;
+
+    const staff = await resolveStaffProfile(targetSchoolId, staffId);
+    if (!staff) {
+      throw new AppError(`Staff member '${staffId}' not found in this school.`, 404, 'RECORD_NOT_FOUND');
+    }
+
+    const updated = await prisma.staffProfile.update({
+      where: { id: staff.id },
+      data: { employmentStatus: status },
+    });
+
+    return {
+      id: updated.id,
+      employeeId: updated.employeeId,
+      employmentStatus: updated.employmentStatus,
+    };
+  }
 }
 
 export const coreSchoolService = new CoreSchoolService();

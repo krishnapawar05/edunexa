@@ -185,6 +185,46 @@ export class CoreSchoolController {
       next(err);
     }
   }
+
+  async getSchoolOverviewStats(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const stats = await coreSchoolService.getSchoolOverviewStats(req.schoolId!);
+      res.status(200).json({ success: true, data: stats });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async updateStudent(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { id } = req.params;
+      const updated = await coreSchoolService.updateStudent(req.schoolId!, id, req.body);
+      res.status(200).json({ success: true, data: updated });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async deleteStudent(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { id } = req.params;
+      const result = await coreSchoolService.deleteStudent(req.schoolId!, id);
+      res.status(200).json({ success: true, data: result });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async updateStaffStatus(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { id } = req.params;
+      const { status } = req.body;
+      const updated = await coreSchoolService.updateStaffStatus(req.schoolId!, id, status);
+      res.status(200).json({ success: true, data: updated });
+    } catch (err) {
+      next(err);
+    }
+  }
 }
 
 export const coreSchoolController = new CoreSchoolController();

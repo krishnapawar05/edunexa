@@ -44,6 +44,15 @@ router.post('/admissions/apply', (req, res, next) => {
 router.use(authenticateUser);
 router.use(requireTenantScope);
 
+// Consolidated School Overview Statistics
+router.get(
+  '/school/overview-stats',
+  requireRole(PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.SUPER_ADMIN),
+  (req, res, next) => {
+    coreSchoolController.getSchoolOverviewStats(req, res, next);
+  }
+);
+
 // Academic Structure
 router.get(
   '/academic/structure',
@@ -133,6 +142,22 @@ router.get(
   }
 );
 
+router.patch(
+  '/students/:id',
+  requireRole(PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.SUPER_ADMIN),
+  (req, res, next) => {
+    coreSchoolController.updateStudent(req, res, next);
+  }
+);
+
+router.delete(
+  '/students/:id',
+  requireRole(PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.SUPER_ADMIN),
+  (req, res, next) => {
+    coreSchoolController.deleteStudent(req, res, next);
+  }
+);
+
 // Faculty & Staff Management
 router.get(
   '/staff',
@@ -153,6 +178,14 @@ router.post(
   validateRequest({ body: CreateStaffSchema }),
   (req, res, next) => {
     coreSchoolController.createStaff(req, res, next);
+  }
+);
+
+router.patch(
+  '/staff/:id/status',
+  requireRole(PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.HR_STAFF, PlatformRole.SUPER_ADMIN),
+  (req, res, next) => {
+    coreSchoolController.updateStaffStatus(req, res, next);
   }
 );
 

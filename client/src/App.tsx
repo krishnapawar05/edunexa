@@ -33,8 +33,15 @@ import { SchoolTenantsPage } from './modules/superadmin/SchoolTenantsPage.js';
 import { SubscriptionsPage } from './modules/superadmin/SubscriptionsPage.js';
 import { AuditLogsPage } from './modules/superadmin/AuditLogsPage.js';
 import { PlatformSettingsPage } from './modules/superadmin/PlatformSettingsPage.js';
-import { SchoolAdminDashboard } from './modules/schooladmin/SchoolAdminDashboard.js';
+import { SchoolOverviewPage } from './modules/schooladmin/SchoolOverviewPage.js';
+import { StudentDirectoryPage } from './modules/schooladmin/StudentDirectoryPage.js';
 import { StudentDossierPage } from './modules/schooladmin/StudentDossierPage.js';
+import { AdmissionsQueuePage } from './modules/schooladmin/AdmissionsQueuePage.js';
+import { FacultyHrPage } from './modules/schooladmin/FacultyHrPage.js';
+import { VirtualIdCardsPage } from './modules/schooladmin/VirtualIdCardsPage.js';
+import { DailyAttendancePage } from './modules/schooladmin/DailyAttendancePage.js';
+import { FeesInvoicesPage } from './modules/schooladmin/FeesInvoicesPage.js';
+import { EventsNoticesPage } from './modules/schooladmin/EventsNoticesPage.js';
 import { TeacherDashboard } from './modules/teacher/TeacherDashboard.js';
 import { StudentDashboard } from './modules/student/StudentDashboard.js';
 import { ParentDashboard } from './modules/parent/ParentDashboard.js';
@@ -102,15 +109,18 @@ export const App: React.FC = () => {
             </ProtectedRoute>
           }
         >
-          <Route path="/admin" element={<SchoolAdminDashboard initialTab="students" />} />
-          <Route path="/admin/students" element={<SchoolAdminDashboard initialTab="students" />} />
+          <Route path="/admin" element={<SchoolOverviewPage />} />
+          <Route path="/admin/students" element={<StudentDirectoryPage />} />
           <Route path="/admin/students/:id" element={<StudentDossierPage />} />
-          <Route path="/admin/admissions" element={<SchoolAdminDashboard initialTab="admissions" />} />
-          <Route path="/admin/staff" element={<SchoolAdminDashboard initialTab="staff" />} />
-          <Route path="/admin/id-cards" element={<SchoolAdminDashboard initialTab="id-cards" />} />
-          <Route path="/admin/attendance" element={<SchoolAdminDashboard initialTab="students" />} />
-          <Route path="/admin/finance" element={<AccountsDashboard />} />
-          <Route path="/admin/notices" element={<ParentDashboard />} />
+          <Route path="/admin/admissions" element={<AdmissionsQueuePage />} />
+          <Route path="/admin/faculty" element={<FacultyHrPage />} />
+          <Route path="/admin/staff" element={<Navigate to="/admin/faculty" replace />} />
+          <Route path="/admin/id-cards" element={<VirtualIdCardsPage />} />
+          <Route path="/admin/attendance" element={<DailyAttendancePage />} />
+          <Route path="/admin/fees" element={<FeesInvoicesPage />} />
+          <Route path="/admin/finance" element={<Navigate to="/admin/fees" replace />} />
+          <Route path="/admin/events-notices" element={<EventsNoticesPage />} />
+          <Route path="/admin/notices" element={<Navigate to="/admin/events-notices" replace />} />
         </Route>
 
         {/* Teacher Workspace */}

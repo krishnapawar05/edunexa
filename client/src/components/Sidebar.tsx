@@ -78,20 +78,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
           { id: 'overview', path: '/admin', label: 'School Overview', icon: LayoutDashboard },
           { id: 'students', path: '/admin/students', label: 'Student Directory & SIS', icon: GraduationCap },
           { id: 'admissions', path: '/admin/admissions', label: 'Admissions Review Queue', icon: FileCheck },
-          { id: 'staff', path: '/admin/staff', label: 'Faculty & HR', icon: Users },
+          { id: 'faculty', path: '/admin/faculty', label: 'Faculty & HR', icon: Users },
           { id: 'id-cards', path: '/admin/id-cards', label: 'Virtual ID Cards & QR', icon: IdCard },
           { id: 'attendance', path: '/admin/attendance', label: 'Daily Attendance', icon: CalendarCheck },
-          { id: 'finance', path: '/admin/finance', label: 'Fees & Invoices', icon: CreditCard },
-          { id: 'notices', path: '/admin/notices', label: 'Events & Notices', icon: Bell },
+          { id: 'fees', path: '/admin/fees', label: 'Fees & Invoices', icon: CreditCard },
+          { id: 'events-notices', path: '/admin/events-notices', label: 'Events & Notices', icon: Bell },
         ];
       case 'PRINCIPAL':
         return [
           { id: 'overview', path: '/admin', label: 'Academic Overview', icon: LayoutDashboard },
           { id: 'students', path: '/admin/students', label: 'Student Directory & SIS', icon: GraduationCap },
           { id: 'admissions', path: '/admin/admissions', label: 'Admissions Review Queue', icon: FileCheck },
-          { id: 'staff', path: '/admin/staff', label: 'Faculty & HR', icon: Users },
+          { id: 'faculty', path: '/admin/faculty', label: 'Faculty & HR', icon: Users },
+          { id: 'id-cards', path: '/admin/id-cards', label: 'Virtual ID Cards & QR', icon: IdCard },
           { id: 'attendance', path: '/admin/attendance', label: 'Daily Attendance', icon: CalendarCheck },
-          { id: 'notices', path: '/admin/notices', label: 'Events & Notices', icon: Bell },
+          { id: 'fees', path: '/admin/fees', label: 'Fees & Invoices', icon: CreditCard },
+          { id: 'events-notices', path: '/admin/events-notices', label: 'Events & Notices', icon: Bell },
         ];
       case 'TEACHER':
         return [

@@ -81,7 +81,7 @@ describe('STAGE 4: Core School Management Test Suite', () => {
   // 3. Student Creation & Unique Admission Number Enforcement
   // --------------------------------------------------------------------------
   it('3a. School Admin can enroll a new student with valid admission number format', async () => {
-    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+    const randomSuffix = Math.floor(100000 + Math.random() * 899999);
     const newAdmissionNumber = `ADM-2026-${randomSuffix}`;
 
     const res = await request(app)
