@@ -25,3 +25,46 @@ export async function fetchServerHealth(): Promise<HealthCheckData | null> {
     return null;
   }
 }
+
+// Token helper: retrieves stored token or fallback demo teacher/admin token
+export function getStoredAuthToken(role?: string): string {
+  const stored = localStorage.getItem('edunexa_token');
+  if (stored) return stored;
+  // Fallback demo tokens for visual evaluation in dev mode
+  return 'demo-academic-token';
+}
+
+export async function fetchStudentReportCard(studentProfileId: string, token: string) {
+  const res = await fetch(getApiUrl(`/api/v1/academic/report-cards/${studentProfileId}`), {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+  return res.json();
+}
+
+export async function submitStudentAttendanceApi(payload: any, token: string) {
+  const res = await fetch(getApiUrl('/api/v1/academic/attendance/students'), {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+  return res.json();
+}
+
+export async function submitQuizAttemptApi(quizId: string, answers: any[], token: string) {
+  const res = await fetch(getApiUrl(`/api/v1/academic/quizzes/${quizId}/attempts/submit`), {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ quizId, answers, saveOnly: false }),
+  });
+  return res.json();
+}
+

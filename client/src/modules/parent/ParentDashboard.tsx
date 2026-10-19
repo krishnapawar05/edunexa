@@ -58,6 +58,7 @@ export const ParentDashboard: React.FC = () => {
   const [selectedChildIndex, setSelectedChildIndex] = useState(0);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [showReportCardModal, setShowReportCardModal] = useState(false);
 
   const activeChild = children[selectedChildIndex];
 
@@ -177,7 +178,7 @@ export const ParentDashboard: React.FC = () => {
             </div>
             <button
               className="ed-btn ed-btn-sm ed-btn-secondary"
-              onClick={() => alert(`Downloading verified report card for ${activeChild.name}...`)}
+              onClick={() => setShowReportCardModal(true)}
             >
               <Download size={13} /> Official Report Card
             </button>
@@ -344,6 +345,136 @@ export const ParentDashboard: React.FC = () => {
                   </div>
                 </form>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Official Term Report Card Modal for Linked Child */}
+      {showReportCardModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.75)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 110,
+            padding: 'var(--space-4)',
+          }}
+        >
+          <div
+            className="ed-card"
+            style={{
+              width: '100%',
+              maxWidth: '680px',
+              backgroundColor: '#ffffff',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              boxShadow: 'var(--shadow-xl)',
+            }}
+          >
+            <div className="ed-card-header" style={{ borderBottom: '2px solid var(--primary-700)' }}>
+              <div>
+                <h3 style={{ fontSize: '1.15rem', color: 'var(--primary-800)', fontWeight: 800 }}>
+                  Apex Academy of Sciences & Arts
+                </h3>
+                <p style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+                  Affiliated to Central Board of Secondary Education • Academic Session 2026–2027
+                </p>
+              </div>
+              <button className="ed-btn-icon" onClick={() => setShowReportCardModal(false)}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="ed-card-body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: 'var(--space-2)',
+                  padding: '12px 14px',
+                  backgroundColor: 'var(--bg-subtle)',
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: '0.84rem',
+                }}
+              >
+                <div><strong>Student Name:</strong> {activeChild.name}</div>
+                <div><strong>Admission Number:</strong> {activeChild.admissionNo}</div>
+                <div><strong>Class & Section:</strong> {activeChild.grade} (Roll #{activeChild.rollNo})</div>
+                <div><strong>Attendance Standing:</strong> {activeChild.attendance} (Satisfies promotion criteria)</div>
+              </div>
+
+              <div className="ed-table-container">
+                <table className="ed-table">
+                  <thead>
+                    <tr>
+                      <th>Subject</th>
+                      <th>Max Marks</th>
+                      <th>Pass Marks</th>
+                      <th>Marks Scored</th>
+                      <th>Grade</th>
+                      <th>Term Weight</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {activeChild.recentMarks.map((m, i) => (
+                      <tr key={i}>
+                        <td style={{ fontWeight: 600 }}>{m.subject}</td>
+                        <td>100</td>
+                        <td>35</td>
+                        <td style={{ fontWeight: 700, color: 'var(--primary-700)' }}>{m.marks.split(' / ')[0]}</td>
+                        <td><span className="ed-badge ed-badge-success">{m.grade}</span></td>
+                        <td>30% (Mid-Term)</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '12px 16px',
+                  backgroundColor: 'var(--primary-50, #f0fdfa)',
+                  border: '1px solid var(--primary-200, #99f6e4)',
+                  borderRadius: 'var(--radius-sm)',
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>CUMULATIVE BOARD SCORE</div>
+                  <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--primary-800)' }}>
+                    {activeChild.currentTermGPA} • Grade A1
+                  </div>
+                </div>
+
+                <div>
+                  <span className="ed-badge ed-badge-success" style={{ fontSize: '0.82rem', padding: '6px 12px' }}>
+                    PROMOTED TO NEXT GRADE
+                  </span>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)' }}>
+                <button
+                  type="button"
+                  className="ed-btn ed-btn-secondary"
+                  onClick={() => setShowReportCardModal(false)}
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  className="ed-btn ed-btn-primary"
+                  onClick={() => window.print()}
+                >
+                  <Award size={15} /> Print / Save Verified PDF
+                </button>
+              </div>
             </div>
           </div>
         </div>

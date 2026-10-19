@@ -21,6 +21,11 @@ export const StudentDashboard: React.FC = () => {
 
   // Active Quiz Countdown Simulation
   const [quizTimer, setQuizTimer] = useState('28m 42s');
+  const [showQuizModal, setShowQuizModal] = useState(false);
+  const [showReportCardModal, setShowReportCardModal] = useState(false);
+  const [selectedAnswers, setSelectedAnswers] = useState<Record<string, string>>({});
+  const [quizSubmitted, setQuizSubmitted] = useState(false);
+  const [quizResult, setQuizResult] = useState<{ score: number; maxScore: number; passed: boolean } | null>(null);
 
   const studentData = {
     name: 'Aarav Sharma',
@@ -237,68 +242,433 @@ export const StudentDashboard: React.FC = () => {
                 <div style={{ fontSize: '0.84rem', color: 'var(--text-secondary)' }}>
                   Questions: <strong>20 MCQs & Short Concepts</strong> • Negative Marking: <strong>-0.25</strong>
                 </div>
-                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                  Server enforced duration: <strong>45 minutes</strong> (Browser clock tampering blocked)
-                </div>
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                Server enforced duration: <strong>45 minutes</strong> (Browser clock tampering blocked)
               </div>
+            </div>
+            <button
+              className="ed-btn ed-btn-primary"
+              onClick={() => {
+                setShowQuizModal(true);
+                setQuizSubmitted(false);
+                setQuizResult(null);
+              }}
+            >
+              {quizSubmitted ? 'Review Past Submission' : 'Take Assessment'}
+            </button>
+          </div>
+        </div>
+
+        {/* AI Learning Assistant Drawer */}
+        <div className="ed-card">
+          <div className="ed-card-header">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Sparkles size={16} style={{ color: 'var(--primary-600)' }} />
+              <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>AI Personalized Learning Assistant</span>
+            </div>
+            <span className="ed-badge ed-badge-info">Curriculum Aligned</span>
+          </div>
+          <div className="ed-card-body">
+            <form onSubmit={handleAiAsk} style={{ display: 'flex', gap: 'var(--space-2)' }}>
+              <input
+                className="ed-input"
+                placeholder="Ask a question about physics, math, or study concepts..."
+                value={aiQuestion}
+                onChange={(e) => setAiQuestion(e.target.value)}
+              />
               <button
+                type="submit"
+                disabled={aiLoading}
                 className="ed-btn ed-btn-primary"
-                onClick={() => alert('Starting secure assessment session with server-side timer...')}
+                style={{ minWidth: '90px' }}
               >
-                Take Assessment
+                {aiLoading ? 'Thinking...' : 'Explain'}
+              </button>
+            </form>
+
+            {aiAnswer && (
+              <div
+                style={{
+                  marginTop: 'var(--space-3)',
+                  padding: '10px 12px',
+                  backgroundColor: 'var(--bg-subtle)',
+                  border: '1px solid var(--border-default)',
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: '0.84rem',
+                  lineHeight: 1.5,
+                }}
+              >
+                <div style={{ fontWeight: 600, color: 'var(--primary-700)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Sparkles size={13} /> Explanation & Concept Breakdown:
+                </div>
+                {aiAnswer}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+      </div>
+
+      {/* Interactive Quiz Assessment Modal */}
+      {showQuizModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.75)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 110,
+            padding: 'var(--space-4)',
+          }}
+        >
+          <div
+            className="ed-card"
+            style={{
+              width: '100%',
+              maxWidth: '680px',
+              backgroundColor: '#ffffff',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              boxShadow: 'var(--shadow-xl)',
+            }}
+          >
+            <div className="ed-card-header" style={{ borderBottom: '2px solid var(--primary-600)' }}>
+              <div>
+                <span className="ed-badge ed-badge-warning" style={{ marginBottom: '4px' }}>
+                  <Clock size={12} /> Server Timer: {quizTimer} Remaining
+                </span>
+                <h3 style={{ fontSize: '1.1rem', marginTop: '4px' }}>
+                  Physics Chapter 4: Electromagnetism & Induction
+                </h3>
+                <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                  Total Marks: 15 • Passing: 6 • Negative Marking: -0.25 on incorrect MCQs
+                </p>
+              </div>
+              <button className="ed-btn-icon" onClick={() => setShowQuizModal(false)}>
+                ✕
               </button>
             </div>
-          </div>
 
-          {/* AI Learning Assistant Drawer */}
-          <div className="ed-card">
-            <div className="ed-card-header">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Sparkles size={16} style={{ color: 'var(--primary-600)' }} />
-                <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>AI Personalized Learning Assistant</span>
-              </div>
-              <span className="ed-badge ed-badge-info">Curriculum Aligned</span>
-            </div>
-            <div className="ed-card-body">
-              <form onSubmit={handleAiAsk} style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                <input
-                  className="ed-input"
-                  placeholder="Ask a question about physics, math, or study concepts..."
-                  value={aiQuestion}
-                  onChange={(e) => setAiQuestion(e.target.value)}
-                />
-                <button
-                  type="submit"
-                  disabled={aiLoading}
-                  className="ed-btn ed-btn-primary"
-                  style={{ minWidth: '90px' }}
-                >
-                  {aiLoading ? 'Thinking...' : 'Explain'}
-                </button>
-              </form>
-
-              {aiAnswer && (
-                <div
-                  style={{
-                    marginTop: 'var(--space-3)',
-                    padding: '10px 12px',
-                    backgroundColor: 'var(--bg-subtle)',
-                    border: '1px solid var(--border-default)',
-                    borderRadius: 'var(--radius-sm)',
-                    fontSize: '0.84rem',
-                    lineHeight: 1.5,
-                  }}
-                >
-                  <div style={{ fontWeight: 600, color: 'var(--primary-700)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <Sparkles size={13} /> Explanation & Concept Breakdown:
+            <div className="ed-card-body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+              {quizSubmitted ? (
+                <div style={{ textAlign: 'center', padding: 'var(--space-4)' }}>
+                  <div
+                    style={{
+                      width: '64px',
+                      height: '64px',
+                      borderRadius: '50%',
+                      backgroundColor: 'var(--success-bg)',
+                      border: '2px solid var(--success-border)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      margin: '0 auto var(--space-3)',
+                      color: 'var(--success-text)',
+                    }}
+                  >
+                    <CheckCircle2 size={36} />
                   </div>
-                  {aiAnswer}
+                  <h4 style={{ fontSize: '1.2rem', fontWeight: 800 }}>Assessment Submitted Successfully!</h4>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '4px' }}>
+                    Your objective answers have been auto-graded by the server-side evaluation engine.
+                  </p>
+
+                  <div
+                    style={{
+                      margin: 'var(--space-4) auto',
+                      maxWidth: '340px',
+                      padding: '16px',
+                      backgroundColor: 'var(--bg-subtle)',
+                      borderRadius: 'var(--radius-md)',
+                      border: '1px solid var(--border-default)',
+                    }}
+                  >
+                    <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>SCORE OBTAINED</div>
+                    <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--primary-700)' }}>
+                      10.0 / 15.0
+                    </div>
+                    <span className="ed-badge ed-badge-success" style={{ marginTop: '6px' }}>
+                      Passed (Objective Component)
+                    </span>
+                    <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '8px' }}>
+                      Short answer response forwarded to Dr. Julian Thorne for subjective rubric review.
+                    </p>
+                  </div>
+
+                  <button
+                    className="ed-btn ed-btn-primary"
+                    onClick={() => setShowQuizModal(false)}
+                  >
+                    Return to Dashboard
+                  </button>
                 </div>
+              ) : (
+                <>
+                  {/* Question 1 */}
+                  <div style={{ padding: '12px', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-sm)' }}>
+                    <div style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: '8px' }}>
+                      Q1. What is the SI unit of magnetic flux density? <span style={{ color: 'var(--text-muted)', fontSize: '0.76rem' }}>(5 Marks)</span>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                      {[
+                        { id: 'opt1', text: 'Tesla (T)' },
+                        { id: 'opt2', text: 'Weber (Wb)' },
+                        { id: 'opt3', text: 'Henry (H)' },
+                        { id: 'opt4', text: 'Gauss (G)' },
+                      ].map((opt) => (
+                        <label
+                          key={opt.id}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            padding: '8px 10px',
+                            borderRadius: 'var(--radius-xs)',
+                            border: '1px solid var(--border-default)',
+                            backgroundColor: selectedAnswers['q1'] === opt.id ? 'var(--primary-50, #f0fdfa)' : '#ffffff',
+                            cursor: 'pointer',
+                            fontSize: '0.84rem',
+                          }}
+                        >
+                          <input
+                            type="radio"
+                            name="q1"
+                            checked={selectedAnswers['q1'] === opt.id}
+                            onChange={() => setSelectedAnswers({ ...selectedAnswers, q1: opt.id })}
+                          />
+                          {opt.text}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Question 2 */}
+                  <div style={{ padding: '12px', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-sm)' }}>
+                    <div style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: '8px' }}>
+                      Q2. According to Faraday's law, induced EMF is directly proportional to the rate of change of magnetic flux. <span style={{ color: 'var(--text-muted)', fontSize: '0.76rem' }}>(5 Marks)</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '12px' }}>
+                      {['True', 'False'].map((val) => (
+                        <label
+                          key={val}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            padding: '8px 16px',
+                            borderRadius: 'var(--radius-xs)',
+                            border: '1px solid var(--border-default)',
+                            backgroundColor: selectedAnswers['q2'] === val ? 'var(--primary-50, #f0fdfa)' : '#ffffff',
+                            cursor: 'pointer',
+                            fontSize: '0.84rem',
+                          }}
+                        >
+                          <input
+                            type="radio"
+                            name="q2"
+                            checked={selectedAnswers['q2'] === val}
+                            onChange={() => setSelectedAnswers({ ...selectedAnswers, q2: val })}
+                          />
+                          {val}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Question 3 */}
+                  <div style={{ padding: '12px', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-sm)' }}>
+                    <div style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: '8px' }}>
+                      Q3. Formulate Lenz's law in your own words regarding the direction of induced current. <span style={{ color: 'var(--text-muted)', fontSize: '0.76rem' }}>(5 Marks • Descriptive)</span>
+                    </div>
+                    <textarea
+                      className="ed-input"
+                      rows={3}
+                      placeholder="Write your answer explaining the conservation of energy principle..."
+                      value={selectedAnswers['q3'] || ''}
+                      onChange={(e) => setSelectedAnswers({ ...selectedAnswers, q3: e.target.value })}
+                    />
+                  </div>
+
+                  {/* Actions */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 'var(--space-2)' }}>
+                    <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+                      Answers are automatically saved to server memory every 30 seconds.
+                    </span>
+                    <button
+                      type="button"
+                      className="ed-btn ed-btn-primary"
+                      onClick={() => {
+                        setQuizSubmitted(true);
+                        setQuizResult({ score: 10, maxScore: 15, passed: true });
+                      }}
+                    >
+                      Submit Assessment Now
+                    </button>
+                  </div>
+                </>
               )}
             </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* Official Term Report Card Modal */}
+      {showReportCardModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.75)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 110,
+            padding: 'var(--space-4)',
+          }}
+        >
+          <div
+            className="ed-card"
+            style={{
+              width: '100%',
+              maxWidth: '680px',
+              backgroundColor: '#ffffff',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              boxShadow: 'var(--shadow-xl)',
+            }}
+          >
+            <div className="ed-card-header" style={{ borderBottom: '2px solid var(--primary-700)' }}>
+              <div>
+                <h3 style={{ fontSize: '1.15rem', color: 'var(--primary-800)', fontWeight: 800 }}>
+                  Apex Academy of Sciences & Arts
+                </h3>
+                <p style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+                  Affiliated to Central Board of Secondary Education • Academic Session 2026–2027
+                </p>
+              </div>
+              <button className="ed-btn-icon" onClick={() => setShowReportCardModal(false)}>
+                ✕
+              </button>
+            </div>
+
+            <div className="ed-card-body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+              {/* Student Demographics Banner */}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: 'var(--space-2)',
+                  padding: '12px 14px',
+                  backgroundColor: 'var(--bg-subtle)',
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: '0.84rem',
+                }}
+              >
+                <div><strong>Student Name:</strong> {studentData.name}</div>
+                <div><strong>Admission Number:</strong> {studentData.admissionNumber}</div>
+                <div><strong>Class & Section:</strong> {studentData.class} - {studentData.section} (Roll #{studentData.rollNumber})</div>
+                <div><strong>Attendance Record:</strong> {studentData.attendance} (Eligible for Promotion)</div>
+              </div>
+
+              {/* Assessment Marks Breakdown Table */}
+              <div className="ed-table-container">
+                <table className="ed-table">
+                  <thead>
+                    <tr>
+                      <th>Subject</th>
+                      <th>Max Marks</th>
+                      <th>Pass Marks</th>
+                      <th>Marks Scored</th>
+                      <th>Grade</th>
+                      <th>Term Weight</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td style={{ fontWeight: 600 }}>Physics Core</td>
+                      <td>100</td>
+                      <td>35</td>
+                      <td style={{ fontWeight: 700, color: 'var(--primary-700)' }}>92</td>
+                      <td><span className="ed-badge ed-badge-success">A1</span></td>
+                      <td>30% (Mid-Term)</td>
+                    </tr>
+                    <tr>
+                      <td style={{ fontWeight: 600 }}>Mathematics (Advanced)</td>
+                      <td>100</td>
+                      <td>35</td>
+                      <td style={{ fontWeight: 700, color: 'var(--primary-700)' }}>88</td>
+                      <td><span className="ed-badge ed-badge-success">A2</span></td>
+                      <td>30% (Mid-Term)</td>
+                    </tr>
+                    <tr>
+                      <td style={{ fontWeight: 600 }}>Chemistry Theory & Lab</td>
+                      <td>100</td>
+                      <td>35</td>
+                      <td style={{ fontWeight: 700, color: 'var(--primary-700)' }}>91</td>
+                      <td><span className="ed-badge ed-badge-success">A1</span></td>
+                      <td>30% (Mid-Term)</td>
+                    </tr>
+                    <tr>
+                      <td style={{ fontWeight: 600 }}>English Literature</td>
+                      <td>100</td>
+                      <td>35</td>
+                      <td style={{ fontWeight: 700, color: 'var(--primary-700)' }}>85</td>
+                      <td><span className="ed-badge ed-badge-success">A2</span></td>
+                      <td>30% (Mid-Term)</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Summary Stats */}
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '12px 16px',
+                  backgroundColor: 'var(--primary-50, #f0fdfa)',
+                  border: '1px solid var(--primary-200, #99f6e4)',
+                  borderRadius: 'var(--radius-sm)',
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>CUMULATIVE WEIGHTED SCORE</div>
+                  <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--primary-800)' }}>
+                    89.0% • Grade A1
+                  </div>
+                </div>
+
+                <div>
+                  <span className="ed-badge ed-badge-success" style={{ fontSize: '0.82rem', padding: '6px 12px' }}>
+                    PROMOTED TO NEXT GRADE
+                  </span>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)' }}>
+                <button
+                  type="button"
+                  className="ed-btn ed-btn-secondary"
+                  onClick={() => setShowReportCardModal(false)}
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  className="ed-btn ed-btn-primary"
+                  onClick={() => window.print()}
+                >
+                  <Award size={15} /> Print / Save Official PDF
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* QR Code Verification Simulation Modal */}
       {showQrModal && (
