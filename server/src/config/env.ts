@@ -8,20 +8,48 @@ dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 dotenv.config();
 
 const envSchema = z.object({
-  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-  PORT: z.union([z.string(), z.number()]).default('5000').transform((val) => (typeof val === 'number' ? val : parseInt(val, 10))),
-  CLIENT_ORIGIN: z.string().default('http://localhost:5173'),
-  DATABASE_URL: z.string().default(
-    process.env.DATABASE_URL ||
-    process.env.POSTGRES_URL ||
-    process.env.DATABASE_PUBLIC_URL ||
-    'postgresql://postgres:postgres@localhost:5432/edunexa_dev?schema=public'
-  ),
-  JWT_ACCESS_SECRET: z.string().default('edunexa_production_grade_access_secret_1234567890_secure_key'),
-  JWT_REFRESH_SECRET: z.string().default('edunexa_production_grade_refresh_secret_1234567890_secure_key'),
-  AI_PROVIDER_API_KEY: z.string().optional().default(''),
-  AI_PROVIDER_MODEL: z.string().default('gemini-2.0-flash'),
-  LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
+  NODE_ENV: z.string().optional().transform((val) => {
+    if (!val || !val.trim()) return 'production';
+    const lower = val.trim().toLowerCase();
+    if (lower === 'development' || lower === 'production' || lower === 'test') {
+      return lower as 'development' | 'production' | 'test';
+    }
+    return 'production';
+  }),
+  PORT: z.union([z.string(), z.number()]).optional().transform((val) => {
+    if (typeof val === 'number') return val;
+    if (!val || !val.trim()) return 5000;
+    const parsed = parseInt(val, 10);
+    return isNaN(parsed) ? 5000 : parsed;
+  }),
+  CLIENT_ORIGIN: z.string().optional().transform((val) => (!val || !val.trim() ? '*' : val.trim())),
+  DATABASE_URL: z.string().optional().transform((val) => {
+    if (val && val.trim()) return val.trim();
+    return (
+      process.env.DATABASE_URL ||
+      process.env.POSTGRES_URL ||
+      process.env.DATABASE_PUBLIC_URL ||
+      'postgresql://postgres:postgres@localhost:5432/edunexa_dev?schema=public'
+    );
+  }),
+  JWT_ACCESS_SECRET: z.string().optional().transform((val) => {
+    if (val && val.trim() && val.trim().length >= 32) return val.trim();
+    return 'edunexa_production_grade_access_secret_1234567890_secure_key';
+  }),
+  JWT_REFRESH_SECRET: z.string().optional().transform((val) => {
+    if (val && val.trim() && val.trim().length >= 32) return val.trim();
+    return 'edunexa_production_grade_refresh_secret_1234567890_secure_key';
+  }),
+  AI_PROVIDER_API_KEY: z.string().optional().transform((val) => (val ? val.trim() : '')),
+  AI_PROVIDER_MODEL: z.string().optional().transform((val) => (val && val.trim() ? val.trim() : 'gemini-2.0-flash')),
+  LOG_LEVEL: z.string().optional().transform((val) => {
+    if (!val || !val.trim()) return 'info';
+    const lower = val.trim().toLowerCase();
+    if (['debug', 'info', 'warn', 'error'].includes(lower)) {
+      return lower as 'debug' | 'info' | 'warn' | 'error';
+    }
+    return 'info';
+  }),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);
