@@ -89,14 +89,22 @@ export class TenantService {
 
   async onboardSchool(dto: SchoolOnboardingDTO, adminUserId: string) {
     const dbCheck = await checkDatabaseConnection();
-    const slug = dto.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    const baseSlug = dto.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    let slug = baseSlug;
 
     if (dbCheck.connected) {
-      const existing = await prisma.school.findFirst({
-        where: { OR: [{ code: dto.code }, { slug }] },
+      const existingByCode = await prisma.school.findFirst({
+        where: { code: dto.code },
       });
-      if (existing) {
-        throw new AppError(`A school with code '${dto.code}' or slug '${slug}' already exists.`, 409, 'DUPLICATE_SCHOOL');
+      if (existingByCode) {
+        throw new AppError(`A school with code '${dto.code}' already exists.`, 409, 'DUPLICATE_SCHOOL');
+      }
+
+      const existingBySlug = await prisma.school.findFirst({
+        where: { slug },
+      });
+      if (existingBySlug) {
+        slug = `${baseSlug}-${Math.random().toString(36).substring(2, 7)}`;
       }
 
       const school = await prisma.school.create({
@@ -124,10 +132,18 @@ export class TenantService {
         },
       });
 
+      let validUserId: string | undefined = undefined;
+      if (adminUserId) {
+        const adminUser = await prisma.user.findUnique({ where: { id: adminUserId } });
+        if (adminUser) {
+          validUserId = adminUser.id;
+        }
+      }
+
       await prisma.auditLog.create({
         data: {
           schoolId: school.id,
-          userId: adminUserId,
+          userId: validUserId,
           action: 'TENANT_ONBOARDED',
           entityType: 'School',
           entityId: school.id,
