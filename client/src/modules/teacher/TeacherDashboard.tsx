@@ -16,7 +16,7 @@ import {
   ThumbsDown,
   Edit3,
 } from 'lucide-react';
-import { generateQuizDraftApi, reviewQuizDraftApi, fetchAiStatusApi } from '../../services/api.js';
+import { generateQuizDraftApi, reviewQuizDraftApi, fetchAiStatusApi, getStoredAuthToken } from '../../services/api.js';
 
 export const TeacherDashboard: React.FC = () => {
   const [quizzes, setQuizzes] = useState([
@@ -131,7 +131,7 @@ export const TeacherDashboard: React.FC = () => {
     setAiToast(null);
 
     try {
-      const token = localStorage.getItem('edunexa_token') || 'demo-token';
+      const token = getStoredAuthToken('TEACHER');
       const res = await generateQuizDraftApi(
         {
           studyMaterial: aiStudyMaterial,

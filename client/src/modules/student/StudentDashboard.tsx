@@ -13,7 +13,7 @@ import {
   ExternalLink,
   ShieldAlert,
 } from 'lucide-react';
-import { askSchoolAssistantApi, fetchAiStatusApi } from '../../services/api.js';
+import { askSchoolAssistantApi, fetchAiStatusApi, getStoredAuthToken } from '../../services/api.js';
 
 export const StudentDashboard: React.FC = () => {
   const [showQrModal, setShowQrModal] = useState(false);
@@ -58,7 +58,7 @@ export const StudentDashboard: React.FC = () => {
     setAiUnconfigured(false);
 
     try {
-      const token = localStorage.getItem('edunexa_token') || 'demo-token';
+      const token = getStoredAuthToken('STUDENT');
       const res = await askSchoolAssistantApi(aiQuestion.trim(), 'GENERAL', token);
 
       if (res.success && res.data) {

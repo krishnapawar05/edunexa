@@ -31,7 +31,7 @@ export function getStoredAuthToken(role?: string): string {
   const stored = localStorage.getItem('edunexa_token');
   if (stored) return stored;
   // Fallback demo tokens for visual evaluation in dev mode
-  return 'demo-academic-token';
+  return role === 'TEACHER' ? 'demo-teacher-token' : 'demo-student-token';
 }
 
 export async function fetchStudentReportCard(studentProfileId: string, token: string) {
