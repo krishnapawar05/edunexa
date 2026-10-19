@@ -3,6 +3,7 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { Lock, Mail, ArrowRight, ShieldCheck } from 'lucide-react';
 import { useSchoolBranding } from '../../context/SchoolBrandingContext.js';
 import { getApiUrl, setAuthSession } from '../../services/api.js';
+import { ThemeSwitcher } from '../../components/ThemeSwitcher.js';
 
 interface LoginPageProps {
   onLoginSuccess?: (role: string) => void;
@@ -77,8 +78,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGoToPubl
         alignItems: 'center',
         justifyContent: 'center',
         padding: 'var(--space-6)',
+        position: 'relative',
       }}
     >
+      {/* Top Right Floating Toolbar with Theme Toggle */}
+      <div style={{ position: 'absolute', top: '16px', right: '20px', zIndex: 10 }}>
+        <ThemeSwitcher compact={false} />
+      </div>
+
       <div style={{ width: '100%', maxWidth: '440px' }}>
         {/* Brand Banner */}
         <div style={{ textAlign: 'center', marginBottom: 'var(--space-6)' }}>
@@ -107,7 +114,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGoToPubl
         </div>
 
         {/* Login Form */}
-        <div className="ed-card ed-card-body" style={{ backgroundColor: '#ffffff', boxShadow: 'var(--shadow-md)' }}>
+        <div className="ed-card ed-card-body" style={{ backgroundColor: 'var(--bg-surface)', boxShadow: 'var(--shadow-md)' }}>
           <div
             style={{
               display: 'flex',

@@ -8,12 +8,12 @@ import {
   RefreshCw,
   Sliders,
   Menu,
-  LogOut,
   ShieldCheck,
 } from 'lucide-react';
 import { HealthCheckData } from '@edunexa/shared';
 import { useSchoolBranding } from '../context/SchoolBrandingContext.js';
-import { operationsApi, getStoredUser, clearAuthSession } from '../services/api.js';
+import { operationsApi, getStoredUser } from '../services/api.js';
+import { ThemeSwitcher } from './ThemeSwitcher.js';
 
 interface HeaderProps {
   currentRole: string;
@@ -77,11 +77,6 @@ export const Header: React.FC<HeaderProps> = ({
     } catch (err) {
       console.warn('Failed to mark read:', err);
     }
-  };
-
-  const handleSignOut = () => {
-    clearAuthSession();
-    navigate('/login', { replace: true });
   };
 
   return (
@@ -228,8 +223,8 @@ export const Header: React.FC<HeaderProps> = ({
                 right: 0,
                 top: 'calc(100% + 6px)',
                 width: '320px',
-                backgroundColor: '#ffffff',
-                border: '1px solid #cbd5e1',
+                backgroundColor: 'var(--bg-surface)',
+                border: '1px solid var(--border-default)',
                 borderRadius: 'var(--radius-md)',
                 boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
                 padding: 'var(--space-4)',
@@ -287,6 +282,9 @@ export const Header: React.FC<HeaderProps> = ({
           )}
         </div>
 
+        {/* Global Light / Dark / System Theme Switcher */}
+        <ThemeSwitcher />
+
         {/* Verified Authenticated User Identity (Role-Isolated, Read-Only) */}
         <div
           data-testid="header-user-badge"
@@ -342,25 +340,6 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
         </div>
-
-        {/* Explicit Sign Out Button */}
-        <button
-          onClick={handleSignOut}
-          className="ed-btn ed-btn-secondary"
-          title="Sign out of authenticated session"
-          style={{
-            padding: '5px 10px',
-            fontSize: '0.78rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '5px',
-            borderColor: 'var(--border-default)',
-            color: 'var(--danger-text, #dc2626)',
-          }}
-        >
-          <LogOut size={13} />
-          <span>Sign Out</span>
-        </button>
       </div>
     </header>
   );

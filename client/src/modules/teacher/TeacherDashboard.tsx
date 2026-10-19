@@ -485,7 +485,7 @@ export const TeacherDashboard: React.FC = () => {
             padding: 'var(--space-4)',
           }}
         >
-          <div className="ed-card" style={{ width: '100%', maxWidth: '480px', backgroundColor: '#ffffff' }}>
+          <div className="ed-card ed-modal-container" style={{ width: '100%', maxWidth: '480px', backgroundColor: 'var(--bg-surface)' }}>
             <div className="ed-card-header">
               <div>
                 <h3 style={{ fontSize: '1.1rem' }}>Create Assessment / Quiz</h3>
@@ -570,13 +570,13 @@ export const TeacherDashboard: React.FC = () => {
           }}
         >
           <div
-            className="ed-card"
+            className="ed-card ed-modal-container"
             style={{
               width: '100%',
               maxWidth: '680px',
               maxHeight: '90vh',
               overflowY: 'auto',
-              backgroundColor: '#ffffff',
+              backgroundColor: 'var(--bg-surface)',
             }}
           >
             <div className="ed-card-header">
@@ -805,9 +805,10 @@ export const TeacherDashboard: React.FC = () => {
                                 style={{
                                   fontSize: '0.76rem',
                                   padding: '4px 8px',
-                                  backgroundColor: opt === q.correctAnswer ? 'rgba(16, 185, 129, 0.15)' : '#ffffff',
+                                  backgroundColor: opt === q.correctAnswer ? 'var(--success-bg)' : 'var(--bg-surface)',
                                   border: `1px solid ${opt === q.correctAnswer ? 'var(--success-solid)' : 'var(--border-default)'}`,
                                   borderRadius: 'var(--radius-sm)',
+                                  color: 'var(--text-primary)',
                                   fontWeight: opt === q.correctAnswer ? 600 : 400,
                                 }}
                               >

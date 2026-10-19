@@ -407,16 +407,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
             <button
               onClick={handleLogout}
-              title="Log out of session"
+              data-testid="sidebar-logout-btn"
+              aria-label="Log out of authenticated session"
+              title="Log out of authenticated session"
               style={{
                 background: 'transparent',
                 border: 'none',
                 color: '#94a3b8',
                 cursor: 'pointer',
-                padding: '4px',
+                padding: '6px',
+                borderRadius: 'var(--radius-xs)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'color 0.15s ease, background-color 0.15s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = '#ef4444';
+                e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.12)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = '#94a3b8';
+                e.currentTarget.style.backgroundColor = 'transparent';
               }}
             >
-              <LogOut size={15} />
+              <LogOut size={16} />
             </button>
           </div>
         </div>

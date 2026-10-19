@@ -131,7 +131,7 @@ export const StudentDossierPage: React.FC = () => {
         style={{
           padding: 'var(--space-6)',
           marginBottom: 'var(--space-6)',
-          backgroundColor: '#ffffff',
+          backgroundColor: 'var(--bg-surface)',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'flex-start',
@@ -188,7 +188,7 @@ export const StudentDossierPage: React.FC = () => {
       {/* Grid of dossier details */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 'var(--space-6)' }}>
         {/* Personal Details */}
-        <div className="ed-card" style={{ padding: 'var(--space-5)', backgroundColor: '#ffffff' }}>
+        <div className="ed-card" style={{ padding: 'var(--space-5)', backgroundColor: 'var(--bg-surface)' }}>
           <h3 style={{ fontSize: '0.98rem', fontWeight: 700, margin: '0 0 var(--space-4)', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <User size={16} style={{ color: 'var(--primary-600)' }} /> Personal & Demographics
           </h3>
@@ -213,7 +213,7 @@ export const StudentDossierPage: React.FC = () => {
         </div>
 
         {/* Guardian / Family Information */}
-        <div className="ed-card" style={{ padding: 'var(--space-5)', backgroundColor: '#ffffff' }}>
+        <div className="ed-card" style={{ padding: 'var(--space-5)', backgroundColor: 'var(--bg-surface)' }}>
           <h3 style={{ fontSize: '0.98rem', fontWeight: 700, margin: '0 0 var(--space-4)', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Phone size={16} style={{ color: 'var(--primary-600)' }} /> Guardian & Emergency Contacts
           </h3>
@@ -246,7 +246,7 @@ export const StudentDossierPage: React.FC = () => {
         </div>
 
         {/* ID Card & Security Verification Token */}
-        <div className="ed-card" style={{ padding: 'var(--space-5)', backgroundColor: '#ffffff', gridColumn: '1 / -1' }}>
+        <div className="ed-card" style={{ padding: 'var(--space-5)', backgroundColor: 'var(--bg-surface)', gridColumn: '1 / -1' }}>
           <h3 style={{ fontSize: '0.98rem', fontWeight: 700, margin: '0 0 var(--space-4)', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <IdCard size={16} style={{ color: 'var(--primary-600)' }} /> ISO CR80 Virtual ID Card Credential
           </h3>

@@ -298,7 +298,7 @@ export const SuperAdminDashboard: React.FC = () => {
             padding: 'var(--space-4)',
           }}
         >
-          <div className="ed-card" style={{ width: '100%', maxWidth: '520px', backgroundColor: '#ffffff' }}>
+          <div className="ed-card ed-modal-container" style={{ width: '100%', maxWidth: '520px', backgroundColor: 'var(--bg-surface)' }}>
             <div className="ed-card-header">
               <div>
                 <h3 style={{ fontSize: '1.1rem' }}>Onboard New School Tenant</h3>

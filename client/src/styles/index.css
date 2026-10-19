@@ -368,13 +368,96 @@ a:hover {
 
 /* Modal and Dropdown Solid Backing Enforcement */
 .ed-modal-container {
-  background-color: #ffffff !important;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+  background-color: var(--bg-surface) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-default) !important;
+  box-shadow: var(--shadow-lg) !important;
+}
+
+.ed-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(15, 23, 42, 0.72);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: var(--space-4);
+}
+
+.ed-modal {
+  background-color: var(--bg-surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  z-index: 1001;
+}
+
+.ed-modal-header {
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--border-default);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: var(--bg-surface);
+}
+
+.ed-modal-body {
+  padding: var(--space-5);
+  flex: 1;
+}
+
+.ed-modal-footer {
+  padding: var(--space-4) var(--space-5);
+  border-top: 1px solid var(--border-default);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  background-color: var(--bg-surface);
 }
 
 .ed-dropdown-menu {
-  background-color: #ffffff !important;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
-  border: 1px solid #e2e8f0 !important;
+  background-color: var(--bg-surface) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-default) !important;
+  box-shadow: var(--shadow-md) !important;
 }
+
+/* Global Dark Theme Element Overrides */
+[data-theme="dark"],
+html.dark {
+  color-scheme: dark;
+}
+
+[data-theme="dark"] .ed-table tr:hover td,
+html.dark .ed-table tr:hover td {
+  background-color: rgba(38, 53, 77, 0.45);
+}
+
+[data-theme="dark"] .ed-select option,
+html.dark .ed-select option {
+  background-color: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+/* Smooth Theme Transitions for Core Surfaces */
+html,
+body,
+.ed-card,
+header,
+aside,
+main,
+nav,
+.ed-modal-container {
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.15s ease;
+}
+
 

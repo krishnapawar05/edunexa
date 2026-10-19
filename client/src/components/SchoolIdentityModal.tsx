@@ -80,10 +80,10 @@ export const SchoolIdentityModal: React.FC = () => {
       <div
         className="ed-modal-container"
         style={{
-          backgroundColor: '#ffffff',
+          backgroundColor: 'var(--bg-surface)',
           borderRadius: 'var(--radius-lg)',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(0, 0, 0, 0.05)',
-          border: '1px solid #cbd5e1',
+          boxShadow: 'var(--shadow-lg)',
+          border: '1px solid var(--border-default)',
           width: '100%',
           maxWidth: '580px',
           maxHeight: '90vh',
@@ -98,11 +98,11 @@ export const SchoolIdentityModal: React.FC = () => {
         <div
           style={{
             padding: 'var(--space-4) var(--space-6)',
-            borderBottom: '1px solid #e2e8f0',
+            borderBottom: '1px solid var(--border-default)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            backgroundColor: '#f8fafc',
+            backgroundColor: 'var(--bg-subtle)',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>

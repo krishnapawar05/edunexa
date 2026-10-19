@@ -529,11 +529,11 @@ export const StudentDashboard: React.FC = () => {
           }}
         >
           <div
-            className="ed-card"
+            className="ed-card ed-modal-container"
             style={{
               width: '100%',
               maxWidth: '680px',
-              backgroundColor: '#ffffff',
+              backgroundColor: 'var(--bg-surface)',
               maxHeight: '90vh',
               overflowY: 'auto',
               boxShadow: 'var(--shadow-xl)',
@@ -631,9 +631,10 @@ export const StudentDashboard: React.FC = () => {
                                 padding: '8px 10px',
                                 borderRadius: 'var(--radius-xs)',
                                 border: '1px solid var(--border-default)',
-                                backgroundColor: selectedAnswers[q.id] === choice.id ? 'var(--primary-50, #f0fdfa)' : '#ffffff',
+                                backgroundColor: selectedAnswers[q.id] === choice.id ? 'var(--primary-50)' : 'var(--bg-surface)',
                                 cursor: 'pointer',
                                 fontSize: '0.84rem',
+                                color: 'var(--text-primary)',
                               }}
                             >
                               <input
@@ -694,11 +695,11 @@ export const StudentDashboard: React.FC = () => {
           }}
         >
           <div
-            className="ed-card"
+            className="ed-card ed-modal-container"
             style={{
               width: '100%',
               maxWidth: '680px',
-              backgroundColor: '#ffffff',
+              backgroundColor: 'var(--bg-surface)',
               maxHeight: '90vh',
               overflowY: 'auto',
               boxShadow: 'var(--shadow-xl)',
@@ -839,7 +840,7 @@ export const StudentDashboard: React.FC = () => {
             padding: 'var(--space-4)',
           }}
         >
-          <div className="ed-card" style={{ width: '100%', maxWidth: '440px', backgroundColor: '#ffffff' }}>
+          <div className="ed-card ed-modal-container" style={{ width: '100%', maxWidth: '440px', backgroundColor: 'var(--bg-surface)' }}>
             <div className="ed-card-header">
               <div>
                 <h3 style={{ fontSize: '1.05rem' }}>ID Verification Endpoint Preview</h3>

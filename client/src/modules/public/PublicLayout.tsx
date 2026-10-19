@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useSchoolBranding } from '../../context/SchoolBrandingContext.js';
 import { SchoolIdentityModal } from '../../components/SchoolIdentityModal.js';
+import { ThemeSwitcher } from '../../components/ThemeSwitcher.js';
 import { coreApi } from '../../services/api.js';
 
 export const PublicLayout: React.FC = () => {
@@ -92,7 +93,7 @@ export const PublicLayout: React.FC = () => {
   ];
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#ffffff', color: 'var(--text-primary)' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--bg-app)', color: 'var(--text-primary)' }}>
       {/* Dynamic School Identity Modal */}
       <SchoolIdentityModal />
 
@@ -122,7 +123,7 @@ export const PublicLayout: React.FC = () => {
             <Mail size={12} style={{ color: 'var(--primary-500)' }} /> admissions@apexacademy.edu
           </span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
           <button
             onClick={() => setIsCustomizing(true)}
             style={{
@@ -175,6 +176,9 @@ export const PublicLayout: React.FC = () => {
           >
             <LogIn size={12} /> ERP Portal Login
           </Link>
+
+          {/* Theme Switcher Toggle */}
+          <ThemeSwitcher compact={true} />
         </div>
       </div>
 
@@ -186,7 +190,7 @@ export const PublicLayout: React.FC = () => {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          backgroundColor: '#ffffff',
+          backgroundColor: 'var(--bg-surface)',
           position: 'sticky',
           top: 0,
           zIndex: 30,
@@ -271,7 +275,7 @@ export const PublicLayout: React.FC = () => {
             padding: 'var(--space-4)',
           }}
         >
-          <div className="ed-card" style={{ width: '100%', maxWidth: '520px', backgroundColor: '#ffffff', maxHeight: '90vh', overflowY: 'auto' }}>
+          <div className="ed-card ed-modal-container" style={{ width: '100%', maxWidth: '520px', backgroundColor: 'var(--bg-surface)', maxHeight: '90vh', overflowY: 'auto' }}>
             <div className="ed-card-header">
               <div>
                 <h3 style={{ fontSize: '1.1rem' }}>Online Admission Application 2026–2027</h3>
