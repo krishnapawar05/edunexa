@@ -4,6 +4,7 @@ import {
   authenticateUser,
   requireRole,
   requireTenantScope,
+  enforceStudentIsolation,
 } from '../../middleware/auth.middleware.js';
 import { validateRequest } from '../../middleware/validate.js';
 import {
@@ -135,8 +136,11 @@ router.get(
     PlatformRole.TEACHER,
     PlatformRole.HR_STAFF,
     PlatformRole.ACCOUNTS,
+    PlatformRole.STUDENT,
+    PlatformRole.PARENT,
     PlatformRole.SUPER_ADMIN
   ),
+  enforceStudentIsolation,
   (req, res, next) => {
     coreSchoolController.getStudentById(req, res, next);
   }

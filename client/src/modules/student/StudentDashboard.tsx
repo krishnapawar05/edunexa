@@ -20,6 +20,7 @@ import {
   askSchoolAssistantApi,
   fetchAiStatusApi,
   getStoredAuthToken,
+  getStoredUser,
   coreApi,
   academicApi,
 } from '../../services/api.js';
@@ -57,21 +58,26 @@ export const StudentDashboard: React.FC = () => {
       setLoadingDashboard(true);
       setErrorDashboard(null);
 
-      // Fetch student profile for Aarav Sharma (stu-aarav-01)
-      const studentProfile = await coreApi.getStudentById('stu-aarav-01');
+      // Determine active student ID from stored session or fallback to Aarav
+      const storedUser = getStoredUser();
+      const currentStudentId = storedUser?.studentProfileId || 'stu-aarav-01';
+
+      // Fetch student profile for authenticated student
+      const studentProfile = await coreApi.getStudentById(currentStudentId);
       setStudent(studentProfile);
 
       // Fetch attendance summary
       try {
-        const att = await academicApi.getStudentAttendanceSummary('stu-aarav-01');
+        const att = await academicApi.getStudentAttendanceSummary(currentStudentId);
         setAttendanceSummary(att);
       } catch (e) {
         console.warn('Attendance summary error:', e);
       }
 
-      // Fetch live quizzes for Grade 10
+      // Fetch live quizzes for student class
       try {
-        const quizList = await academicApi.listQuizzes({ className: 'Grade 10' });
+        const targetClass = studentProfile?.className || studentProfile?.enrollments?.[0]?.class?.name || 'Grade 10';
+        const quizList = await academicApi.listQuizzes({ className: targetClass });
         setQuizzes(quizList);
         if (quizList.length > 0) {
           setActiveQuiz(quizList[0]);
@@ -82,7 +88,7 @@ export const StudentDashboard: React.FC = () => {
 
       // Fetch report card
       try {
-        const rc = await academicApi.getReportCard('stu-aarav-01');
+        const rc = await academicApi.getReportCard(currentStudentId);
         setReportCard(rc);
       } catch (e) {
         console.warn('Report card error:', e);
@@ -178,8 +184,8 @@ export const StudentDashboard: React.FC = () => {
     ? `${student.firstName} ${student.lastName}`
     : (loadingDashboard ? 'Loading...' : 'Student Portal');
   const admissionNumber = student?.admissionNumber || '—';
-  const className = student?.enrollments?.[0]?.class?.name || '—';
-  const sectionName = student?.enrollments?.[0]?.section?.name || '—';
+  const className = student?.className || student?.enrollments?.[0]?.class?.name || '—';
+  const sectionName = student?.sectionName || student?.enrollments?.[0]?.section?.name || '—';
   const rollNumber = student?.rollNumber || student?.enrollments?.[0]?.rollNumber || '—';
   const bloodGroup = student?.bloodGroup || '—';
   const verificationToken = student?.idCard?.verificationToken || '';

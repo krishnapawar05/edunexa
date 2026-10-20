@@ -195,6 +195,8 @@ export class AuthService {
             role: tokenPayload.role,
             schoolId: tokenPayload.schoolId,
             schoolName: primaryMembership?.school?.name,
+            studentProfileId: tokenPayload.studentProfileId,
+            staffProfileId: tokenPayload.staffProfileId,
           },
         };
       }
@@ -244,6 +246,8 @@ export class AuthService {
         role: user.role,
         schoolId: user.schoolId,
         schoolSlug: user.schoolSlug,
+        studentProfileId: (user as any).studentProfileId,
+        staffProfileId: (user as any).staffProfileId,
       },
     };
   }
