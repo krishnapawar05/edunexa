@@ -225,6 +225,15 @@ export class CoreSchoolController {
       next(err);
     }
   }
+
+  async getTeacherProfile(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const profile = await coreSchoolService.getTeacherProfile(req.schoolId!, req.user!.userId);
+      res.status(200).json({ success: true, data: profile });
+    } catch (err) {
+      next(err);
+    }
+  }
 }
 
 export const coreSchoolController = new CoreSchoolController();

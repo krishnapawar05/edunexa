@@ -29,11 +29,33 @@ export const TeacherAttendancePage: React.FC = () => {
     remarks?: string;
   }>>([]);
 
+  const [assignedClasses, setAssignedClasses] = useState<string[]>([]);
+  const [assignedSections, setAssignedSections] = useState<string[]>([]);
+
   const [loading, setLoading] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
+
+  useEffect(() => {
+    coreApi.getTeacherProfile()
+      .then((profile) => {
+        if (profile?.assignments && profile.assignments.length > 0) {
+          const classes = Array.from(new Set(profile.assignments.map((a: any) => a.class?.name || a.subject?.class?.name).filter(Boolean))) as string[];
+          const sections = Array.from(new Set(profile.assignments.map((a: any) => a.section?.name).filter(Boolean))) as string[];
+          if (classes.length > 0) {
+            setAssignedClasses(classes);
+            setSelectedClass(classes[0]);
+          }
+          if (sections.length > 0) {
+            setAssignedSections(sections);
+            setSelectedSection(sections[0]);
+          }
+        }
+      })
+      .catch((err) => console.warn('Could not load teacher assigned classes:', err));
+  }, []);
 
   const loadRosterAndAttendance = async () => {
     try {
@@ -217,10 +239,9 @@ export const TeacherAttendancePage: React.FC = () => {
               value={selectedClass}
               onChange={(e) => setSelectedClass(e.target.value)}
             >
-              <option value="Grade 9">Grade 9</option>
-              <option value="Grade 10">Grade 10</option>
-              <option value="Grade 11">Grade 11</option>
-              <option value="Grade 12">Grade 12</option>
+              {(assignedClasses.length > 0 ? assignedClasses : ['Grade 9', 'Grade 10', 'Grade 11', 'Grade 12']).map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
             </select>
           </div>
 
@@ -234,8 +255,9 @@ export const TeacherAttendancePage: React.FC = () => {
               value={selectedSection}
               onChange={(e) => setSelectedSection(e.target.value)}
             >
-              <option value="A">Section A</option>
-              <option value="B">Section B</option>
+              {(assignedSections.length > 0 ? assignedSections : ['A', 'B', 'C']).map((sec) => (
+                <option key={sec} value={sec}>Section {sec}</option>
+              ))}
             </select>
           </div>
 

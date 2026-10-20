@@ -110,7 +110,7 @@ export const TeacherTimetablePage: React.FC = () => {
         roomNumber: newRoom,
         className: selectedClass,
         sectionName: selectedSection,
-        teacherName: user ? `${user.firstName} ${user.lastName}` : 'Dr. Julian Thorne',
+        teacherName: user ? `${user.firstName} ${user.lastName}`.trim() : 'Faculty Member',
       });
 
       setShowAddModal(false);
@@ -142,6 +142,7 @@ export const TeacherTimetablePage: React.FC = () => {
   // KPI metrics
   const totalWeeklyTeachingPeriods = slots.length;
   const todayPeriods = slotsByDay[currentDayName] || [];
+  const designatedVenue = slots.find((s) => s.roomNumber)?.roomNumber || (slots.length > 0 ? 'Assigned Rooms' : 'TBD');
 
   return (
     <div style={{ padding: 'var(--space-6)', maxWidth: '1400px', margin: '0 auto' }}>
@@ -339,14 +340,14 @@ export const TeacherTimetablePage: React.FC = () => {
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
-            <span style={{ fontSize: '0.825rem', fontWeight: 600, textTransform: 'uppercase' }}>Lab Hours</span>
+            <span style={{ fontSize: '0.825rem', fontWeight: 600, textTransform: 'uppercase' }}>Assigned Venue</span>
             <MapPin size={18} color="#8b5cf6" />
           </div>
           <div style={{ fontSize: '1.75rem', fontWeight: 800, marginTop: 'var(--space-2)' }}>
-            Lab 204
+            {designatedVenue}
           </div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
-            Designated practical venue
+            Practical / lecture venue
           </div>
         </div>
       </div>

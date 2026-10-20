@@ -104,18 +104,25 @@ export const TeacherExamMarksPage: React.FC = () => {
     try {
       setLoadingStudents(true);
       setError(null);
-      const res = await coreApi.listStudents({ className: selectedClass, limit: 100 });
+      const [res, existingMarks] = await Promise.all([
+        coreApi.listStudents({ className: selectedClass, limit: 100 }),
+        academicApi.getExamMarks(selectedExamId).catch(() => []),
+      ]);
       const items = res?.items || [];
+      const marksList = Array.isArray(existingMarks) ? existingMarks : [];
       setStudents(
-        items.map((s: any) => ({
-          studentProfileId: s.id,
-          name: `${s.firstName} ${s.lastName}`,
-          rollNumber: s.rollNumber || s.admissionNumber || '—',
-          marksObtained: '',
-          isAbsent: false,
-          isExempt: false,
-          teacherRemarks: '',
-        }))
+        items.map((s: any) => {
+          const m = marksList.find((x: any) => x.studentProfileId === s.id);
+          return {
+            studentProfileId: s.id,
+            name: `${s.firstName} ${s.lastName}`,
+            rollNumber: s.rollNumber || s.admissionNumber || '—',
+            marksObtained: m && m.marksObtained !== undefined ? m.marksObtained : '',
+            isAbsent: m ? Boolean(m.isAbsent) : false,
+            isExempt: false,
+            teacherRemarks: m?.teacherRemarks || '',
+          };
+        })
       );
     } catch (err: any) {
       setError(err.message || 'Failed to load student roster for evaluation.');

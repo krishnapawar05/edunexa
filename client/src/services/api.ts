@@ -326,6 +326,35 @@ export const coreApi = {
       method: 'PATCH',
       body: JSON.stringify({ status }),
     }),
+
+  getTeacherProfile: () =>
+    apiRequest<{
+      id: string;
+      employeeId: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+      phone: string | null;
+      designation: string;
+      department: string;
+      joiningDate: string;
+      status: string;
+      schoolId: string;
+      schoolName: string;
+      idCardNumber: string | null;
+      assignments: Array<{
+        id: string;
+        subjectId: string;
+        subjectCode: string;
+        subjectName: string;
+        classId: string;
+        className: string;
+        sections: Array<{ id: string; name: string; capacity: number }>;
+        isLeadTeacher: boolean;
+      }>;
+      assignedClasses: string[];
+      assignedSubjects: string[];
+    }>('/api/v1/core/teacher/profile'),
 };
 
 // ============================================================================
@@ -424,6 +453,9 @@ export const academicApi = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+
+  getExamMarks: (examScheduleId: string) =>
+    apiRequest<any[]>(`/api/v1/academic/exams/schedules/${examScheduleId}/marks`),
 
   correctExamMark: (data: { markId: string; newMarks: number; rationale: string }) =>
     apiRequest<any>('/api/v1/academic/exams/marks/correct', {

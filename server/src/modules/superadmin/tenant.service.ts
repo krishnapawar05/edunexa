@@ -699,9 +699,15 @@ export class TenantService {
   }
 
   async getSettings() {
+    let activeSchoolsCount = 0;
+    try {
+      activeSchoolsCount = await prisma.school.count({ where: { status: TenantStatus.ACTIVE } });
+    } catch {
+      activeSchoolsCount = 0;
+    }
     return {
       ...PLATFORM_SETTINGS,
-      activeSchoolsCount: MEMORY_SCHOOLS.filter((s) => s.status === TenantStatus.ACTIVE).length,
+      activeSchoolsCount,
       serverTime: new Date().toISOString(),
     };
   }

@@ -239,4 +239,13 @@ router.patch(
   }
 );
 
+// Teacher Profile & Assigned Subjects/Classes
+router.get(
+  '/teacher/profile',
+  requireRole(PlatformRole.TEACHER, PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.SUPER_ADMIN),
+  (req, res, next) => {
+    coreSchoolController.getTeacherProfile(req, res, next);
+  }
+);
+
 export default router;

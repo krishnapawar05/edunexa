@@ -1323,6 +1323,54 @@ export class AcademicService {
   }
 
   /**
+   * Fetch saved Exam Marks for an Exam Schedule from PostgreSQL
+   */
+  async getExamScheduleMarks(schoolIdOrIdentifier: string, examScheduleId: string) {
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    const targetSchoolId = school ? school.id : schoolIdOrIdentifier;
+
+    const exam = await prisma.examSchedule.findFirst({
+      where: {
+        id: examScheduleId,
+        subject: { class: { schoolId: targetSchoolId } },
+      },
+      include: {
+        marks: {
+          include: {
+            student: {
+              include: {
+                membership: { include: { user: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!exam) {
+      throw new AppError(`Exam schedule '${examScheduleId}' not found.`, 404, 'RECORD_NOT_FOUND');
+    }
+
+    return exam.marks.map((m) => ({
+      id: m.id,
+      examScheduleId: m.examScheduleId,
+      studentProfileId: m.studentProfileId,
+      admissionNumber: m.student?.admissionNumber || '',
+      studentName: m.student?.membership?.user
+        ? `${m.student.membership.user.firstName} ${m.student.membership.user.lastName}`
+        : 'Student',
+      marksObtained: m.marksObtained,
+      grade: m.grade || '—',
+      isAbsent: m.isAbsent,
+      isExempt: m.isExempt,
+      teacherRemarks: m.teacherRemarks || '',
+      enteredByUserId: m.enteredByUserId,
+      createdAt: m.createdAt.toISOString(),
+      updatedAt: m.updatedAt.toISOString(),
+    }));
+  }
+
+  /**
    * Correct Exam Mark with Mandatory Audit Reason in PostgreSQL
    */
   async correctExamMark(schoolIdOrIdentifier: string, correctedByUserId: string, data: CorrectExamMarkDTO) {

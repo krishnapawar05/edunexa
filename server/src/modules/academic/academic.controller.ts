@@ -291,6 +291,21 @@ export class AcademicController {
     }
   }
 
+  async getExamScheduleMarks(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const schoolId = req.user!.schoolId!;
+      const result = await academicService.getExamScheduleMarks(schoolId, id);
+      const response: ApiSuccessResponse<typeof result> = {
+        success: true,
+        data: result,
+      };
+      res.status(200).json(response);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async submitExamMarksBatch(req: Request, res: Response, next: NextFunction) {
     try {
       const parsed = SubmitExamMarksBatchSchema.parse(req.body);

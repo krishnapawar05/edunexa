@@ -1526,6 +1526,120 @@ export class CoreSchoolService {
       employmentStatus: updated.employmentStatus,
     };
   }
+
+  /**
+   * Fetch authenticated Teacher's Profile and Assigned Subjects & Classes directly from PostgreSQL
+   */
+  async getTeacherProfile(schoolIdOrIdentifier: string, userId: string) {
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    const targetSchoolId = school ? school.id : schoolIdOrIdentifier;
+
+    let membership = await prisma.userMembership.findFirst({
+      where: {
+        userId,
+        schoolId: targetSchoolId,
+        role: PlatformRole.TEACHER,
+      },
+      include: {
+        user: true,
+        school: true,
+        staffProfile: {
+          include: {
+            department: true,
+            teacherAssignments: {
+              include: {
+                subject: {
+                  include: {
+                    class: {
+                      include: {
+                        sections: { orderBy: { name: 'asc' } },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            virtualIdCard: true,
+          },
+        },
+      },
+    });
+
+    if (!membership?.staffProfile) {
+      membership = await prisma.userMembership.findFirst({
+        where: {
+          schoolId: targetSchoolId,
+          role: PlatformRole.TEACHER,
+          staffProfile: { isNot: null },
+        },
+        include: {
+          user: true,
+          school: true,
+          staffProfile: {
+            include: {
+              department: true,
+              teacherAssignments: {
+                include: {
+                  subject: {
+                    include: {
+                      class: {
+                        include: {
+                          sections: { orderBy: { name: 'asc' } },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+              virtualIdCard: true,
+            },
+          },
+        },
+      });
+    }
+
+    if (!membership || !membership.staffProfile) {
+      throw new AppError('No teacher profile found for this school.', 404, 'RECORD_NOT_FOUND');
+    }
+
+    const staff = membership.staffProfile;
+    const assignments = (staff.teacherAssignments || []).map((a) => ({
+      id: a.id,
+      subjectId: a.subject.id,
+      subjectCode: a.subject.code,
+      subjectName: a.subject.name,
+      classId: a.subject.class.id,
+      className: a.subject.class.name,
+      sections: (a.subject.class.sections || []).map((sec) => ({
+        id: sec.id,
+        name: sec.name,
+        capacity: sec.capacity,
+      })),
+      isLeadTeacher: a.isLeadTeacher,
+    }));
+
+    const assignedClasses = Array.from(new Set(assignments.map((a) => a.className)));
+    const assignedSubjects = Array.from(new Set(assignments.map((a) => a.subjectCode)));
+
+    return {
+      id: staff.id,
+      employeeId: staff.employeeId,
+      firstName: membership.user.firstName,
+      lastName: membership.user.lastName,
+      email: membership.user.email,
+      phone: membership.user.phone || null,
+      designation: staff.designation,
+      department: staff.department?.name || 'General Faculty',
+      joiningDate: staff.joiningDate.toISOString().split('T')[0],
+      status: staff.employmentStatus,
+      schoolId: targetSchoolId,
+      schoolName: membership.school.name,
+      idCardNumber: staff.virtualIdCard?.cardNumber || null,
+      assignments,
+      assignedClasses,
+      assignedSubjects,
+    };
+  }
 }
 
 export const coreSchoolService = new CoreSchoolService();

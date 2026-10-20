@@ -54,6 +54,7 @@ export const TeacherClassesPage: React.FC = () => {
     approvedLeaves: number;
     attendancePercentage: number;
   } | null>(null);
+  const [classAttendanceRate, setClassAttendanceRate] = useState<string>('—');
 
   const user = getStoredUser();
 
@@ -65,7 +66,26 @@ export const TeacherClassesPage: React.FC = () => {
         className: selectedClass,
         limit: 100,
       });
-      setStudents(res?.items || []);
+      const items = res?.items || [];
+      setStudents(items);
+
+      // Fetch real class attendance rate from PostgreSQL
+      try {
+        const report = await academicApi.getClassAttendanceReport({
+          className: selectedClass,
+          sectionName: selectedSection,
+          date: new Date().toISOString().split('T')[0],
+        });
+        if (report && report.attendancePercentage !== undefined) {
+          setClassAttendanceRate(`${report.attendancePercentage}%`);
+        } else if (items.length > 0) {
+          setClassAttendanceRate('Recorded');
+        } else {
+          setClassAttendanceRate('—');
+        }
+      } catch {
+        setClassAttendanceRate(items.length > 0 ? 'Recorded' : '—');
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to fetch student directory from server.');
     } finally {
@@ -75,7 +95,7 @@ export const TeacherClassesPage: React.FC = () => {
 
   useEffect(() => {
     loadStudents();
-  }, [selectedClass]);
+  }, [selectedClass, selectedSection]);
 
   const viewStudentAcademicInfo = async (student: StudentProfile) => {
     setSelectedStudent(student);
@@ -233,7 +253,7 @@ export const TeacherClassesPage: React.FC = () => {
             <CalendarCheck size={18} color="#16a34a" />
           </div>
           <div style={{ fontSize: '1.75rem', fontWeight: 800, marginTop: 'var(--space-2)' }}>
-            94.6%
+            {classAttendanceRate}
           </div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
             Aggregated term compliance
@@ -581,11 +601,11 @@ export const TeacherClassesPage: React.FC = () => {
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Phone size={14} color="var(--brand-primary)" />
-                  <span>Contact: {selectedStudent.parentContact || selectedStudent.emergencyContact || '+1 (555) 019-2831'}</span>
+                  <span>Contact: {selectedStudent.parentContact || selectedStudent.emergencyContact || 'Not provided'}</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Mail size={14} color="var(--brand-primary)" />
-                  <span>Guardian Email: {selectedStudent.parentEmail || 'guardian.contact@apexacademy.edu'}</span>
+                  <span>Guardian Email: {selectedStudent.parentEmail || 'Not provided'}</span>
                 </div>
               </div>
             </div>

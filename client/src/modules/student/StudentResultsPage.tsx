@@ -48,10 +48,10 @@ export const StudentResultsPage: React.FC = () => {
   const studentFullName = student
     ? `${student.firstName} ${student.lastName}`
     : (reportCard?.studentName || 'Authenticated Student');
-  const admissionNumber = student?.admissionNumber || reportCard?.admissionNumber || 'ADM-2026-0891';
-  const className = student?.className || reportCard?.className || 'Grade 10';
-  const sectionName = student?.sectionName || reportCard?.sectionName || 'A';
-  const rollNumber = student?.rollNumber || reportCard?.rollNumber || '14';
+  const admissionNumber = student?.admissionNumber || reportCard?.admissionNumber || '—';
+  const className = student?.className || reportCard?.className || '—';
+  const sectionName = student?.sectionName || reportCard?.sectionName || '—';
+  const rollNumber = student?.rollNumber || reportCard?.rollNumber || '—';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
@@ -126,23 +126,23 @@ export const StudentResultsPage: React.FC = () => {
         <div className="ed-metric-tile">
           <span className="label">Cumulative Aggregate</span>
           <span className="value" style={{ color: 'var(--primary-700)' }}>
-            {reportCard ? `${reportCard.overallPercentage}%` : '89.0%'}
+            {reportCard && reportCard.overallPercentage !== undefined ? `${reportCard.overallPercentage}%` : (loading ? '...' : '—')}
           </span>
-          <span className="subtitle">Overall Grade: {reportCard?.overallGrade || 'A1'}</span>
+          <span className="subtitle">Overall Grade: {reportCard?.overallGrade || '—'}</span>
         </div>
 
         <div className="ed-metric-tile">
           <span className="label">Promotion Status</span>
           <span className="value" style={{ color: 'var(--success-solid)', fontSize: '1.3rem' }}>
-            {reportCard?.promotionStatus || 'PROMOTED'}
+            {reportCard?.promotionStatus || (loading ? '...' : 'PENDING')}
           </span>
-          <span className="subtitle">Eligible for Grade 11 Transition</span>
+          <span className="subtitle">Official term progress standing</span>
         </div>
 
         <div className="ed-metric-tile">
           <span className="label">Attendance Minimum</span>
           <span className="value" style={{ color: 'var(--success-solid)' }}>
-            {reportCard?.attendancePercentage || 94.2}%
+            {reportCard?.attendancePercentage !== undefined ? `${reportCard.attendancePercentage}%` : (loading ? '...' : '—')}
           </span>
           <span className="subtitle">Verified above 75% CBSE requirement</span>
         </div>
@@ -287,7 +287,7 @@ export const StudentResultsPage: React.FC = () => {
               Cumulative Aggregate Performance
             </div>
             <div style={{ fontSize: '1.4rem', fontWeight: 900, color: 'var(--primary-800)', marginTop: '2px' }}>
-              {reportCard?.overallPercentage || '89.0'}% • Cumulative Grade: {reportCard?.overallGrade || 'A1'}
+              {reportCard && reportCard.overallPercentage !== undefined ? `${reportCard.overallPercentage}% • Cumulative Grade: ${reportCard.overallGrade || '—'}` : 'Evaluation pending formal publication'}
             </div>
           </div>
 
@@ -296,7 +296,7 @@ export const StudentResultsPage: React.FC = () => {
               className="ed-badge ed-badge-success"
               style={{ fontSize: '0.84rem', padding: '6px 14px', fontWeight: 700 }}
             >
-              {reportCard?.promotionStatus || 'PROMOTED TO NEXT GRADE'}
+              {reportCard?.promotionStatus || 'PENDING EVALUATION'}
             </span>
           </div>
         </div>

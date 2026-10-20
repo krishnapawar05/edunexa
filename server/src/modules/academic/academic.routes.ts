@@ -106,6 +106,9 @@ router.post(
 // List exam schedules
 router.get('/exams/schedules', academicController.listExamSchedules);
 
+// Get exam schedule marks
+router.get('/exams/schedules/:id/marks', academicController.getExamScheduleMarks);
+
 // Batch enter marks (Teacher, Exam Coordinator, School Admin)
 router.post(
   '/exams/marks/batch',

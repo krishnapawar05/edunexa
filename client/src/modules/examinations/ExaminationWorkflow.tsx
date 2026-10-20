@@ -54,10 +54,12 @@ export const ExaminationWorkflow: React.FC = () => {
 
       // 1. Fetch live exam schedules
       let schedules: any[] = [];
+      let targetExamId = '';
       try {
         schedules = await academicApi.listExamSchedules();
         setExamSchedules(schedules);
         if (schedules.length > 0) {
+          targetExamId = schedules[0].id;
           setSelectedExamId(schedules[0].id);
           setSelectedExamName(schedules[0].name || 'Physics Core Examination');
           setIsLocked(schedules[0].status === 'PUBLISHED');
@@ -66,20 +68,33 @@ export const ExaminationWorkflow: React.FC = () => {
         console.warn('Exam schedules fetch notice:', err);
       }
 
-      // 2. Fetch student roster from Grade 10
+      // 2. Fetch existing marks from DB for targetExamId
+      let existingMarks: any[] = [];
+      if (targetExamId) {
+        try {
+          existingMarks = await academicApi.getExamMarks(targetExamId);
+        } catch (err) {
+          console.warn('Exam marks fetch notice:', err);
+        }
+      }
+
+      // 3. Fetch student roster from Grade 10
       const studentsRes = await coreApi.listStudents({ className: 'Grade 10' });
       if (studentsRes && studentsRes.items) {
         setStudentsMarks(
-          studentsRes.items.map((s: any, idx: number) => ({
-            studentId: s.id,
-            admissionNo: s.admissionNumber || `ADM-2026-00${idx + 10}`,
-            name: `${s.firstName} ${s.lastName}`,
-            rollNo: Number(s.rollNumber || idx + 1),
-            marksObtained: idx === 0 ? 94 : idx === 1 ? 88 : idx === 2 ? '' : 76,
-            isAbsent: idx === 2,
-            isExempt: false,
-            teacherRemarks: idx === 0 ? 'Exceptional mastery of core concepts' : 'Consistent performance',
-          }))
+          studentsRes.items.map((s: any, idx: number) => {
+            const markRecord = existingMarks.find((m: any) => m.studentProfileId === s.id);
+            return {
+              studentId: s.id,
+              admissionNo: s.admissionNumber || `ADM-2026-00${idx + 10}`,
+              name: `${s.firstName} ${s.lastName}`,
+              rollNo: Number(s.rollNumber || idx + 1),
+              marksObtained: markRecord && markRecord.marksObtained !== undefined ? markRecord.marksObtained : '',
+              isAbsent: markRecord ? Boolean(markRecord.isAbsent) : false,
+              isExempt: false,
+              teacherRemarks: markRecord?.teacherRemarks || '',
+            };
+          })
         );
       }
     } catch (err: any) {

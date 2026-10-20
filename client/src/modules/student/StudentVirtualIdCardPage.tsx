@@ -45,13 +45,13 @@ export const StudentVirtualIdCardPage: React.FC = () => {
   const studentFullName = student
     ? `${student.firstName} ${student.lastName}`
     : 'Authenticated Student';
-  const admissionNumber = student?.admissionNumber || 'ADM-2026-0891';
-  const className = student?.className || student?.enrollments?.[0]?.class?.name || 'Grade 10';
-  const sectionName = student?.sectionName || student?.enrollments?.[0]?.section?.name || 'A';
-  const rollNumber = student?.rollNumber || student?.enrollments?.[0]?.rollNumber || '14';
-  const bloodGroup = student?.bloodGroup || 'O+';
-  const cardStatus = student?.idCard?.status || 'ACTIVE';
-  const verificationToken = student?.idCard?.verificationToken || 'edunexa-token-77a8b9';
+  const admissionNumber = student?.admissionNumber || '—';
+  const className = student?.className || student?.enrollments?.[0]?.class?.name || '—';
+  const sectionName = student?.sectionName || student?.enrollments?.[0]?.section?.name || '—';
+  const rollNumber = student?.rollNumber || student?.enrollments?.[0]?.rollNumber || '—';
+  const bloodGroup = student?.bloodGroup || '—';
+  const cardStatus = student?.idCard?.status || 'PENDING';
+  const verificationToken = student?.idCard?.verificationToken || '';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
@@ -302,7 +302,7 @@ export const StudentVirtualIdCardPage: React.FC = () => {
                       <strong style={{ color: '#ffffff' }}>Terms of Use:</strong> This card is the property of Apex Academy of Sciences and must be returned upon request or transfer. Found cards should be deposited at the campus administration office.
                     </div>
                     <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '6px' }}>
-                      <div>Emergency Campus Contact: +1 (555) 019-2831</div>
+                      <div>Campus Contact: {student?.membership?.school?.phone || 'Campus Administration Office'}</div>
                       <div>Portal Verification URL: https://edunexa.campus.edu/verify</div>
                     </div>
                   </div>

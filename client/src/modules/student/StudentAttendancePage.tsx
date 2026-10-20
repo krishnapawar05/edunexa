@@ -46,7 +46,7 @@ export const StudentAttendancePage: React.FC = () => {
   const studentFullName = student
     ? `${student.firstName} ${student.lastName}`
     : 'Authenticated Student';
-  const attendancePct = summary?.attendancePercentage ?? 94.2;
+  const attendancePct = summary?.attendancePercentage ?? 0;
   const isEligible = attendancePct >= 75.0;
 
   return (
@@ -127,23 +127,23 @@ export const StudentAttendancePage: React.FC = () => {
         <div className="ed-metric-tile">
           <span className="label">Days Present</span>
           <span className="value" style={{ color: 'var(--success-solid)' }}>
-            {summary ? summary.presentDays : (loading ? '...' : 146)}
+            {summary ? summary.presentDays : (loading ? '...' : 0)}
           </span>
-          <span className="subtitle">Total School Days: {summary ? summary.totalDays : 155}</span>
+          <span className="subtitle">Total School Days: {summary ? summary.totalDays : 0}</span>
         </div>
 
         <div className="ed-metric-tile">
           <span className="label">Unexcused Absences</span>
-          <span className="value" style={{ color: summary?.absentDays > 5 ? 'var(--danger-solid)' : 'var(--text-primary)' }}>
-            {summary ? summary.absentDays : (loading ? '...' : 6)}
+          <span className="value" style={{ color: (summary?.absentDays || 0) > 5 ? 'var(--danger-solid)' : 'var(--text-primary)' }}>
+            {summary ? summary.absentDays : (loading ? '...' : 0)}
           </span>
-          <span className="subtitle">Tardy / Late Days: {summary?.lateDays ?? 2}</span>
+          <span className="subtitle">Tardy / Late Days: {summary?.lateDays ?? 0}</span>
         </div>
 
         <div className="ed-metric-tile">
           <span className="label">Approved Leaves</span>
           <span className="value" style={{ color: 'var(--primary-700)' }}>
-            {summary ? summary.approvedLeaves : (loading ? '...' : 3)}
+            {summary ? summary.approvedLeaves : (loading ? '...' : 0)}
           </span>
           <span className="subtitle">Verified Medical / Sanctioned</span>
         </div>
@@ -215,19 +215,19 @@ export const StudentAttendancePage: React.FC = () => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.82rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 10px', backgroundColor: 'var(--bg-subtle)', borderRadius: 'var(--radius-xs)' }}>
                 <span>Total Instructional School Days:</span>
-                <strong>{summary ? summary.totalDays : 155} Days</strong>
+                <strong>{summary ? summary.totalDays : 0} Days</strong>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 10px', backgroundColor: 'var(--bg-subtle)', borderRadius: 'var(--radius-xs)' }}>
                 <span>Full Days Present:</span>
-                <strong style={{ color: 'var(--success-solid)' }}>{summary ? summary.presentDays : 146} Days</strong>
+                <strong style={{ color: 'var(--success-solid)' }}>{summary ? summary.presentDays : 0} Days</strong>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 10px', backgroundColor: 'var(--bg-subtle)', borderRadius: 'var(--radius-xs)' }}>
                 <span>Unexcused Days Absent:</span>
-                <strong style={{ color: 'var(--danger-solid)' }}>{summary ? summary.absentDays : 6} Days</strong>
+                <strong style={{ color: 'var(--danger-solid)' }}>{summary ? summary.absentDays : 0} Days</strong>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 10px', backgroundColor: 'var(--bg-subtle)', borderRadius: 'var(--radius-xs)' }}>
                 <span>Approved Leaves / Medical Exemption:</span>
-                <strong style={{ color: 'var(--primary-700)' }}>{summary ? summary.approvedLeaves : 3} Days</strong>
+                <strong style={{ color: 'var(--primary-700)' }}>{summary ? summary.approvedLeaves : 0} Days</strong>
               </div>
             </div>
           </div>

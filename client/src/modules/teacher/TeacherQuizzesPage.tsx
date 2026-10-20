@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import {
   academicApi,
+  coreApi,
   generateQuizDraftApi,
   reviewQuizDraftApi,
   fetchAiStatusApi,
@@ -33,6 +34,10 @@ export const TeacherQuizzesPage: React.FC = () => {
   // Filter state
   const [filterClass, setFilterClass] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
+
+  // Assigned options from teacher profile
+  const [assignedClasses, setAssignedClasses] = useState<string[]>([]);
+  const [assignedSubjects, setAssignedSubjects] = useState<string[]>([]);
 
   // Create Quiz Modal State
   const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
@@ -49,14 +54,12 @@ export const TeacherQuizzesPage: React.FC = () => {
     choices: Array<{ choiceText: string; isCorrect: boolean }>;
   }>>([
     {
-      questionText: 'What is the SI unit of magnetic flux density?',
+      questionText: '',
       questionType: 'MULTIPLE_CHOICE',
       marks: 10,
       choices: [
-        { choiceText: 'Tesla (T)', isCorrect: true },
-        { choiceText: 'Weber (Wb)', isCorrect: false },
-        { choiceText: 'Henry (H)', isCorrect: false },
-        { choiceText: 'Gauss (G)', isCorrect: false },
+        { choiceText: '', isCorrect: true },
+        { choiceText: '', isCorrect: false },
       ],
     },
   ]);
@@ -64,9 +67,7 @@ export const TeacherQuizzesPage: React.FC = () => {
 
   // AI Quiz Generator State
   const [showAiModal, setShowAiModal] = useState<boolean>(false);
-  const [aiMaterial, setAiMaterial] = useState<string>(
-    'Faraday’s Law of Electromagnetic Induction states that the electromotive force (EMF) induced in a circuit is directly proportional to the time rate of change of magnetic flux through the circuit. Lenz’s Law further specifies that the direction of the induced current opposes the change in magnetic flux that produced it. Units: Magnetic flux is measured in Webers (Wb), and magnetic field is measured in Tesla (T).'
-  );
+  const [aiMaterial, setAiMaterial] = useState<string>('');
   const [aiSubject, setAiSubject] = useState<string>('Physics');
   const [aiGrade, setAiGrade] = useState<string>('Grade 10');
   const [aiDifficulty, setAiDifficulty] = useState<'EASY' | 'MEDIUM' | 'HARD'>('MEDIUM');
@@ -91,6 +92,23 @@ export const TeacherQuizzesPage: React.FC = () => {
 
   useEffect(() => {
     loadQuizzes();
+    coreApi.getTeacherProfile()
+      .then((profile) => {
+        if (profile?.assignments && profile.assignments.length > 0) {
+          const classes = Array.from(new Set(profile.assignments.map((a: any) => a.class?.name || a.subject?.class?.name).filter(Boolean))) as string[];
+          const subjects = Array.from(new Set(profile.assignments.map((a: any) => a.subject?.code).filter(Boolean))) as string[];
+          if (classes.length > 0) {
+            setAssignedClasses(classes);
+            setNewClass(classes[0]);
+            setAiGrade(classes[0]);
+          }
+          if (subjects.length > 0) {
+            setAssignedSubjects(subjects);
+            setNewSubject(subjects[0]);
+          }
+        }
+      })
+      .catch((err) => console.warn('Could not load teacher profile for quizzes:', err));
   }, []);
 
   const handleOpenAiModal = async () => {
