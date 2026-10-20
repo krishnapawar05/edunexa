@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Users,
   Award,
@@ -14,6 +15,9 @@ import {
   Check,
   Loader2,
   RefreshCw,
+  Calendar,
+  Sparkles,
+  BookOpen,
 } from 'lucide-react';
 import { Breadcrumbs } from '../../components/Breadcrumbs.js';
 import {
@@ -22,8 +26,19 @@ import {
   operationsApi,
 } from '../../services/api.js';
 
+interface Ward {
+  id: string;
+  studentProfileId: string;
+  admissionNumber: string;
+  name: string;
+  grade: string;
+  className: string;
+  sectionName: string;
+  rollNumber: number;
+}
+
 export const ParentDashboard: React.FC = () => {
-  const [children, setChildren] = useState<any[]>([]);
+  const [children, setChildren] = useState<Ward[]>([]);
   const [selectedChildIndex, setSelectedChildIndex] = useState(0);
   const [loadingChildren, setLoadingChildren] = useState(true);
   const [errorChildren, setErrorChildren] = useState<string | null>(null);
@@ -32,6 +47,8 @@ export const ParentDashboard: React.FC = () => {
   const [reportCard, setReportCard] = useState<any>(null);
   const [attendanceSummary, setAttendanceSummary] = useState<any>(null);
   const [invoices, setInvoices] = useState<any[]>([]);
+  const [upcomingEvents, setUpcomingEvents] = useState<any[]>([]);
+  const [recentNotices, setRecentNotices] = useState<any[]>([]);
   const [loadingChildData, setLoadingChildData] = useState(false);
 
   // Fee Payment Modal State
@@ -40,27 +57,29 @@ export const ParentDashboard: React.FC = () => {
   const [paymentSubmitting, setPaymentSubmitting] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [paymentAmount, setPaymentAmount] = useState<number>(0);
   const [paymentMode, setPaymentMode] = useState('ONLINE');
+  const [paymentTxnRef, setPaymentTxnRef] = useState('');
 
   // Report Card Modal State
   const [showReportCardModal, setShowReportCardModal] = useState(false);
 
-  // Load students linked to parent
+  // Load students linked to parent via authorized PostgreSQL endpoint
   const loadChildren = async () => {
     try {
       setLoadingChildren(true);
       setErrorChildren(null);
 
-      // Fetch students for school
-      const res = await coreApi.listStudents();
-      const studentItems = res.items || [];
-      // If multiple, filter or take the students (e.g. Aarav Sharma)
-      const mappedChildren = studentItems.map((s: any) => ({
-        id: s.id,
-        name: `${s.firstName} ${s.lastName}`,
-        grade: `${s.enrollments?.[0]?.class?.name || 'Grade 10'}-${s.enrollments?.[0]?.section?.name || 'A'}`,
-        admissionNo: s.admissionNumber,
-        rollNo: s.rollNumber || s.enrollments?.[0]?.rollNumber || 1,
+      const res = await coreApi.getParentChildren();
+      const mappedChildren: Ward[] = (res || []).map((s: any) => ({
+        id: s.id || s.studentProfileId,
+        studentProfileId: s.studentProfileId || s.id,
+        name: s.name || `${s.firstName} ${s.lastName}`.trim(),
+        grade: s.grade || `${s.className}-${s.sectionName}`,
+        className: s.className || 'Grade 10',
+        sectionName: s.sectionName || 'A',
+        admissionNumber: s.admissionNumber,
+        rollNumber: s.rollNumber || 1,
       }));
 
       setChildren(mappedChildren);
@@ -78,32 +97,25 @@ export const ParentDashboard: React.FC = () => {
     try {
       setLoadingChildData(true);
 
-      // Fetch report card
-      try {
-        const rc = await academicApi.getReportCard(childId);
-        setReportCard(rc);
-      } catch (e) {
-        console.warn('Report card fetch notice:', e);
-        setReportCard(null);
-      }
+      const [rcRes, attRes, invsRes, evtsRes, noticesRes] = await Promise.allSettled([
+        academicApi.getReportCard(childId),
+        academicApi.getStudentAttendanceSummary(childId),
+        operationsApi.listFeeInvoices({ studentProfileId: childId }),
+        operationsApi.listEvents(),
+        operationsApi.listNotices(),
+      ]);
 
-      // Fetch attendance summary
-      try {
-        const att = await academicApi.getStudentAttendanceSummary(childId);
-        setAttendanceSummary(att);
-      } catch (e) {
-        console.warn('Attendance summary notice:', e);
-        setAttendanceSummary(null);
-      }
+      if (rcRes.status === 'fulfilled') setReportCard(rcRes.value);
+      else setReportCard(null);
 
-      // Fetch fee invoices
-      try {
-        const invs = await operationsApi.listFeeInvoices({ studentProfileId: childId });
-        setInvoices(invs);
-      } catch (e) {
-        console.warn('Fee invoices fetch notice:', e);
-        setInvoices([]);
-      }
+      if (attRes.status === 'fulfilled') setAttendanceSummary(attRes.value);
+      else setAttendanceSummary(null);
+
+      if (invsRes.status === 'fulfilled') setInvoices(invsRes.value || []);
+      else setInvoices([]);
+
+      if (evtsRes.status === 'fulfilled') setUpcomingEvents((evtsRes.value || []).slice(0, 3));
+      if (noticesRes.status === 'fulfilled') setRecentNotices((noticesRes.value || []).slice(0, 3));
     } finally {
       setLoadingChildData(false);
     }
@@ -121,82 +133,90 @@ export const ParentDashboard: React.FC = () => {
     }
   };
 
-  const activeChild = children[selectedChildIndex] || {
-    id: 'stu-aarav-01',
-    name: 'Aarav Sharma',
-    grade: 'Grade 10-A',
-    admissionNo: 'ADM-2026-0042',
-    rollNo: 1,
-  };
+  const activeChild = children[selectedChildIndex] || null;
 
+  // Real calculations
   const pendingInvoice = invoices.find((inv) => inv.status !== 'PAID');
-  const outstandingAmount = pendingInvoice ? (pendingInvoice.amountDue - pendingInvoice.amountPaid) : 0;
+  const outstandingAmount = invoices.reduce((acc, inv) => {
+    return acc + Math.max(0, inv.amountDue - inv.amountPaid - (inv.discountApplied || 0));
+  }, 0);
+
+  const termScore = reportCard?.overallPercentage ? `${reportCard.overallPercentage}%` : 'Pending Publication';
+  const attendancePercent =
+    attendanceSummary && attendanceSummary.totalWorkingDays > 0
+      ? `${attendanceSummary.attendancePercentage}%`
+      : 'Not recorded';
 
   const handleOpenPaymentModal = (invoice: any) => {
+    const due = Math.max(0, invoice.amountDue - invoice.amountPaid - (invoice.discountApplied || 0));
     setSelectedInvoice(invoice);
+    setPaymentAmount(due);
+    setPaymentTxnRef(`TXN-${Date.now().toString().slice(-6)}`);
     setPaymentSuccess(false);
     setPaymentError(null);
     setShowPaymentModal(true);
   };
 
-  const handleSimulatedPayment = async (e: React.FormEvent) => {
+  const handleProcessPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedInvoice) return;
-
     try {
       setPaymentSubmitting(true);
       setPaymentError(null);
 
-      const payAmount = selectedInvoice.amountDue - selectedInvoice.amountPaid;
       await operationsApi.recordFeePayment({
         invoiceId: selectedInvoice.id,
-        amount: payAmount > 0 ? payAmount : 5000,
+        amountPaid: Number(paymentAmount),
         paymentMethod: paymentMode,
-        transactionReference: `TXN-PAR-${Date.now()}`,
+        transactionRef: paymentTxnRef,
+        notes: `Parent fee remittance via gateway reference ${paymentTxnRef}`,
       });
 
       setPaymentSuccess(true);
-      // Refresh invoices for active child
-      await loadChildDetails(activeChild.id);
+      if (activeChild) {
+        const updatedInvoices = await operationsApi.listFeeInvoices({ studentProfileId: activeChild.id });
+        setInvoices(updatedInvoices || []);
+      }
     } catch (err: any) {
-      setPaymentError(err.message || 'Payment processing failed.');
+      setPaymentError(err.message || 'Payment transaction failed. Please retry.');
     } finally {
       setPaymentSubmitting(false);
     }
   };
 
-  const attendancePercent = attendanceSummary
-    ? `${attendanceSummary.attendancePercentage}%`
-    : reportCard?.attendancePercentage
-    ? `${reportCard.attendancePercentage}%`
-    : '—';
-
-  const termScore = reportCard
-    ? `${reportCard.overallPercentage}% (Grade ${reportCard.overallGrade})`
-    : '—';
-
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
-      {/* Breadcrumbs & Header */}
-      <div>
-        <Breadcrumbs items={[{ label: 'Parent Portal' }, { label: 'Academic & Fee Dashboard' }]} />
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
+    <div className="ed-page">
+      <Breadcrumbs items={[{ label: 'Parent Portal' }, { label: 'Academic Overview' }]} />
+
+      {/* Header and Child Switcher */}
+      <div className="ed-card" style={{ marginBottom: 'var(--space-6)', padding: 'var(--space-5)' }}>
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 'var(--space-4)',
+          }}
+        >
           <div>
-            <h2>Parent & Guardian Academic Overview</h2>
-            <p style={{ color: 'var(--text-muted)' }}>
-              Authorized guardian portal • Sunil & Kavita Sharma
+            <h2 style={{ fontSize: '1.45rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
+              Parent & Guardian Portal
+            </h2>
+            <p style={{ margin: '4px 0 0', fontSize: '0.86rem', color: 'var(--text-secondary)' }}>
+              Real-time academic performance, attendance compliance, and fee management ledger.
             </p>
           </div>
 
-          {/* Sibling / Child Profile Switcher */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {/* Child Selector Tabs */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
             <button
-              className="ed-btn ed-btn-sm ed-btn-secondary"
-              onClick={() => activeChild && loadChildDetails(activeChild.id)}
-              disabled={loadingChildData}
-              title="Refresh Student Data"
+              className="ed-btn ed-btn-secondary"
+              onClick={loadChildren}
+              disabled={loadingChildren}
+              title="Refresh Ward Data"
             >
-              <RefreshCw size={13} className={loadingChildData ? 'animate-spin' : ''} />
+              <RefreshCw size={14} className={loadingChildren ? 'animate-spin' : ''} />
             </button>
 
             <div
@@ -249,401 +269,423 @@ export const ParentDashboard: React.FC = () => {
       </div>
 
       {errorChildren && (
-        <div style={{ padding: '12px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--radius-sm)', color: '#dc2626', fontSize: '0.85rem' }}>
-          {errorChildren}
+        <div style={{ padding: '12px 16px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--radius-md)', color: '#dc2626', fontSize: '0.88rem', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: 'var(--space-6)' }}>
+          <AlertTriangle size={16} />
+          <span>{errorChildren}</span>
         </div>
       )}
 
-      {/* Child Metrics Overview */}
-      <div className="ed-grid-4">
-        <div className="ed-metric-tile">
-          <span className="label">Current Term Score</span>
-          <span className="value" style={{ color: 'var(--primary-700)' }}>{termScore}</span>
-          <span className="subtitle">Published Board Grade Point</span>
+      {!loadingChildren && children.length === 0 && !errorChildren && (
+        <div className="ed-card" style={{ padding: '64px 24px', textAlign: 'center', color: 'var(--text-muted)' }}>
+          <Users size={48} style={{ margin: '0 auto 16px', opacity: 0.3 }} />
+          <h3 style={{ margin: '0 0 8px', fontWeight: 800, color: 'var(--text-primary)' }}>
+            No Wards Linked to this Account
+          </h3>
+          <p style={{ margin: 0, fontSize: '0.9rem', maxWidth: '480px', marginLeft: 'auto', marginRight: 'auto' }}>
+            No registered student records are currently associated with your guardian membership in this school. If your ward is actively enrolled, please contact the school administration to link their student account.
+          </p>
         </div>
+      )}
 
-        <div className="ed-metric-tile">
-          <span className="label">Attendance Rate</span>
-          <span className="value" style={{ color: 'var(--teal-accent)' }}>{attendancePercent}</span>
-          <span className="subtitle">
-            <CheckCircle2 size={13} style={{ color: 'var(--success-solid)' }} /> Satisfies 85% requirement
-          </span>
-        </div>
-
-        <div className="ed-metric-tile">
-          <span className="label">Fee Ledger Status</span>
-          <span
-            className="value"
-            style={{ color: outstandingAmount > 0 ? 'var(--warning-solid)' : 'var(--success-solid)' }}
-          >
-            {outstandingAmount > 0 ? `₹ ${outstandingAmount.toLocaleString()}` : 'Settled'}
-          </span>
-          <span className="subtitle">
-            {outstandingAmount > 0 ? `${pendingInvoice?.feeStructureHead || 'Term Tuition'} Due` : 'All invoices cleared'}
-          </span>
-        </div>
-
-        <div className="ed-metric-tile">
-          <span className="label">Next Milestone</span>
-          <span className="value" style={{ fontSize: '1.15rem', color: 'var(--text-primary)' }}>Nov 10</span>
-          <span className="subtitle">Half-Yearly Examination</span>
-        </div>
-      </div>
-
-      {/* Main Grid: Subject-wise Academic Ledger & Fee Invoice Panel */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.8fr 1.2fr', gap: 'var(--space-6)' }}>
-        {/* Academic Marks Summary */}
-        <div className="ed-card">
-          <div className="ed-card-header">
-            <div>
-              <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>
-                {activeChild.name} — Published Assessment Results
+      {activeChild && (
+        <>
+          {/* Child Metrics Overview */}
+          <div className="ed-grid-4" style={{ marginBottom: 'var(--space-6)' }}>
+            <div className="ed-metric-tile">
+              <span className="label">Term Aggregate</span>
+              <span className="value" style={{ color: 'var(--primary-700)' }}>{termScore}</span>
+              <span className="subtitle">
+                <Link to="/parent/results" style={{ color: 'var(--primary-600)', textDecoration: 'none', fontWeight: 600 }}>
+                  View Full Report Card →
+                </Link>
               </span>
-              <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-                Academic Session 2026–2027 • {activeChild.admissionNo}
-              </p>
             </div>
-            <button
-              className="ed-btn ed-btn-sm ed-btn-secondary"
-              onClick={() => setShowReportCardModal(true)}
-            >
-              <Download size={13} /> Official Report Card
-            </button>
+
+            <div className="ed-metric-tile">
+              <span className="label">Attendance Rate</span>
+              <span className="value" style={{ color: 'var(--teal-accent)' }}>{attendancePercent}</span>
+              <span className="subtitle">
+                <Link to="/parent/attendance" style={{ color: 'var(--primary-600)', textDecoration: 'none', fontWeight: 600 }}>
+                  {attendanceSummary?.totalWorkingDays ? `${attendanceSummary.presentDays} of ${attendanceSummary.totalWorkingDays} sessions →` : 'View Records →'}
+                </Link>
+              </span>
+            </div>
+
+            <div className="ed-metric-tile">
+              <span className="label">Outstanding Fees</span>
+              <span
+                className="value"
+                style={{ color: outstandingAmount > 0 ? 'var(--warning-solid)' : 'var(--success-solid)' }}
+              >
+                {outstandingAmount > 0 ? `₹ ${outstandingAmount.toLocaleString()}` : 'Settled'}
+              </span>
+              <span className="subtitle">
+                <Link to="/parent/fees" style={{ color: 'var(--primary-600)', textDecoration: 'none', fontWeight: 600 }}>
+                  {outstandingAmount > 0 ? 'Pay Outstanding Invoices →' : 'View Fee Receipts →'}
+                </Link>
+              </span>
+            </div>
+
+            <div className="ed-metric-tile">
+              <span className="label">Registered Ward</span>
+              <span className="value" style={{ fontSize: '1.1rem', color: 'var(--text-primary)' }}>
+                {activeChild.name}
+              </span>
+              <span className="subtitle">
+                {activeChild.admissionNumber} • {activeChild.grade}
+              </span>
+            </div>
           </div>
 
-          <div className="ed-table-container" style={{ border: 'none', borderRadius: 0 }}>
-            {loadingChildData ? (
-              <div style={{ padding: '36px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                <Loader2 size={24} className="animate-spin" style={{ margin: '0 auto 8px' }} />
-                <span>Loading examination results...</span>
+          {/* Main Grid: Subject-wise Academic Ledger & Fee Invoice Panel */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1.8fr 1.2fr', gap: 'var(--space-6)', marginBottom: 'var(--space-6)' }}>
+            {/* Academic Marks Summary */}
+            <div className="ed-card">
+              <div className="ed-card-header">
+                <div>
+                  <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>
+                    {activeChild.name} — Published Assessment Results
+                  </span>
+                  <p style={{ margin: '2px 0 0', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                    Academic Session 2026–2027 • Admission #{activeChild.admissionNumber}
+                  </p>
+                </div>
+                {reportCard && reportCard.subjects && reportCard.subjects.length > 0 && (
+                  <button
+                    className="ed-btn ed-btn-sm ed-btn-secondary"
+                    onClick={() => setShowReportCardModal(true)}
+                  >
+                    <Download size={13} /> Official Report Card
+                  </button>
+                )}
               </div>
-            ) : reportCard && reportCard.subjects && reportCard.subjects.length > 0 ? (
-              <table className="ed-table">
-                <thead>
-                  <tr>
-                    <th>Subject</th>
-                    <th>Marks Obtained</th>
-                    <th>Max Marks</th>
-                    <th>Awarded Grade</th>
-                    <th>Remarks</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {reportCard.subjects.map((m: any, i: number) => (
-                    <tr key={i}>
-                      <td style={{ fontWeight: 600 }}>{m.subjectName}</td>
-                      <td style={{ fontWeight: 700, color: 'var(--primary-700)' }}>{m.marksObtained}</td>
-                      <td>{m.maxMarks}</td>
-                      <td>
-                        <span className={`ed-badge ${m.grade === 'A1' || m.grade === 'A2' ? 'ed-badge-success' : 'ed-badge-neutral'}`}>
-                          {m.grade}
+
+              <div className="ed-table-container" style={{ border: 'none', borderRadius: 0 }}>
+                {loadingChildData ? (
+                  <div style={{ padding: '36px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    <Loader2 size={24} className="animate-spin" style={{ margin: '0 auto 8px' }} />
+                    <span>Loading examination results...</span>
+                  </div>
+                ) : reportCard && reportCard.subjects && reportCard.subjects.length > 0 ? (
+                  <table className="ed-table">
+                    <thead>
+                      <tr>
+                        <th>Subject</th>
+                        <th>Marks Obtained</th>
+                        <th>Max Marks</th>
+                        <th>Awarded Grade</th>
+                        <th>Remarks</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reportCard.subjects.map((m: any, i: number) => (
+                        <tr key={i}>
+                          <td style={{ fontWeight: 600 }}>{m.subjectName}</td>
+                          <td style={{ fontWeight: 700, color: 'var(--primary-700)' }}>{m.marksObtained}</td>
+                          <td>{m.maxMarks}</td>
+                          <td>
+                            <span className={`ed-badge ${m.grade === 'A1' || m.grade === 'A2' ? 'ed-badge-success' : 'ed-badge-neutral'}`}>
+                              {m.grade}
+                            </span>
+                          </td>
+                          <td style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                            {m.teacherRemarks || 'Satisfactory'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div style={{ padding: '36px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    <Award size={32} style={{ margin: '0 auto 8px', opacity: 0.3 }} />
+                    <p style={{ fontWeight: 600, margin: '0 0 4px' }}>No Published Marks Yet</p>
+                    <span style={{ fontSize: '0.78rem' }}>Formal exam marks have not been published for this student.</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Fee Dues & Invoices Quick Card */}
+            <div className="ed-card">
+              <div className="ed-card-header">
+                <div>
+                  <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>Fee Invoices & Dues</span>
+                  <p style={{ margin: '2px 0 0', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                    Financial Ledger Standing
+                  </p>
+                </div>
+                <Link to="/parent/fees" className="ed-btn ed-btn-sm ed-btn-secondary" style={{ textDecoration: 'none' }}>
+                  All Invoices
+                </Link>
+              </div>
+
+              <div style={{ padding: 'var(--space-4)' }}>
+                {invoices.length > 0 ? (
+                  invoices.map((inv) => {
+                    const balance = Math.max(0, inv.amountDue - inv.amountPaid - (inv.discountApplied || 0));
+                    return (
+                      <div
+                        key={inv.id}
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          padding: '12px',
+                          border: '1px solid var(--border-default)',
+                          borderRadius: 'var(--radius-sm)',
+                          marginBottom: '10px',
+                          backgroundColor: inv.status === 'PAID' ? 'var(--bg-subtle)' : '#fffbeb',
+                        }}
+                      >
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontWeight: 700, fontSize: '0.88rem' }}>{inv.invoiceNumber}</span>
+                            <span className={`ed-badge ${inv.status === 'PAID' ? 'ed-badge-success' : 'ed-badge-warning'}`}>
+                              {inv.status}
+                            </span>
+                          </div>
+                          <p style={{ margin: '2px 0 0', fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+                            {inv.feeStructureHead} • Due {inv.dueDate}
+                          </p>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <span style={{ fontWeight: 800, fontSize: '0.95rem' }}>₹ {inv.amountDue.toLocaleString()}</span>
+                          {balance > 0 ? (
+                            <button
+                              className="ed-btn ed-btn-sm ed-btn-primary"
+                              style={{ display: 'block', marginTop: '4px' }}
+                              onClick={() => handleOpenPaymentModal(inv)}
+                            >
+                              Pay ₹{balance.toLocaleString()}
+                            </button>
+                          ) : (
+                            <span style={{ display: 'block', fontSize: '0.74rem', color: 'var(--success-text)', fontWeight: 600 }}>
+                              Cleared
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    <CreditCard size={28} style={{ margin: '0 auto 8px', opacity: 0.3 }} />
+                    <p style={{ margin: 0, fontSize: '0.84rem' }}>No fee invoices recorded</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom Grid: Institutional Events & Notices */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-6)' }}>
+            {/* School Events */}
+            <div className="ed-card">
+              <div className="ed-card-header">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Calendar size={18} style={{ color: 'var(--primary-600)' }} />
+                  <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>Upcoming Institutional Events</span>
+                </div>
+                <Link to="/parent/notices" style={{ fontSize: '0.78rem', color: 'var(--primary-600)', textDecoration: 'none' }}>
+                  Calendar →
+                </Link>
+              </div>
+
+              <div style={{ padding: 'var(--space-4)' }}>
+                {upcomingEvents.length > 0 ? (
+                  upcomingEvents.map((evt) => (
+                    <div
+                      key={evt.id}
+                      style={{
+                        padding: '10px 12px',
+                        borderBottom: '1px solid var(--border-default)',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <div>
+                        <strong style={{ fontSize: '0.86rem', display: 'block' }}>{evt.title}</strong>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                          {new Date(evt.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          {evt.venue ? ` • ${evt.venue}` : ''}
                         </span>
-                      </td>
-                      <td style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{m.teacherRemarks || 'Satisfactory'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : (
-              <div style={{ padding: '36px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                <Award size={32} style={{ margin: '0 auto 8px', opacity: 0.3 }} />
-                <p style={{ fontWeight: 600 }}>No Published Marks Yet</p>
-                <p style={{ fontSize: '0.8rem' }}>Marks will appear here once official examination results are published by the school coordinator.</p>
+                      </div>
+                      <span className="ed-badge ed-badge-info" style={{ fontSize: '0.72rem' }}>
+                        {evt.audience}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--text-muted)', textAlign: 'center', padding: '16px' }}>
+                    No upcoming events scheduled
+                  </p>
+                )}
               </div>
+            </div>
+
+            {/* Recent School Notices */}
+            <div className="ed-card">
+              <div className="ed-card-header">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Bell size={18} style={{ color: 'var(--primary-600)' }} />
+                  <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>Recent School Circulars</span>
+                </div>
+                <Link to="/parent/notices" style={{ fontSize: '0.78rem', color: 'var(--primary-600)', textDecoration: 'none' }}>
+                  View All →
+                </Link>
+              </div>
+
+              <div style={{ padding: 'var(--space-4)' }}>
+                {recentNotices.length > 0 ? (
+                  recentNotices.map((n) => (
+                    <div
+                      key={n.id}
+                      style={{
+                        padding: '10px 12px',
+                        borderBottom: '1px solid var(--border-default)',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                        {n.isUrgent && <span className="ed-badge ed-badge-danger" style={{ fontSize: '0.68rem' }}>URGENT</span>}
+                        <strong style={{ fontSize: '0.86rem' }}>{n.title}</strong>
+                      </div>
+                      <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {n.content}
+                      </p>
+                    </div>
+                  ))
+                ) : (
+                  <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--text-muted)', textAlign: 'center', padding: '16px' }}>
+                    No recent circulars published
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Fee Payment Modal */}
+      {showPaymentModal && selectedInvoice && (
+        <div className="ed-modal-overlay" onClick={() => !paymentSubmitting && setShowPaymentModal(false)}>
+          <div className="ed-modal-content" style={{ maxWidth: '480px', width: '100%', padding: 'var(--space-6)' }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid var(--border-default)', paddingBottom: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <CreditCard size={20} style={{ color: 'var(--primary-600)' }} />
+                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800 }}>Fee Settlement</h3>
+              </div>
+              <button className="ed-btn ed-btn-sm ed-btn-secondary" disabled={paymentSubmitting} onClick={() => setShowPaymentModal(false)}>
+                <X size={14} />
+              </button>
+            </div>
+
+            {paymentSuccess ? (
+              <div style={{ padding: '24px', textAlign: 'center' }}>
+                <CheckCircle2 size={48} style={{ color: 'var(--success-solid)', margin: '0 auto 12px' }} />
+                <h4 style={{ margin: '0 0 6px', fontWeight: 800 }}>Payment Processed Successfully</h4>
+                <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
+                  Your remittance for {selectedInvoice.invoiceNumber} has been reconciled in the student ledger.
+                </p>
+              </div>
+            ) : (
+              <form onSubmit={handleProcessPayment}>
+                {paymentError && (
+                  <div style={{ padding: '10px 14px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--radius-sm)', color: '#dc2626', fontSize: '0.84rem', marginBottom: '16px' }}>
+                    {paymentError}
+                  </div>
+                )}
+
+                <div style={{ backgroundColor: 'var(--bg-subtle)', padding: '12px', borderRadius: 'var(--radius-sm)', marginBottom: '16px', fontSize: '0.85rem' }}>
+                  <div><strong>Invoice:</strong> {selectedInvoice.invoiceNumber}</div>
+                  <div><strong>Component:</strong> {selectedInvoice.feeStructureHead}</div>
+                  <div><strong>Student:</strong> {activeChild?.name} ({activeChild?.admissionNumber})</div>
+                </div>
+
+                <div style={{ marginBottom: '14px' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '6px' }}>Amount (₹)</label>
+                  <input
+                    type="number"
+                    className="ed-input"
+                    style={{ width: '100%', fontWeight: 700 }}
+                    value={paymentAmount}
+                    onChange={(e) => setPaymentAmount(Number(e.target.value))}
+                    max={selectedInvoice.amountDue - selectedInvoice.amountPaid}
+                    min={1}
+                    required
+                  />
+                </div>
+
+                <div style={{ marginBottom: '14px' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '6px' }}>Payment Method</label>
+                  <select className="ed-input" style={{ width: '100%' }} value={paymentMode} onChange={(e) => setPaymentMode(e.target.value)}>
+                    <option value="ONLINE">Unified Payments Interface (UPI)</option>
+                    <option value="CARD">Debit / Credit Card</option>
+                    <option value="NET_BANKING">Net Banking</option>
+                  </select>
+                </div>
+
+                <div style={{ marginBottom: '20px' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '6px' }}>Transaction Ref</label>
+                  <input type="text" className="ed-input" style={{ width: '100%', fontFamily: 'monospace' }} value={paymentTxnRef} onChange={(e) => setPaymentTxnRef(e.target.value)} required />
+                </div>
+
+                <button type="submit" className="ed-btn ed-btn-primary" style={{ width: '100%', justifyContent: 'center' }} disabled={paymentSubmitting}>
+                  {paymentSubmitting ? 'Remitting Payment...' : `Confirm & Settle ₹ ${paymentAmount.toLocaleString()}`}
+                </button>
+              </form>
             )}
           </div>
         </div>
-
-        {/* Fee Payment & Notices Panel */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-          {/* Fee Card */}
-          <div className="ed-card ed-card-body">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-3)' }}>
-              <div style={{ fontWeight: 700, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <CreditCard size={16} style={{ color: 'var(--primary-600)' }} />
-                <span>Term Tuition Account</span>
-              </div>
-              <span className={`ed-badge ${outstandingAmount > 0 ? 'ed-badge-warning' : 'ed-badge-success'}`}>
-                {outstandingAmount > 0 ? 'DUE' : 'PAID'}
-              </span>
-            </div>
-
-            <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-              {pendingInvoice
-                ? `Invoice #${pendingInvoice.invoiceNumber} for ₹ ${outstandingAmount.toLocaleString()} (${pendingInvoice.feeStructureHead}) is due on ${pendingInvoice.dueDate}.`
-                : 'All term fees and laboratory dues are currently settled. Real receipts are on file in the school ledger.'}
-            </p>
-
-            <div style={{ marginTop: 'var(--space-4)' }}>
-              {pendingInvoice ? (
-                <button
-                  className="ed-btn ed-btn-primary"
-                  style={{ width: '100%' }}
-                  onClick={() => handleOpenPaymentModal(pendingInvoice)}
-                >
-                  Pay Invoice (₹ {outstandingAmount.toLocaleString()})
-                </button>
-              ) : (
-                <button
-                  className="ed-btn ed-btn-secondary"
-                  style={{ width: '100%' }}
-                  onClick={() => alert('Official fee ledger receipt is on file. Verified in PostgreSQL.')}
-                >
-                  <Receipt size={14} /> Download Payment Receipt
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Teacher Feedback Note */}
-          <div className="ed-card ed-card-body">
-            <div style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Award size={15} style={{ color: 'var(--teal-accent)' }} />
-              <span>Teacher Academic Note</span>
-            </div>
-            <p style={{ fontSize: '0.82rem', lineHeight: 1.5, color: 'var(--text-secondary)' }}>
-              "{activeChild.name} demonstrates keen aptitude in analytical problem solving and scientific principles. Keep up the consistent attendance."
-            </p>
-            <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '6px' }}>
-              — Dr. Julian Thorne (Physical Sciences)
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Simulated Fee Payment Modal */}
-      {showPaymentModal && selectedInvoice && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(15, 23, 42, 0.7)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 100,
-            padding: 'var(--space-4)',
-          }}
-        >
-          <div className="ed-card" style={{ width: '100%', maxWidth: '460px', backgroundColor: '#ffffff' }}>
-            <div className="ed-card-header">
-              <div>
-                <h3 style={{ fontSize: '1.05rem' }}>School Fee Payment Gateway</h3>
-                <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-                  Invoice #{selectedInvoice.invoiceNumber} • {activeChild.name} ({activeChild.admissionNo})
-                </p>
-              </div>
-              <button className="ed-btn-icon" onClick={() => setShowPaymentModal(false)}>
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="ed-card-body">
-              {paymentError && (
-                <div style={{ padding: '8px 12px', marginBottom: '12px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--radius-sm)', color: '#dc2626', fontSize: '0.80rem' }}>
-                  {paymentError}
-                </div>
-              )}
-
-              {paymentSuccess ? (
-                <div style={{ textAlign: 'center', padding: 'var(--space-4) 0' }}>
-                  <CheckCircle2 size={44} style={{ color: 'var(--success-solid)', margin: '0 auto var(--space-2)' }} />
-                  <h4>Payment Recorded to PostgreSQL!</h4>
-                  <p style={{ fontSize: '0.84rem', marginTop: '6px' }}>
-                    Receipt generated in operations fee ledger. Status updated to PAID.
-                  </p>
-                  <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                    In accordance with PRD §14, payment is cryptographically verified and persisted.
-                  </p>
-                  <button
-                    className="ed-btn ed-btn-primary"
-                    style={{ marginTop: 'var(--space-4)' }}
-                    onClick={() => setShowPaymentModal(false)}
-                  >
-                    Close & Return to Dashboard
-                  </button>
-                </div>
-              ) : (
-                <form onSubmit={handleSimulatedPayment}>
-                  <div style={{ padding: '10px 12px', backgroundColor: 'var(--bg-subtle)', borderRadius: 'var(--radius-sm)', marginBottom: 'var(--space-3)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.84rem' }}>
-                      <span>{selectedInvoice.feeStructureHead || 'Tuition Fee'}:</span>
-                      <strong style={{ fontFamily: 'var(--font-mono)' }}>
-                        ₹ {(selectedInvoice.amountDue - selectedInvoice.amountPaid).toLocaleString()}.00
-                      </strong>
-                    </div>
-                  </div>
-
-                  <div className="ed-input-group">
-                    <label className="ed-label">Payment Channel</label>
-                    <select
-                      className="ed-select"
-                      value={paymentMode}
-                      onChange={(e) => setPaymentMode(e.target.value)}
-                    >
-                      <option value="ONLINE">Online UPI / NetBanking Gateway</option>
-                      <option value="BANK_TRANSFER">Bank Direct NEFT / RTGS Transfer</option>
-                      <option value="SCHOLARSHIP">Institutional Scholarship Adjustment</option>
-                    </select>
-                  </div>
-
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
-                    <button
-                      type="button"
-                      className="ed-btn ed-btn-secondary"
-                      onClick={() => setShowPaymentModal(false)}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={paymentSubmitting}
-                      className="ed-btn ed-btn-primary"
-                    >
-                      {paymentSubmitting ? 'Recording to Ledger...' : 'Confirm & Settle Invoice'}
-                    </button>
-                  </div>
-                </form>
-              )}
-            </div>
-          </div>
-        </div>
       )}
 
-      {/* Official Term Report Card Modal for Linked Child */}
-      {showReportCardModal && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(15, 23, 42, 0.75)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 110,
-            padding: 'var(--space-4)',
-          }}
-        >
-          <div
-            className="ed-card"
-            style={{
-              width: '100%',
-              maxWidth: '680px',
-              backgroundColor: '#ffffff',
-              maxHeight: '90vh',
-              overflowY: 'auto',
-              boxShadow: 'var(--shadow-xl)',
-            }}
-          >
-            <div className="ed-card-header" style={{ borderBottom: '2px solid var(--primary-700)' }}>
+      {/* Official Report Card Modal */}
+      {showReportCardModal && reportCard && (
+        <div className="ed-modal-overlay" onClick={() => setShowReportCardModal(false)}>
+          <div className="ed-modal-content" style={{ maxWidth: '780px', width: '100%', padding: 'var(--space-6)' }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid var(--border-default)', paddingBottom: '16px', marginBottom: '20px' }}>
               <div>
-                <h3 style={{ fontSize: '1.15rem', color: 'var(--primary-800)', fontWeight: 800 }}>
+                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: 'var(--primary-800)' }}>
                   Apex Academy of Sciences & Arts
                 </h3>
-                <p style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
-                  Affiliated to Central Board of Secondary Education • Academic Session {reportCard?.academicSession || '2026–2027'}
+                <p style={{ margin: '2px 0 0', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                  Affiliated to CBSE, New Delhi • Official Academic Progress Report 2026–2027
                 </p>
               </div>
-              <button className="ed-btn-icon" onClick={() => setShowReportCardModal(false)}>
-                <X size={18} />
+              <button className="ed-btn ed-btn-sm ed-btn-secondary" onClick={() => setShowReportCardModal(false)}>
+                <X size={14} /> Close
               </button>
             </div>
 
-            <div className="ed-card-body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr',
-                  gap: 'var(--space-2)',
-                  padding: '12px 14px',
-                  backgroundColor: 'var(--bg-subtle)',
-                  borderRadius: 'var(--radius-sm)',
-                  fontSize: '0.84rem',
-                }}
-              >
-                <div><strong>Student Name:</strong> {reportCard?.studentName || activeChild.name}</div>
-                <div><strong>Admission Number:</strong> {reportCard?.admissionNumber || activeChild.admissionNo}</div>
-                <div><strong>Class & Section:</strong> {reportCard?.className || activeChild.grade} (Roll #{reportCard?.rollNumber || activeChild.rollNo})</div>
-                <div><strong>Attendance Standing:</strong> {reportCard?.attendancePercentage || attendancePercent} (Satisfies promotion criteria)</div>
-              </div>
-
-              <div className="ed-table-container">
-                <table className="ed-table">
-                  <thead>
-                    <tr>
-                      <th>Subject</th>
-                      <th>Max Marks</th>
-                      <th>Pass Marks</th>
-                      <th>Marks Scored</th>
-                      <th>Grade</th>
-                      <th>Remarks</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {reportCard?.subjects && reportCard.subjects.length > 0 ? (
-                      reportCard.subjects.map((m: any, i: number) => (
-                        <tr key={i}>
-                          <td style={{ fontWeight: 600 }}>{m.subjectName}</td>
-                          <td>{m.maxMarks}</td>
-                          <td>{m.passMarks}</td>
-                          <td style={{ fontWeight: 700, color: 'var(--primary-700)' }}>{m.marksObtained}</td>
-                          <td><span className={`ed-badge ${m.grade === 'A1' || m.grade === 'A2' ? 'ed-badge-success' : 'ed-badge-neutral'}`}>{m.grade}</span></td>
-                          <td style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{m.teacherRemarks || 'Satisfactory'}</td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '24px' }}>
-                          No published examination marks available yet.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  padding: '12px 16px',
-                  backgroundColor: 'var(--primary-50, #f0fdfa)',
-                  border: '1px solid var(--primary-200, #99f6e4)',
-                  borderRadius: 'var(--radius-sm)',
-                }}
-              >
-                <div>
-                  <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>CUMULATIVE BOARD SCORE</div>
-                  <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--primary-800)' }}>
-                    {reportCard?.overallPercentage || '89.0'}% • Grade {reportCard?.overallGrade || 'A1'}
-                  </div>
-                </div>
-
-                <div>
-                  <span className="ed-badge ed-badge-success" style={{ fontSize: '0.82rem', padding: '6px 12px' }}>
-                    {reportCard?.promotionStatus || 'PROMOTED TO NEXT GRADE'}
-                  </span>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)' }}>
-                <button
-                  type="button"
-                  className="ed-btn ed-btn-secondary"
-                  onClick={() => setShowReportCardModal(false)}
-                >
-                  Close
-                </button>
-                <button
-                  type="button"
-                  className="ed-btn ed-btn-primary"
-                  onClick={() => window.print()}
-                >
-                  <Award size={15} /> Print / Save Verified PDF
-                </button>
-              </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', backgroundColor: 'var(--bg-subtle)', padding: '14px', borderRadius: 'var(--radius-sm)', marginBottom: '20px', fontSize: '0.84rem' }}>
+              <div><strong>Student Name:</strong><br />{activeChild?.name}</div>
+              <div><strong>Admission No:</strong><br />{activeChild?.admissionNumber}</div>
+              <div><strong>Class & Section:</strong><br />{activeChild?.grade}</div>
+              <div><strong>Roll Number:</strong><br />#{activeChild?.rollNumber}</div>
             </div>
+
+            <table className="ed-table" style={{ marginBottom: '24px' }}>
+              <thead>
+                <tr>
+                  <th>Subject</th>
+                  <th>Obtained</th>
+                  <th>Maximum</th>
+                  <th>Grade</th>
+                  <th>Remarks</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(reportCard.subjects || []).map((s: any, idx: number) => (
+                  <tr key={idx}>
+                    <td style={{ fontWeight: 600 }}>{s.subjectName}</td>
+                    <td style={{ fontWeight: 700 }}>{s.marksObtained}</td>
+                    <td>{s.maxMarks}</td>
+                    <td><span className="ed-badge ed-badge-success">{s.grade || 'A'}</span></td>
+                    <td style={{ fontSize: '0.8rem' }}>{s.teacherRemarks || 'Satisfactory'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}

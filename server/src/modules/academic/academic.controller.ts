@@ -396,6 +396,7 @@ export class AcademicController {
       const caller = {
         userId: req.user!.userId,
         role: req.user!.role,
+        guardianStudentIds: req.user!.guardianStudentIds,
       };
 
       const result = await academicService.getStudentReportCard(schoolId, studentProfileId, caller);

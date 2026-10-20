@@ -235,6 +235,15 @@ export class CoreSchoolController {
       next(err);
     }
   }
+
+  async getParentChildren(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const children = await coreSchoolService.getParentChildren(req.schoolId!, req.user!.userId);
+      res.status(200).json({ success: true, data: children });
+    } catch (err) {
+      next(err);
+    }
+  }
 }
 
 export const coreSchoolController = new CoreSchoolController();

@@ -64,6 +64,10 @@ import { StudentFeesPage } from './modules/student/StudentFeesPage.js';
 import { StudentNoticesPage } from './modules/student/StudentNoticesPage.js';
 import { StudentAiTutorPage } from './modules/student/StudentAiTutorPage.js';
 import { ParentDashboard } from './modules/parent/ParentDashboard.js';
+import { ParentResultsPage } from './modules/parent/ParentResultsPage.js';
+import { ParentAttendancePage } from './modules/parent/ParentAttendancePage.js';
+import { ParentFeesPage } from './modules/parent/ParentFeesPage.js';
+import { ParentNoticesPage } from './modules/parent/ParentNoticesPage.js';
 import { ExaminationWorkflow } from './modules/examinations/ExaminationWorkflow.js';
 import { HrStaffDashboard } from './modules/hr/HrStaffDashboard.js';
 import { AccountsDashboard } from './modules/accounts/AccountsDashboard.js';
@@ -193,10 +197,10 @@ export const App: React.FC = () => {
           }
         >
           <Route path="/parent" element={<ParentDashboard />} />
-          <Route path="/parent/results" element={<ParentDashboard />} />
-          <Route path="/parent/attendance" element={<ParentDashboard />} />
-          <Route path="/parent/fees" element={<ParentDashboard />} />
-          <Route path="/parent/notices" element={<ParentDashboard />} />
+          <Route path="/parent/results" element={<ParentResultsPage />} />
+          <Route path="/parent/attendance" element={<ParentAttendancePage />} />
+          <Route path="/parent/fees" element={<ParentFeesPage />} />
+          <Route path="/parent/notices" element={<ParentNoticesPage />} />
         </Route>
 
         {/* Examination Coordinator Workspace */}

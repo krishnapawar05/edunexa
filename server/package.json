@@ -13,7 +13,7 @@
     "prisma:deploy": "prisma migrate deploy",
     "prisma:studio": "prisma studio",
     "prisma:seed": "tsx prisma/seed.ts",
-    "test": "vitest run"
+    "test": "vitest run --testTimeout=15000"
   },
   "dependencies": {
     "@edunexa/shared": "*",

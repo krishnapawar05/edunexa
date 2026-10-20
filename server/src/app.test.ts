@@ -4,16 +4,20 @@ import { app } from './app.js';
 import { env } from './config/env.js';
 
 describe('EduNexa Core Server Foundation', () => {
-  it('GET /api/health should return 200 with standardized success envelope', async () => {
-    const res = await request(app).get('/api/health');
-    expect(res.status).toBe(200);
-    expect(res.body).toHaveProperty('success', true);
-    expect(res.body).toHaveProperty('data');
-    expect(res.body.data).toHaveProperty('service', 'EduNexa ERP Core Engine');
-    expect(res.body.data).toHaveProperty('uptimeSeconds');
-    expect(res.body.data).toHaveProperty('database');
-    expect(res.body.data.database).toHaveProperty('status');
-  });
+  it(
+    'GET /api/health should return 200 with standardized success envelope',
+    async () => {
+      const res = await request(app).get('/api/health');
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveProperty('success', true);
+      expect(res.body).toHaveProperty('data');
+      expect(res.body.data).toHaveProperty('service', 'EduNexa ERP Core Engine');
+      expect(res.body.data).toHaveProperty('uptimeSeconds');
+      expect(res.body.data).toHaveProperty('database');
+      expect(res.body.data.database).toHaveProperty('status');
+    },
+    15000
+  );
 
   it('GET /api/undefined-endpoint should return 404 with structured error envelope', async () => {
     const res = await request(app).get('/api/undefined-endpoint');

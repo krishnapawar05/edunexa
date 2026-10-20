@@ -772,24 +772,27 @@ export class OperationsService {
     };
   }
 
-  async listFeeInvoices(schoolIdOrIdentifier: string, studentProfileId?: string) {
+  async listFeeInvoices(schoolIdOrIdentifier: string, studentProfileId?: string | string[]) {
     const school = await resolveSchool(schoolIdOrIdentifier);
     const targetSchoolId = school ? school.id : schoolIdOrIdentifier;
 
-    let targetStudentId: string | undefined = undefined;
-    if (studentProfileId) {
+    let studentProfileFilter: any = undefined;
+    if (Array.isArray(studentProfileId)) {
+      studentProfileFilter = { in: studentProfileId };
+    } else if (studentProfileId) {
       const student = await resolveStudentProfile(targetSchoolId, studentProfileId);
-      if (student) targetStudentId = student.id;
+      studentProfileFilter = student ? student.id : studentProfileId;
     }
 
     const invoices = await prisma.feeInvoice.findMany({
       where: {
         feeStructure: { schoolId: targetSchoolId },
-        ...(targetStudentId ? { studentProfileId: targetStudentId } : {}),
+        ...(studentProfileFilter ? { studentProfileId: studentProfileFilter } : {}),
       },
       include: {
         feeStructure: { include: { class: true } },
         student: { include: { membership: { include: { user: true } } } },
+        payments: { orderBy: { paidAt: 'desc' } },
       },
       orderBy: { dueDate: 'asc' },
     });
@@ -799,6 +802,7 @@ export class OperationsService {
       schoolId: targetSchoolId,
       invoiceNumber: i.invoiceNumber,
       studentProfileId: i.student.admissionNumber || i.studentProfileId,
+      actualStudentProfileId: i.studentProfileId,
       studentName: `${i.student.membership.user.firstName} ${i.student.membership.user.lastName}`.trim(),
       className: i.feeStructure.class.name,
       feeStructureHead: i.feeStructure.feeHead,
@@ -807,8 +811,18 @@ export class OperationsService {
       discountApplied: i.discountApplied,
       dueDate: i.dueDate.toISOString().split('T')[0],
       status: i.status as FeePaymentStatusType,
+      payments: (i.payments || []).map((p) => ({
+        id: p.id,
+        receiptNumber: p.receiptNumber,
+        amountPaid: p.amountPaid,
+        paymentMethod: p.paymentMethod,
+        transactionRef: p.transactionRef,
+        date: p.paidAt.toISOString().split('T')[0],
+        notes: p.notes,
+        isSimulated: p.isSimulated,
+      })),
       auditTrail: (i.auditTrail as any) || [],
-      createdAt: new Date().toISOString(),
+      createdAt: (i as any).createdAt ? (i as any).createdAt.toISOString() : i.dueDate.toISOString(),
     }));
   }
 

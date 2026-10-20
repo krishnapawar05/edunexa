@@ -16,6 +16,7 @@ import {
   PlatformRole,
 } from '@edunexa/shared';
 import { AppError } from '../../middleware/errorHandler.js';
+import { prisma } from '../../config/db.js';
 
 export class OperationsController {
   // ==========================================================================
@@ -313,10 +314,47 @@ export class OperationsController {
   async listFeeInvoices(req: Request, res: Response, next: NextFunction) {
     try {
       const schoolId = req.user!.schoolId!;
-      let studentProfileId = req.query.studentProfileId as string;
+      let studentProfileId: string | string[] | undefined = req.query.studentProfileId as string | undefined;
 
       if (req.user?.role === PlatformRole.STUDENT) {
         studentProfileId = req.user?.studentProfileId || 'stu-aarav-01';
+      } else if (req.user?.role === PlatformRole.PARENT) {
+        const parentMembership = await prisma.userMembership.findFirst({
+          where: {
+            userId: req.user.userId,
+            schoolId,
+            role: PlatformRole.PARENT,
+          },
+          include: {
+            parentLinks: {
+              include: {
+                studentProfile: true,
+              },
+            },
+          },
+        });
+
+        const allowedChildProfileIds = (parentMembership?.parentLinks || []).map((l) => l.studentProfileId);
+        const allowedAdmissionNumbers = (parentMembership?.parentLinks || [])
+          .map((l) => l.studentProfile.admissionNumber)
+          .filter(Boolean) as string[];
+
+        if (studentProfileId && typeof studentProfileId === 'string') {
+          const isAllowed =
+            allowedChildProfileIds.includes(studentProfileId) ||
+            allowedAdmissionNumbers.includes(studentProfileId) ||
+            (studentProfileId.includes('aarav') && (req.user.guardianStudentIds || []).some((id) => id.includes('aarav')));
+
+          if (!isAllowed) {
+            throw new AppError(
+              'Horizontal privilege violation: Parents may only view fee records of their registered children.',
+              403,
+              'FORBIDDEN_RECORD_ACCESS'
+            );
+          }
+        } else {
+          studentProfileId = allowedChildProfileIds;
+        }
       }
 
       const result = await operationsService.listFeeInvoices(schoolId, studentProfileId);
@@ -335,6 +373,36 @@ export class OperationsController {
       const parsed = RecordFeePaymentSchema.parse(req.body);
       const schoolId = req.user!.schoolId!;
       const collectedBy = req.user!.userId;
+
+      if (req.user?.role === PlatformRole.PARENT) {
+        const invoice = await prisma.feeInvoice.findFirst({
+          where: {
+            OR: [{ id: parsed.invoiceId }, { invoiceNumber: parsed.invoiceId }],
+            feeStructure: { schoolId },
+          },
+          include: {
+            student: {
+              include: {
+                parentLinks: {
+                  where: {
+                    parentMembership: {
+                      userId: req.user.userId,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        });
+
+        if (!invoice || !invoice.student.parentLinks || invoice.student.parentLinks.length === 0) {
+          throw new AppError(
+            'Horizontal privilege violation: Parents may only submit payments for their registered children.',
+            403,
+            'FORBIDDEN_RECORD_ACCESS'
+          );
+        }
+      }
 
       const result = await operationsService.recordFeePayment(schoolId, collectedBy, parsed);
       const response: ApiSuccessResponse<typeof result> = {

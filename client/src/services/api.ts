@@ -363,6 +363,34 @@ export const coreApi = {
       assignedClasses: string[];
       assignedSubjects: string[];
     }>('/api/v1/core/teacher/profile'),
+
+  getParentChildren: () =>
+    apiRequest<
+      Array<{
+        id: string;
+        studentProfileId: string;
+        admissionNumber: string;
+        firstName: string;
+        lastName: string;
+        name: string;
+        email: string;
+        phone: string | null;
+        avatarUrl: string | null;
+        bloodGroup: string | null;
+        status: string;
+        relationship: string;
+        isPrimaryContact: boolean;
+        className: string;
+        sectionName: string;
+        grade: string;
+        classId: string | null;
+        sectionId: string | null;
+        rollNumber: number;
+        academicSession: string;
+        idCardNumber: string | null;
+        idCardStatus: string | null;
+      }>
+    >('/api/v1/core/parent/children'),
 };
 
 // ============================================================================
@@ -610,11 +638,29 @@ export const operationsApi = {
       collectionRatePercentage: number;
     }>('/api/v1/operations/fees/summary'),
 
-  recordFeePayment: (data: { invoiceId: string; amount: number; paymentMethod: string; transactionReference?: string }) =>
-    apiRequest<any>('/api/v1/operations/fees/payments', {
+  recordFeePayment: (data: {
+    invoiceId: string;
+    amount?: number;
+    amountPaid?: number;
+    paymentMethod: string;
+    transactionReference?: string;
+    transactionRef?: string;
+    notes?: string;
+    isSimulated?: boolean;
+  }) => {
+    const payload = {
+      invoiceId: data.invoiceId,
+      amountPaid: data.amountPaid ?? data.amount ?? 0,
+      paymentMethod: data.paymentMethod,
+      transactionRef: data.transactionRef ?? data.transactionReference ?? `TXN-${Date.now()}`,
+      notes: data.notes,
+      isSimulated: data.isSimulated ?? true,
+    };
+    return apiRequest<any>('/api/v1/operations/fees/payments', {
       method: 'POST',
-      body: JSON.stringify(data),
-    }),
+      body: JSON.stringify(payload),
+    });
+  },
 
   applyFeeConcession: (data: { invoiceId: string; concessionAmount: number; reason: string }) =>
     apiRequest<any>('/api/v1/operations/fees/concessions', {

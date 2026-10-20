@@ -147,6 +147,11 @@ export class AuthService {
               school: true,
               studentProfile: true,
               staffProfile: true,
+              parentLinks: {
+                include: {
+                  studentProfile: true,
+                },
+              },
             },
           },
         },
@@ -171,6 +176,16 @@ export class AuthService {
           throw new AppError('The school subscription has been suspended. Please contact platform support.', 403, 'SCHOOL_SUSPENDED');
         }
 
+        const guardianStudentIds: string[] = [];
+        if (primaryMembership?.parentLinks && primaryMembership.parentLinks.length > 0) {
+          for (const pl of primaryMembership.parentLinks) {
+            guardianStudentIds.push(pl.studentProfileId);
+            if (pl.studentProfile?.admissionNumber) {
+              guardianStudentIds.push(pl.studentProfile.admissionNumber);
+            }
+          }
+        }
+
         const tokenPayload: TokenPayload = {
           userId: user.id,
           email: user.email,
@@ -179,6 +194,7 @@ export class AuthService {
           role: primaryMembership?.role || PlatformRole.STUDENT,
           studentProfileId: primaryMembership?.studentProfile?.id,
           staffProfileId: primaryMembership?.staffProfile?.id,
+          guardianStudentIds: guardianStudentIds.length > 0 ? guardianStudentIds : undefined,
         };
 
         const accessToken = generateAccessToken(tokenPayload);
@@ -197,6 +213,7 @@ export class AuthService {
             schoolName: primaryMembership?.school?.name,
             studentProfileId: tokenPayload.studentProfileId,
             staffProfileId: tokenPayload.staffProfileId,
+            guardianStudentIds: tokenPayload.guardianStudentIds,
           },
         };
       }

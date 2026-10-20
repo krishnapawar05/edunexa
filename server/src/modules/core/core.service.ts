@@ -1648,6 +1648,120 @@ export class CoreSchoolService {
       assignedSubjects,
     };
   }
+
+  /**
+   * Get all registered children/wards linked to the authenticated parent/guardian from PostgreSQL
+   */
+  async getParentChildren(schoolIdOrIdentifier: string, userId: string) {
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    const targetSchoolId = school ? school.id : schoolIdOrIdentifier;
+
+    let membership = await prisma.userMembership.findFirst({
+      where: {
+        userId,
+        schoolId: targetSchoolId,
+        role: PlatformRole.PARENT,
+      },
+      include: {
+        parentLinks: {
+          include: {
+            studentProfile: {
+              include: {
+                membership: {
+                  include: {
+                    user: true,
+                  },
+                },
+                enrollments: {
+                  include: {
+                    class: true,
+                    section: true,
+                    academicSession: true,
+                  },
+                  orderBy: { enrolledAt: 'desc' },
+                },
+                virtualIdCard: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!membership) {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        include: {
+          memberships: {
+            where: {
+              role: PlatformRole.PARENT,
+              schoolId: targetSchoolId,
+            },
+            include: {
+              parentLinks: {
+                include: {
+                  studentProfile: {
+                    include: {
+                      membership: {
+                        include: {
+                          user: true,
+                        },
+                      },
+                      enrollments: {
+                        include: {
+                          class: true,
+                          section: true,
+                          academicSession: true,
+                        },
+                        orderBy: { enrolledAt: 'desc' },
+                      },
+                      virtualIdCard: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+      membership = user?.memberships?.[0] as any;
+    }
+
+    if (!membership || !membership.parentLinks || membership.parentLinks.length === 0) {
+      return [];
+    }
+
+    return membership.parentLinks.map((link) => {
+      const student = link.studentProfile;
+      const user = student.membership.user;
+      const primaryEnrollment = student.enrollments[0];
+
+      return {
+        id: student.id,
+        studentProfileId: student.id,
+        admissionNumber: student.admissionNumber,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        name: `${user.firstName} ${user.lastName}`.trim(),
+        email: user.email,
+        phone: user.phone || null,
+        avatarUrl: user.avatarUrl || null,
+        bloodGroup: student.bloodGroup || null,
+        status: student.status,
+        relationship: link.relationship,
+        isPrimaryContact: link.isPrimaryContact,
+        className: primaryEnrollment?.class?.name || 'Grade 10',
+        sectionName: primaryEnrollment?.section?.name || 'A',
+        grade: `${primaryEnrollment?.class?.name || 'Grade 10'} - ${primaryEnrollment?.section?.name || 'A'}`,
+        classId: primaryEnrollment?.classId || null,
+        sectionId: primaryEnrollment?.sectionId || null,
+        rollNumber: primaryEnrollment?.rollNumber || 1,
+        academicSession: primaryEnrollment?.academicSession?.name || '2026-2027',
+        idCardNumber: student.virtualIdCard?.cardNumber || null,
+        idCardStatus: student.virtualIdCard?.status || null,
+      };
+    });
+  }
 }
 
 export const coreSchoolService = new CoreSchoolService();

@@ -7,6 +7,9 @@ import { PlatformRole } from '@edunexa/shared';
 
 describe('STAGE 4: Core School Management Test Suite', () => {
   beforeAll(async () => {
+    await prisma.user.deleteMany({
+      where: { email: { contains: 'krishna.pawar' } },
+    });
     await prisma.admissionApplication.updateMany({
       where: {
         OR: [{ id: 'adm-app-01' }, { applicationNumber: 'APP-2026-0091' }],

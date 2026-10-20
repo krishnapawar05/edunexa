@@ -248,4 +248,13 @@ router.get(
   }
 );
 
+// Parent Registered Children / Wards
+router.get(
+  '/parent/children',
+  requireRole(PlatformRole.PARENT, PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.SUPER_ADMIN),
+  (req, res, next) => {
+    coreSchoolController.getParentChildren(req, res, next);
+  }
+);
+
 export default router;

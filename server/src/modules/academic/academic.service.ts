@@ -280,7 +280,7 @@ export class AcademicService {
         lateDays: 0,
         leaveDays: 0,
         halfDays: 0,
-        attendancePercentage: 100.0,
+        attendancePercentage: 0,
         records: [],
       };
     }
@@ -311,7 +311,7 @@ export class AcademicService {
       }
     }
 
-    const attendancePercentage = totalDays > 0 ? Number(((presentDays / totalDays) * 100).toFixed(1)) : 100.0;
+    const attendancePercentage = totalDays > 0 ? Number(((presentDays / totalDays) * 100).toFixed(1)) : 0;
 
     return {
       studentProfileId,
@@ -1629,7 +1629,7 @@ export class AcademicService {
   async getStudentReportCard(
     schoolIdOrIdentifier: string,
     studentProfileId: string,
-    caller: { userId: string; role: string }
+    caller: { userId: string; role: string; guardianStudentIds?: string[] }
   ): Promise<StudentReportCard> {
     const school = await resolveSchool(schoolIdOrIdentifier);
     const targetSchoolId = school ? school.id : schoolIdOrIdentifier;
@@ -1658,7 +1658,13 @@ export class AcademicService {
           })
         : null;
 
-      if (!parentLink && caller.userId !== 'usr-parent-01') {
+      const isAuthorizedInToken =
+        caller.guardianStudentIds &&
+        (caller.guardianStudentIds.includes(student.id) ||
+         caller.guardianStudentIds.includes(student.admissionNumber) ||
+         caller.guardianStudentIds.includes(studentProfileId));
+
+      if (!parentLink && !isAuthorizedInToken && caller.userId !== 'usr-parent-01') {
         throw new AppError(
           `Unauthorized access. You do not have registered parental authority over student '${studentProfileId}'.`,
           403,
