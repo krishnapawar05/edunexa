@@ -54,10 +54,28 @@ export const StudentTimetablePage: React.FC = () => {
   const className = student?.className || student?.enrollments?.[0]?.class?.name || 'Grade 10';
   const sectionName = student?.sectionName || student?.enrollments?.[0]?.section?.name || 'A';
 
+  const DAY_INDEX_MAP: Record<number, string> = {
+    1: 'MONDAY',
+    2: 'TUESDAY',
+    3: 'WEDNESDAY',
+    4: 'THURSDAY',
+    5: 'FRIDAY',
+    6: 'SATURDAY',
+    7: 'SUNDAY',
+  };
+
+  const resolveSlotDay = (slot: any): string => {
+    if (typeof slot?.dayOfWeek === 'number') return DAY_INDEX_MAP[slot.dayOfWeek] || 'MONDAY';
+    if (typeof slot?.dayOfWeek === 'string') return slot.dayOfWeek.toUpperCase();
+    if (typeof slot?.day === 'string') return slot.day.toUpperCase();
+    if (typeof slot?.day === 'number') return DAY_INDEX_MAP[slot.day] || 'MONDAY';
+    return '';
+  };
+
   // Filter slots for the selected day and sort by periodNumber or startTime
   const daySlots = timetable
     .filter((slot) => {
-      const slotDay = (slot.dayOfWeek || slot.day || '').toUpperCase();
+      const slotDay = resolveSlotDay(slot);
       return slotDay === selectedDay;
     })
     .sort((a, b) => (a.periodNumber || 0) - (b.periodNumber || 0) || (a.startTime || '').localeCompare(b.startTime || ''));
@@ -137,7 +155,7 @@ export const StudentTimetablePage: React.FC = () => {
         {DAYS_OF_WEEK.map((day) => {
           const isSelected = selectedDay === day;
           const count = timetable.filter(
-            (t) => (t.dayOfWeek || t.day || '').toUpperCase() === day
+            (t) => resolveSlotDay(t) === day
           ).length;
 
           return (

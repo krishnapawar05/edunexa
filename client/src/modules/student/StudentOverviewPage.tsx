@@ -99,10 +99,28 @@ export const StudentOverviewPage: React.FC = () => {
   const outstandingFee = pendingInvoices.reduce((sum, inv) => sum + ((inv.amountDue || 0) - (inv.amountPaid || 0)), 0);
 
   // Current day timetable filter
+  const DAY_INDEX_MAP: Record<number, string> = {
+    1: 'MONDAY',
+    2: 'TUESDAY',
+    3: 'WEDNESDAY',
+    4: 'THURSDAY',
+    5: 'FRIDAY',
+    6: 'SATURDAY',
+    7: 'SUNDAY',
+  };
+
+  const resolveSlotDay = (t: any): string => {
+    if (typeof t?.dayOfWeek === 'number') return DAY_INDEX_MAP[t.dayOfWeek] || 'MONDAY';
+    if (typeof t?.dayOfWeek === 'string') return t.dayOfWeek.toUpperCase();
+    if (typeof t?.day === 'string') return t.day.toUpperCase();
+    if (typeof t?.day === 'number') return DAY_INDEX_MAP[t.day] || 'MONDAY';
+    return '';
+  };
+
   const days = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
   const todayDay = days[new Date().getDay()];
   const todayClasses = timetable.filter(
-    (t) => t.dayOfWeek?.toUpperCase() === todayDay || t.day?.toUpperCase() === todayDay
+    (t) => resolveSlotDay(t) === todayDay
   );
 
   return (
