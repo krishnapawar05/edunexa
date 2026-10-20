@@ -141,6 +141,8 @@ export const DailyAttendancePage: React.FC = () => {
       }));
 
       await academicApi.recordStudentAttendance({
+        className: selectedClass,
+        sectionName: selectedSection,
         date: selectedDate,
         records,
       });

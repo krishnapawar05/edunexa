@@ -31,6 +31,7 @@ export const TeacherAttendancePage: React.FC = () => {
 
   const [assignedClasses, setAssignedClasses] = useState<string[]>([]);
   const [assignedSections, setAssignedSections] = useState<string[]>([]);
+  const [isRecorded, setIsRecorded] = useState<boolean>(false);
 
   const [loading, setLoading] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
@@ -63,42 +64,29 @@ export const TeacherAttendancePage: React.FC = () => {
       setErrorMsg(null);
       setSuccessMsg(null);
 
-      // Load real students from PostgreSQL
-      const studentRes = await coreApi.listStudents({ className: selectedClass, limit: 50 });
-      const students = studentRes?.items || [];
+      // Fetch verified attendance roster directly from PostgreSQL
+      const data = await academicApi.getAttendanceRoster({
+        className: selectedClass,
+        sectionName: selectedSection,
+        date: selectedDate,
+      });
 
-      // Attempt to load existing daily class report if already recorded
-      let existingRecords: Record<string, any> = {};
-      try {
-        const report = await academicApi.getClassAttendanceReport({
-          className: selectedClass,
-          sectionName: selectedSection,
-          date: selectedDate,
-        });
-        if (report && report.records) {
-          report.records.forEach((r: any) => {
-            existingRecords[r.studentProfileId] = r;
-          });
-        }
-      } catch (e) {
-        // No prior records for this date
-      }
+      setIsRecorded(Boolean(data?.isRecorded));
+      const items = data?.roster || [];
 
       setRoster(
-        students.map((s: any) => {
-          const prior = existingRecords[s.id];
-          return {
-            studentProfileId: s.id,
-            studentName: `${s.firstName} ${s.lastName}`,
-            admissionNumber: s.admissionNumber || 'ADM-2026',
-            rollNumber: s.rollNumber || '—',
-            status: prior ? prior.status : 'PRESENT',
-            remarks: prior?.remarks || '',
-          };
-        })
+        items.map((s: any) => ({
+          studentProfileId: s.studentProfileId,
+          studentName: s.studentName,
+          admissionNumber: s.admissionNumber || 'ADM-2026',
+          rollNumber: s.rollNumber || '—',
+          status: s.status || 'PRESENT',
+          remarks: s.remarks || '',
+        }))
       );
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to load class roster from PostgreSQL.');
+      setRoster([]);
     } finally {
       setLoading(false);
     }
@@ -126,6 +114,8 @@ export const TeacherAttendancePage: React.FC = () => {
       setSuccessMsg(null);
 
       await academicApi.recordStudentAttendance({
+        className: selectedClass,
+        sectionName: selectedSection,
         records: roster.map((r) => ({
           studentProfileId: r.studentProfileId,
           status: r.status,
@@ -134,7 +124,9 @@ export const TeacherAttendancePage: React.FC = () => {
         date: selectedDate,
       });
 
+      setIsRecorded(true);
       setSuccessMsg(`Attendance successfully committed to PostgreSQL for ${selectedClass}-${selectedSection} on ${selectedDate}.`);
+      await loadRosterAndAttendance();
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to persist attendance records to database.');
     } finally {
@@ -146,7 +138,9 @@ export const TeacherAttendancePage: React.FC = () => {
   const absentCount = roster.filter((r) => r.status === 'ABSENT').length;
   const lateCount = roster.filter((r) => r.status === 'LATE').length;
   const leaveCount = roster.filter((r) => r.status === 'APPROVED_LEAVE').length;
-  const attendanceRate = roster.length > 0 ? ((presentCount / roster.length) * 100).toFixed(1) : '100.0';
+  const attendanceRate = !isRecorded
+    ? (roster.length > 0 ? 'Not recorded' : 'N/A')
+    : (roster.length > 0 ? ((presentCount / roster.length) * 100).toFixed(1) : 'N/A');
 
   const filteredRoster = roster.filter(
     (s) =>
@@ -304,7 +298,7 @@ export const TeacherAttendancePage: React.FC = () => {
         <div className="ed-metric-tile">
           <span className="label">Present Count</span>
           <span className="value" style={{ color: 'var(--success-solid)' }}>{presentCount}</span>
-          <span className="subtitle">In Attendance</span>
+          <span className="subtitle">{!isRecorded ? (roster.length > 0 ? 'Draft count' : 'None') : 'In Attendance'}</span>
         </div>
 
         <div className="ed-metric-tile">
@@ -317,10 +311,10 @@ export const TeacherAttendancePage: React.FC = () => {
 
         <div className="ed-metric-tile">
           <span className="label">Attendance Rate</span>
-          <span className="value" style={{ color: Number(attendanceRate) >= 75 ? 'var(--success-solid)' : 'var(--warning-solid)' }}>
-            {attendanceRate}%
+          <span className="value" style={{ color: !isRecorded ? 'var(--text-muted)' : Number(attendanceRate) >= 75 ? 'var(--success-solid)' : 'var(--warning-solid)' }}>
+            {!isRecorded ? (roster.length > 0 ? 'Not recorded' : 'N/A') : `${attendanceRate}%`}
           </span>
-          <span className="subtitle">CBSE Target: &gt;75%</span>
+          <span className="subtitle">{!isRecorded ? (roster.length > 0 ? 'Pending session commit' : 'No students enrolled') : 'CBSE Target: >75%'}</span>
         </div>
       </div>
 
@@ -444,6 +438,24 @@ export const TeacherAttendancePage: React.FC = () => {
                 </tbody>
               </table>
             </div>
+          ) : errorMsg ? (
+            <div style={{ padding: 'var(--space-8)', textAlign: 'center', color: '#dc2626' }}>
+              <AlertTriangle size={40} style={{ opacity: 0.8, margin: '0 auto var(--space-3)' }} />
+              <h3 style={{ fontSize: '1.1rem', margin: '0 0 6px 0', color: '#dc2626' }}>
+                Failed to Load Class Roster
+              </h3>
+              <p style={{ margin: '0 0 var(--space-4) 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                {errorMsg}
+              </p>
+              <button
+                type="button"
+                className="ed-btn ed-btn-sm ed-btn-secondary"
+                onClick={loadRosterAndAttendance}
+                disabled={loading}
+              >
+                <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Retry
+              </button>
+            </div>
           ) : (
             <div style={{ padding: 'var(--space-8)', textAlign: 'center', color: 'var(--text-muted)' }}>
               <FileCheck size={40} style={{ opacity: 0.4, margin: '0 auto var(--space-3)' }} />
@@ -451,7 +463,7 @@ export const TeacherAttendancePage: React.FC = () => {
                 No Students Found
               </h3>
               <p style={{ margin: 0, fontSize: '0.85rem' }}>
-                No active student records found for {selectedClass}-{selectedSection}.
+                No active student enrollments found in the database for {selectedClass} - {selectedSection}.
               </p>
             </div>
           )}

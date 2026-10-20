@@ -50,10 +50,11 @@ export class CoreSchoolController {
 
   async listStudents(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { query, className, page, limit } = req.query;
+      const { query, className, sectionName, page, limit } = req.query;
       const result = await coreSchoolService.listStudents(req.schoolId!, {
         query: query as string,
         className: className as string,
+        sectionName: sectionName as string,
         page: page ? parseInt(page as string, 10) : 1,
         limit: limit ? parseInt(limit as string, 10) : 10,
       });

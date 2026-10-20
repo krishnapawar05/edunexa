@@ -119,10 +119,14 @@ export class AcademicService {
       throw new AppError('Tenant school not found.', 404, 'SCHOOL_NOT_FOUND');
     }
 
-    // Resolve class & section in school tenant
+    const normalizedSection = data.sectionName.replace(/^section\s+/i, '').trim();
     let section = await prisma.section.findFirst({
       where: {
-        name: { equals: data.sectionName, mode: 'insensitive' },
+        OR: [
+          { name: { equals: data.sectionName, mode: 'insensitive' } },
+          { name: { equals: normalizedSection, mode: 'insensitive' } },
+          { name: { equals: `Section ${normalizedSection}`, mode: 'insensitive' } },
+        ],
         class: {
           name: { equals: data.className, mode: 'insensitive' },
           schoolId: school.id,
@@ -348,9 +352,14 @@ export class AcademicService {
       };
     }
 
+    const normalizedSection = sectionName.replace(/^section\s+/i, '').trim();
     const section = await prisma.section.findFirst({
       where: {
-        name: { equals: sectionName, mode: 'insensitive' },
+        OR: [
+          { name: { equals: sectionName, mode: 'insensitive' } },
+          { name: { equals: normalizedSection, mode: 'insensitive' } },
+          { name: { equals: `Section ${normalizedSection}`, mode: 'insensitive' } },
+        ],
         class: {
           name: { equals: className, mode: 'insensitive' },
           schoolId: school.id,
@@ -408,6 +417,151 @@ export class AcademicService {
         remarks: r.remarks,
         date,
       })),
+    };
+  }
+
+  /**
+   * Get Section Attendance Roster for a specific date, merging enrolled students with any recorded attendance
+   */
+  async getAttendanceRoster(
+    schoolIdOrIdentifier: string,
+    user: { id: string; role: string; schoolId?: string },
+    className: string,
+    sectionName: string,
+    dateStr: string
+  ) {
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    if (!school) {
+      throw new AppError('Tenant school not found.', 404, 'SCHOOL_NOT_FOUND');
+    }
+
+    const normalizedSection = sectionName.replace(/^section\s+/i, '').trim();
+    const section = await prisma.section.findFirst({
+      where: {
+        OR: [
+          { name: { equals: sectionName, mode: 'insensitive' } },
+          { name: { equals: normalizedSection, mode: 'insensitive' } },
+          { name: { equals: `Section ${normalizedSection}`, mode: 'insensitive' } },
+        ],
+        class: {
+          name: { equals: className, mode: 'insensitive' },
+          schoolId: school.id,
+        },
+      },
+      include: {
+        class: true,
+      },
+    });
+
+    if (!section) {
+      throw new AppError(`Class '${className}' section '${sectionName}' not found.`, 404, 'SECTION_NOT_FOUND');
+    }
+
+    // Role-based authorization: If TEACHER, verify assignment
+    if (user.role === PlatformRole.TEACHER) {
+      const assignment = await prisma.teacherAssignment.findFirst({
+        where: {
+          staff: {
+            membership: {
+              userId: user.id,
+              schoolId: school.id,
+            },
+          },
+          subject: {
+            classId: section.classId,
+          },
+        },
+      });
+
+      if (!assignment) {
+        const staff = await prisma.staffProfile.findFirst({
+          where: {
+            membership: {
+              userId: user.id,
+              schoolId: school.id,
+            },
+          },
+        });
+        if (!staff) {
+          throw new AppError('Teacher profile not found for this school.', 403, 'FORBIDDEN_TEACHER');
+        }
+      }
+    }
+
+    const attendanceDate = new Date(dateStr);
+
+    // Fetch enrolled students
+    const enrollments = await prisma.studentEnrollment.findMany({
+      where: {
+        classId: section.classId,
+        sectionId: section.id,
+        student: {
+          status: 'ACTIVE',
+          membership: { schoolId: school.id },
+        },
+      },
+      include: {
+        student: {
+          include: {
+            membership: {
+              include: { user: true },
+            },
+          },
+        },
+      },
+      orderBy: [
+        { rollNumber: 'asc' },
+        { student: { admissionNumber: 'asc' } },
+      ],
+    });
+
+    // Fetch existing attendance records for this section and date
+    const existingRecords = await prisma.attendanceRecord.findMany({
+      where: {
+        sectionId: section.id,
+        date: attendanceDate,
+      },
+    });
+    const recordMap = new Map(existingRecords.map((r) => [r.studentProfileId, r]));
+
+    const roster = enrollments.map((e) => {
+      const sp = e.student;
+      const existing = recordMap.get(sp.id);
+      return {
+        studentProfileId: sp.id,
+        studentName: `${sp.membership.user.firstName} ${sp.membership.user.lastName}`.trim(),
+        admissionNumber: sp.admissionNumber,
+        rollNumber: e.rollNumber !== null ? String(e.rollNumber) : '—',
+        status: existing ? (existing.status as 'PRESENT' | 'ABSENT' | 'LATE' | 'APPROVED_LEAVE') : null,
+        remarks: existing?.remarks || '',
+        recordId: existing?.id || null,
+      };
+    });
+
+    const totalEnrolled = enrollments.length;
+    const recordedCount = existingRecords.length;
+    const isRecorded = recordedCount > 0;
+    const presentCount = existingRecords.filter((r) => r.status === 'PRESENT' || r.status === 'LATE').length;
+    const absentCount = existingRecords.filter((r) => r.status === 'ABSENT').length;
+    const lateCount = existingRecords.filter((r) => r.status === 'LATE').length;
+    const leaveCount = existingRecords.filter((r) => r.status === 'APPROVED_LEAVE').length;
+    const attendanceRate = isRecorded && totalEnrolled > 0
+      ? Number(((presentCount / totalEnrolled) * 100).toFixed(1))
+      : null;
+
+    return {
+      className: section.class.name,
+      sectionName: section.name,
+      date: dateStr,
+      totalEnrolled,
+      recordedCount,
+      isRecorded,
+      presentCount,
+      absentCount,
+      lateCount,
+      leaveCount,
+      attendanceRate,
+      roster,
     };
   }
 

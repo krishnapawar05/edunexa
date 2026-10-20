@@ -272,7 +272,7 @@ export class CoreSchoolService {
    */
   async listStudents(
     schoolIdOrIdentifier: string,
-    params: { query?: string; className?: string; page?: number; limit?: number }
+    params: { query?: string; className?: string; sectionName?: string; page?: number; limit?: number }
   ) {
     const school = await resolveSchool(schoolIdOrIdentifier);
     const targetSchoolId = school ? school.id : schoolIdOrIdentifier;
@@ -284,13 +284,21 @@ export class CoreSchoolService {
       membership: { schoolId: targetSchoolId },
     };
 
+    const enrollmentFilter: any = {};
     if (params.className && params.className !== 'ALL') {
+      enrollmentFilter.class = {
+        name: { equals: params.className, mode: 'insensitive' },
+      };
+    }
+    if (params.sectionName && params.sectionName !== 'ALL') {
+      enrollmentFilter.section = {
+        name: { equals: params.sectionName, mode: 'insensitive' },
+      };
+    }
+
+    if (Object.keys(enrollmentFilter).length > 0) {
       whereClause.enrollments = {
-        some: {
-          class: {
-            name: { equals: params.className, mode: 'insensitive' },
-          },
-        },
+        some: enrollmentFilter,
       };
     }
 

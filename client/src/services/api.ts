@@ -226,13 +226,21 @@ export const coreApi = {
       body: JSON.stringify(data),
     }),
 
-  listStudents: (params: { className?: string; query?: string; page?: number; limit?: number } = {}) => {
+  listStudents: async (params: { className?: string; sectionName?: string; query?: string; page?: number; limit?: number } = {}) => {
     const query = new URLSearchParams();
     if (params.className) query.set('className', params.className);
+    if (params.sectionName) query.set('sectionName', params.sectionName);
     if (params.query) query.set('query', params.query);
     if (params.page) query.set('page', String(params.page));
     if (params.limit) query.set('limit', String(params.limit));
-    return apiRequest<{ items: any[]; meta: any }>(`/api/v1/core/students?${query.toString()}`);
+    const data = await apiRequest<any>(`/api/v1/core/students?${query.toString()}`);
+    if (Array.isArray(data)) {
+      const result: any = [...data];
+      result.items = data;
+      result.meta = { total: data.length, page: 1, limit: data.length };
+      return result as any[] & { items: any[]; meta: any };
+    }
+    return data;
   },
 
   getStudentById: (studentId: string) =>
@@ -362,11 +370,44 @@ export const coreApi = {
 // ============================================================================
 
 export const academicApi = {
-  recordStudentAttendance: (payload: { records: Array<{ studentProfileId: string; status: string; remarks?: string }>; date?: string; sectionId?: string }) =>
+  recordStudentAttendance: (payload: { className?: string; sectionName?: string; records: Array<{ studentProfileId: string; status: string; remarks?: string }>; date: string }) =>
     apiRequest<any>('/api/v1/academic/attendance/students', {
       method: 'POST',
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        className: payload.className || 'Grade 10',
+        sectionName: payload.sectionName || 'A',
+        ...payload,
+      }),
     }),
+
+  getAttendanceRoster: (params: { className: string; sectionName: string; date?: string }) => {
+    const query = new URLSearchParams();
+    query.set('className', params.className);
+    query.set('sectionName', params.sectionName);
+    if (params.date) query.set('date', params.date);
+    return apiRequest<{
+      className: string;
+      sectionName: string;
+      date: string;
+      totalEnrolled: number;
+      recordedCount: number;
+      isRecorded: boolean;
+      presentCount: number;
+      absentCount: number;
+      lateCount: number;
+      leaveCount: number;
+      attendanceRate: number | null;
+      roster: Array<{
+        studentProfileId: string;
+        studentName: string;
+        admissionNumber: string;
+        rollNumber: string;
+        status: 'PRESENT' | 'ABSENT' | 'LATE' | 'APPROVED_LEAVE' | null;
+        remarks?: string;
+        recordId?: string | null;
+      }>;
+    }>(`/api/v1/academic/attendance/roster?${query.toString()}`);
+  },
 
   correctStudentAttendance: (recordId: string, status: string, reason: string) =>
     apiRequest<any>('/api/v1/academic/attendance/students/correct', {

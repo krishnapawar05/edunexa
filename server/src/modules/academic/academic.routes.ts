@@ -40,6 +40,13 @@ router.get(
   academicController.getClassAttendanceReport
 );
 
+// Get section attendance roster for marking and monitoring (Teacher, School Admin, Principal, Super Admin)
+router.get(
+  '/attendance/roster',
+  requireRole(PlatformRole.TEACHER, PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.SUPER_ADMIN),
+  academicController.getAttendanceRoster
+);
+
 // Staff Attendance & Leaves
 router.post(
   '/attendance/staff',

@@ -95,6 +95,35 @@ export class AcademicController {
     }
   }
 
+  async getAttendanceRoster(req: Request, res: Response, next: NextFunction) {
+    try {
+      const schoolId = req.user!.schoolId!;
+      const className = req.query.className as string;
+      const sectionName = req.query.sectionName as string;
+      const date = (req.query.date as string) || new Date().toISOString().split('T')[0];
+
+      if (!className || !sectionName) {
+        throw new AppError('className and sectionName are required query parameters.', 400, 'BAD_REQUEST');
+      }
+
+      const result = await academicService.getAttendanceRoster(
+        schoolId,
+        { id: req.user!.userId, role: req.user!.role, schoolId },
+        className,
+        sectionName,
+        date
+      );
+
+      const response: ApiSuccessResponse<typeof result> = {
+        success: true,
+        data: result,
+      };
+      res.status(200).json(response);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async recordStaffAttendance(req: Request, res: Response, next: NextFunction) {
     try {
       const parsed = MarkStaffAttendanceSchema.parse(req.body);
