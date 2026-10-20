@@ -598,6 +598,29 @@ export async function askSchoolAssistantApi(
   }
 }
 
+export async function askConceptTutorApi(
+  payload: { topic: string; question: string; subject?: string; gradeLevel?: string },
+  token: string = ''
+) {
+  try {
+    const authToken = token || getStoredAuthToken();
+    const res = await fetch(getApiUrl('/api/v1/ai/tutor/ask'), {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${authToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+    return await res.json();
+  } catch (err: any) {
+    return {
+      success: false,
+      error: { code: 'NETWORK_ERROR', message: err.message || 'Connection failed' },
+    };
+  }
+}
+
 export async function generateQuizDraftApi(payload: any, token: string = '') {
   try {
     const authToken = token || getStoredAuthToken();

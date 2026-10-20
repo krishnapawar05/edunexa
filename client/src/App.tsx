@@ -43,7 +43,17 @@ import { DailyAttendancePage } from './modules/schooladmin/DailyAttendancePage.j
 import { FeesInvoicesPage } from './modules/schooladmin/FeesInvoicesPage.js';
 import { EventsNoticesPage } from './modules/schooladmin/EventsNoticesPage.js';
 import { TeacherDashboard } from './modules/teacher/TeacherDashboard.js';
-import { StudentDashboard } from './modules/student/StudentDashboard.js';
+import { StudentOverviewPage } from './modules/student/StudentOverviewPage.js';
+import { StudentVirtualIdCardPage } from './modules/student/StudentVirtualIdCardPage.js';
+import { StudentAssessmentsPage } from './modules/student/StudentAssessmentsPage.js';
+import { StudentResultsPage } from './modules/student/StudentResultsPage.js';
+import { StudentTimetablePage } from './modules/student/StudentTimetablePage.js';
+import { StudentHomeworkPage } from './modules/student/StudentHomeworkPage.js';
+import { StudentAttendancePage } from './modules/student/StudentAttendancePage.js';
+import { StudentResourcesPage } from './modules/student/StudentResourcesPage.js';
+import { StudentFeesPage } from './modules/student/StudentFeesPage.js';
+import { StudentNoticesPage } from './modules/student/StudentNoticesPage.js';
+import { StudentAiTutorPage } from './modules/student/StudentAiTutorPage.js';
 import { ParentDashboard } from './modules/parent/ParentDashboard.js';
 import { ExaminationWorkflow } from './modules/examinations/ExaminationWorkflow.js';
 import { HrStaffDashboard } from './modules/hr/HrStaffDashboard.js';
@@ -146,11 +156,18 @@ export const App: React.FC = () => {
             </ProtectedRoute>
           }
         >
-          <Route path="/student" element={<StudentDashboard />} />
-          <Route path="/student/id-card" element={<StudentDashboard />} />
-          <Route path="/student/quizzes" element={<StudentDashboard />} />
-          <Route path="/student/results" element={<StudentDashboard />} />
-          <Route path="/student/ai-tutor" element={<StudentDashboard />} />
+          <Route path="/student" element={<StudentOverviewPage />} />
+          <Route path="/student/id-card" element={<StudentVirtualIdCardPage />} />
+          <Route path="/student/assessments" element={<StudentAssessmentsPage />} />
+          <Route path="/student/quizzes" element={<Navigate to="/student/assessments" replace />} />
+          <Route path="/student/results" element={<StudentResultsPage />} />
+          <Route path="/student/timetable" element={<StudentTimetablePage />} />
+          <Route path="/student/homework" element={<StudentHomeworkPage />} />
+          <Route path="/student/attendance" element={<StudentAttendancePage />} />
+          <Route path="/student/resources" element={<StudentResourcesPage />} />
+          <Route path="/student/fees" element={<StudentFeesPage />} />
+          <Route path="/student/notices" element={<StudentNoticesPage />} />
+          <Route path="/student/ai-tutor" element={<StudentAiTutorPage />} />
         </Route>
 
         {/* Parent / Guardian Workspace */}

@@ -3,6 +3,7 @@ import {
   SchoolInfoQuerySchema,
   GenerateQuizDraftSchema,
   ReviewAiQuizDraftSchema,
+  ConceptTutorQuerySchema,
   ApiSuccessResponse,
 } from '@edunexa/shared';
 import { aiService } from './ai.service.js';
@@ -34,6 +35,27 @@ export class AiController {
     const userId = user?.id || 'anonymous-user';
 
     const result = await aiService.askSchoolAssistant(userId, schoolId, validated);
+
+    const response: ApiSuccessResponse<typeof result> = {
+      success: true,
+      data: result,
+      meta: { timestamp: new Date().toISOString() },
+    };
+    res.status(200).json(response);
+  }
+
+  /**
+   * POST /api/v1/ai/tutor/ask
+   * FEATURE 3: Student AI Concept Tutor (Pedagogical concept support & practice)
+   */
+  public async askConceptTutor(req: Request, res: Response): Promise<void> {
+    const user = (req as any).user;
+    const validated = ConceptTutorQuerySchema.parse(req.body);
+
+    const schoolId = user?.schoolId || 'school-apex-01';
+    const userId = user?.id || 'anonymous-user';
+
+    const result = await aiService.askConceptTutor(userId, schoolId, validated);
 
     const response: ApiSuccessResponse<typeof result> = {
       success: true,

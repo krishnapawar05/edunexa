@@ -92,7 +92,7 @@ router.get('/fees/invoices', operationsController.listFeeInvoices);
 
 router.post(
   '/fees/payments',
-  requireRole(PlatformRole.ACCOUNTS, PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.SUPER_ADMIN, PlatformRole.PARENT),
+  requireRole(PlatformRole.ACCOUNTS, PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.SUPER_ADMIN, PlatformRole.PARENT, PlatformRole.STUDENT),
   operationsController.recordFeePayment
 );
 

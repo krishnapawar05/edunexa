@@ -30,6 +30,17 @@ router.post(
 );
 
 /**
+ * FEATURE 3: Student AI Concept Tutor
+ * POST /api/v1/ai/tutor/ask
+ * Accessible to Students, Teachers, Parents, and Admins
+ */
+router.post(
+  '/tutor/ask',
+  authenticateUser,
+  asyncHandler(aiController.askConceptTutor)
+);
+
+/**
  * FEATURE 2: AI-Assisted Quiz Generation
  * POST /api/v1/ai/quiz/generate
  * Accessible only to Teachers and Academic Coordinators

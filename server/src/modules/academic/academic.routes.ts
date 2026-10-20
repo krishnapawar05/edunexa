@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { academicController } from './academic.controller.js';
-import { authenticateUser, requireRole } from '../../middleware/auth.middleware.js';
+import { authenticateUser, requireRole, enforceStudentIsolation } from '../../middleware/auth.middleware.js';
 import { PlatformRole } from '@edunexa/shared';
 
 const router = Router();
@@ -29,6 +29,7 @@ router.patch(
 // Get student attendance summary (Student, Parent, Teacher, School Admin, Principal)
 router.get(
   '/attendance/students/:studentProfileId/summary',
+  enforceStudentIsolation,
   academicController.getStudentAttendanceSummary
 );
 
@@ -133,6 +134,7 @@ router.patch(
 // Get comprehensive student report card (Student, Parent, Teacher, School Admin)
 router.get(
   '/report-cards/:studentProfileId',
+  enforceStudentIsolation,
   academicController.getStudentReportCard
 );
 

@@ -6,6 +6,7 @@ import {
   Users,
   GraduationCap,
   CalendarCheck,
+  Calendar,
   FileQuestion,
   Award,
   CreditCard,
@@ -107,8 +108,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
         return [
           { id: 'overview', path: '/student', label: 'Student Dashboard', icon: LayoutDashboard },
           { id: 'id-card', path: '/student/id-card', label: 'My Virtual ID Card', icon: IdCard },
-          { id: 'quizzes', path: '/student/quizzes', label: 'Assessments & Quizzes', icon: FileQuestion },
+          { id: 'assessments', path: '/student/assessments', label: 'Assessments & Quizzes', icon: FileQuestion },
           { id: 'results', path: '/student/results', label: 'Academic Results', icon: Award },
+          { id: 'timetable', path: '/student/timetable', label: 'Class Timetable', icon: Calendar },
+          { id: 'homework', path: '/student/homework', label: 'Homework & Tasks', icon: BookOpen },
+          { id: 'attendance', path: '/student/attendance', label: 'Attendance Record', icon: CalendarCheck },
+          { id: 'resources', path: '/student/resources', label: 'Learning Resources', icon: Layers },
+          { id: 'fees', path: '/student/fees', label: 'Fee Invoices & Ledger', icon: CreditCard },
+          { id: 'notices', path: '/student/notices', label: 'Notices & Events', icon: Bell },
           { id: 'ai-tutor', path: '/student/ai-tutor', label: 'AI Learning Assistant', icon: Sparkles },
         ];
       case 'PARENT':

@@ -13,6 +13,7 @@ import {
   ApplyFeeConcessionSchema,
   RecordFeeRefundSchema,
   ApiSuccessResponse,
+  PlatformRole,
 } from '@edunexa/shared';
 import { AppError } from '../../middleware/errorHandler.js';
 
@@ -312,7 +313,11 @@ export class OperationsController {
   async listFeeInvoices(req: Request, res: Response, next: NextFunction) {
     try {
       const schoolId = req.user!.schoolId!;
-      const studentProfileId = req.query.studentProfileId as string;
+      let studentProfileId = req.query.studentProfileId as string;
+
+      if (req.user?.role === PlatformRole.STUDENT) {
+        studentProfileId = req.user?.studentProfileId || 'stu-aarav-01';
+      }
 
       const result = await operationsService.listFeeInvoices(schoolId, studentProfileId);
       const response: ApiSuccessResponse<typeof result> = {

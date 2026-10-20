@@ -735,5 +735,26 @@ export interface AiQuizDraftResponse {
   model: string;
 }
 
+export const ConceptTutorQuerySchema = z.object({
+  topic: z.string().min(2, 'Topic must be at least 2 characters').max(200),
+  question: z.string().min(3, 'Question must be at least 3 characters').max(1000),
+  subject: z.string().optional().default('General Science'),
+  gradeLevel: z.string().optional().default('Grade 10'),
+});
+
+export type ConceptTutorQueryDTO = z.infer<typeof ConceptTutorQuerySchema>;
+
+export interface ConceptTutorAnswerResponse {
+  topic: string;
+  question: string;
+  explanation: string;
+  stepByStepGuidance: string[];
+  practiceQuestions: Array<{ question: string; hint: string }>;
+  revisionTips: string[];
+  disclaimer: string;
+  model: string;
+  isAiGenerated: boolean;
+}
+
 
 
