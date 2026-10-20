@@ -43,6 +43,15 @@ import { DailyAttendancePage } from './modules/schooladmin/DailyAttendancePage.j
 import { FeesInvoicesPage } from './modules/schooladmin/FeesInvoicesPage.js';
 import { EventsNoticesPage } from './modules/schooladmin/EventsNoticesPage.js';
 import { TeacherDashboard } from './modules/teacher/TeacherDashboard.js';
+import { TeacherSchedulePage } from './modules/teacher/TeacherSchedulePage.js';
+import { TeacherAttendancePage } from './modules/teacher/TeacherAttendancePage.js';
+import { TeacherQuizzesPage } from './modules/teacher/TeacherQuizzesPage.js';
+import { TeacherExamMarksPage } from './modules/teacher/TeacherExamMarksPage.js';
+import { TeacherResourcesPage } from './modules/teacher/TeacherResourcesPage.js';
+import { TeacherHomeworkPage } from './modules/teacher/TeacherHomeworkPage.js';
+import { TeacherTimetablePage } from './modules/teacher/TeacherTimetablePage.js';
+import { TeacherClassesPage } from './modules/teacher/TeacherClassesPage.js';
+import { TeacherNoticesPage } from './modules/teacher/TeacherNoticesPage.js';
 import { StudentOverviewPage } from './modules/student/StudentOverviewPage.js';
 import { StudentVirtualIdCardPage } from './modules/student/StudentVirtualIdCardPage.js';
 import { StudentAssessmentsPage } from './modules/student/StudentAssessmentsPage.js';
@@ -141,11 +150,16 @@ export const App: React.FC = () => {
             </ProtectedRoute>
           }
         >
-          <Route path="/teacher" element={<TeacherDashboard />} />
-          <Route path="/teacher/attendance" element={<TeacherDashboard />} />
-          <Route path="/teacher/quizzes" element={<TeacherDashboard />} />
-          <Route path="/teacher/examinations" element={<TeacherDashboard />} />
-          <Route path="/teacher/resources" element={<TeacherDashboard />} />
+          <Route path="/teacher" element={<TeacherSchedulePage />} />
+          <Route path="/teacher/attendance" element={<TeacherAttendancePage />} />
+          <Route path="/teacher/quizzes" element={<TeacherQuizzesPage />} />
+          <Route path="/teacher/exams/marks" element={<TeacherExamMarksPage />} />
+          <Route path="/teacher/examinations" element={<Navigate to="/teacher/exams/marks" replace />} />
+          <Route path="/teacher/resources" element={<TeacherResourcesPage />} />
+          <Route path="/teacher/homework" element={<TeacherHomeworkPage />} />
+          <Route path="/teacher/timetable" element={<TeacherTimetablePage />} />
+          <Route path="/teacher/classes" element={<TeacherClassesPage />} />
+          <Route path="/teacher/notices" element={<TeacherNoticesPage />} />
         </Route>
 
         {/* Student Workspace */}

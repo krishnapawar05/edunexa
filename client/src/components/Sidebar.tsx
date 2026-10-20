@@ -101,8 +101,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
           { id: 'overview', path: '/teacher', label: 'Teacher Schedule', icon: LayoutDashboard },
           { id: 'attendance', path: '/teacher/attendance', label: 'Mark Attendance', icon: CalendarCheck },
           { id: 'quizzes', path: '/teacher/quizzes', label: 'Online Quizzes', icon: FileQuestion },
-          { id: 'examinations', path: '/teacher/examinations', label: 'Exam Marks Entry', icon: Award },
+          { id: 'examinations', path: '/teacher/exams/marks', label: 'Exam Marks Entry', icon: Award },
           { id: 'resources', path: '/teacher/resources', label: 'Study Resources', icon: BookOpen },
+          { id: 'homework', path: '/teacher/homework', label: 'Homework & Tasks', icon: ClipboardList },
+          { id: 'timetable', path: '/teacher/timetable', label: 'Weekly Timetable', icon: Calendar },
+          { id: 'classes', path: '/teacher/classes', label: 'Student Directory', icon: GraduationCap },
+          { id: 'notices', path: '/teacher/notices', label: 'Notices & Circulars', icon: Bell },
         ];
       case 'STUDENT':
         return [

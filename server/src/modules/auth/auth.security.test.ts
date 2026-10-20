@@ -360,7 +360,7 @@ describe('STAGE 3: Authentication and Multi-Tenant Security Test Suite', () => {
       .send({
         name: 'Delhi Public Collegiate',
         code: `DPC-${Date.now().toString().slice(-4)}`,
-        email: 'contact@dpc.edu',
+        email: `contact-${Date.now()}@dpc.edu`,
         phone: '+91 11 2345 6789',
         address: '10 Mathura Road',
         city: 'New Delhi',
