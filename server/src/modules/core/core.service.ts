@@ -1536,6 +1536,85 @@ export class CoreSchoolService {
   }
 
   /**
+   * Update Staff Details (Designation, Department, Phone, Employment Status)
+   */
+  async updateStaff(
+    schoolIdOrIdentifier: string,
+    staffId: string,
+    data: {
+      designation?: string;
+      departmentName?: string;
+      phone?: string;
+      employmentStatus?: EmploymentStatus;
+    }
+  ) {
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    const targetSchoolId = school ? school.id : schoolIdOrIdentifier;
+
+    const staff = await resolveStaffProfile(targetSchoolId, staffId);
+    if (!staff) {
+      throw new AppError(`Staff member '${staffId}' not found in this school.`, 404, 'RECORD_NOT_FOUND');
+    }
+
+    let departmentId = staff.departmentId;
+    if (data.departmentName && data.departmentName.trim()) {
+      let dept = await prisma.department.findFirst({
+        where: {
+          schoolId: targetSchoolId,
+          name: { equals: data.departmentName.trim(), mode: 'insensitive' },
+        },
+      });
+      if (!dept) {
+        dept = await prisma.department.create({
+          data: {
+            schoolId: targetSchoolId,
+            name: data.departmentName.trim(),
+            description: `${data.departmentName.trim()} Faculty`,
+          },
+        });
+      }
+      departmentId = dept.id;
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      if (data.phone && staff.membership?.userId) {
+        await tx.user.update({
+          where: { id: staff.membership.userId },
+          data: { phone: data.phone.trim() },
+        });
+      }
+
+      const updatedProfile = await tx.staffProfile.update({
+        where: { id: staff.id },
+        data: {
+          ...(data.designation ? { designation: data.designation.trim() } : {}),
+          ...(departmentId ? { departmentId } : {}),
+          ...(data.employmentStatus ? { employmentStatus: data.employmentStatus } : {}),
+        },
+        include: {
+          membership: { include: { user: true } },
+          department: true,
+        },
+      });
+
+      return updatedProfile;
+    });
+
+    return {
+      id: updated.id,
+      employeeId: updated.employeeId,
+      firstName: updated.membership.user.firstName,
+      lastName: updated.membership.user.lastName,
+      email: updated.membership.user.email,
+      phone: updated.membership.user.phone,
+      departmentName: updated.department?.name || 'General',
+      designation: updated.designation,
+      employmentStatus: updated.employmentStatus,
+      joiningDate: updated.joiningDate.toISOString().split('T')[0],
+    };
+  }
+
+  /**
    * Fetch authenticated Teacher's Profile and Assigned Subjects & Classes directly from PostgreSQL
    */
   async getTeacherProfile(schoolIdOrIdentifier: string, userId: string) {

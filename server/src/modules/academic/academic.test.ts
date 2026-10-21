@@ -55,6 +55,20 @@ describe('STAGE 5: Academic Workflows Test Suite', () => {
     role: PlatformRole.TEACHER,
   });
 
+  const examCoordinatorToken = generateAccessToken({
+    userId: 'usr-exam-01',
+    email: 'exam.coordinator@apexacademy.edu',
+    schoolId: 'sch-apex-01',
+    role: PlatformRole.EXAM_COORDINATOR,
+  });
+
+  const otherSchoolExamCoordinatorToken = generateAccessToken({
+    userId: 'usr-gw-exam',
+    email: 'exam@greenwood.edu',
+    schoolId: 'sch-greenwood-02',
+    role: PlatformRole.EXAM_COORDINATOR,
+  });
+
   let createdQuizId: string;
   let createdExamId: string;
   let testAttendanceRecordId: string;
@@ -478,4 +492,179 @@ describe('STAGE 5: Academic Workflows Test Suite', () => {
     expect(res.status).toBe(403);
     expect(res.body.error.code).toBe('FORBIDDEN_ROLE');
   });
+
+  // ==========================================================================
+  // 5. EXAMINATION COORDINATOR END-TO-END WORKFLOWS & PERMISSIONS
+  // ==========================================================================
+
+  let coordinatorExamId: string;
+  let coordinatorMarkId: string;
+
+  it('5a. Examination Coordinator can list students without 403 FORBIDDEN_ROLE (verifying core API authorization)', async () => {
+    const res = await request(app)
+      .get('/api/v1/core/students?className=Grade 10')
+      .set('Authorization', `Bearer ${examCoordinatorToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(Array.isArray(res.body.data)).toBe(true);
+    expect(res.body.data.length).toBeGreaterThan(0);
+  });
+
+  it('5b. Examination Coordinator can create an examination schedule in PostgreSQL', async () => {
+    const res = await request(app)
+      .post('/api/v1/academic/exams/schedules')
+      .set('Authorization', `Bearer ${examCoordinatorToken}`)
+      .send({
+        academicSession: '2026–2027',
+        className: 'Grade 10',
+        subjectCode: 'MATH-10',
+        name: 'Final Assessment: Advanced Mathematics',
+        examType: 'FINAL_TERM',
+        examDate: '2026-11-15',
+        startTime: '09:00 AM',
+        durationMinutes: 180,
+        maxMarks: 100,
+        passMarks: 40,
+        weightagePercent: 40,
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.name).toBe('Final Assessment: Advanced Mathematics');
+    coordinatorExamId = res.body.data.id;
+  });
+
+  it('5c. Examination Coordinator can update an examination schedule in PostgreSQL', async () => {
+    const res = await request(app)
+      .patch(`/api/v1/academic/exams/schedules/${coordinatorExamId}`)
+      .set('Authorization', `Bearer ${examCoordinatorToken}`)
+      .send({
+        name: 'Final Assessment: Advanced Mathematics (Updated)',
+        durationMinutes: 150,
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.name).toContain('(Updated)');
+    expect(res.body.data.durationMinutes).toBe(150);
+  });
+
+  it('5d. Examination Coordinator can batch enter marks and verify automatic grade assignment', async () => {
+    const res = await request(app)
+      .post('/api/v1/academic/exams/marks/batch')
+      .set('Authorization', `Bearer ${examCoordinatorToken}`)
+      .send({
+        examScheduleId: coordinatorExamId,
+        marks: [
+          { studentProfileId: 'stu-aarav-01', marksObtained: 92, teacherRemarks: 'Distinction' },
+          { studentProfileId: 'stu-ananya-02', isAbsent: true },
+        ],
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.marks.length).toBe(2);
+    expect(res.body.data.marks[0].grade).toBe('A1');
+    expect(res.body.data.marks[1].isAbsent).toBe(true);
+    coordinatorMarkId = res.body.data.marks[0].id;
+  });
+
+  it('5e. Examination Coordinator can correct an exam mark with mandatory audit rationale', async () => {
+    const res = await request(app)
+      .patch('/api/v1/academic/exams/marks/correct')
+      .set('Authorization', `Bearer ${examCoordinatorToken}`)
+      .send({
+        markId: coordinatorMarkId,
+        newMarksObtained: 95,
+        reason: 'Recounting requested by student; awarded 3 marks on theorem question',
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.marksObtained).toBe(95);
+  });
+
+  it('5f. Examination Coordinator can access audit logs for examinations', async () => {
+    const res = await request(app)
+      .get(`/api/v1/academic/exams/audit?examScheduleId=${coordinatorExamId}`)
+      .set('Authorization', `Bearer ${examCoordinatorToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(Array.isArray(res.body.data)).toBe(true);
+    expect(res.body.data.length).toBeGreaterThan(0);
+    expect(res.body.data[0]).toHaveProperty('action');
+    expect(res.body.data[0]).toHaveProperty('timestamp');
+  });
+
+  it('5g. Examination Coordinator can retrieve and update grading schemes', async () => {
+    const getRes = await request(app)
+      .get('/api/v1/academic/exams/grading-schemes')
+      .set('Authorization', `Bearer ${examCoordinatorToken}`);
+
+    expect(getRes.status).toBe(200);
+    expect(getRes.body.success).toBe(true);
+    expect(getRes.body.data).toHaveProperty('grades');
+
+    const putRes = await request(app)
+      .put('/api/v1/academic/exams/grading-schemes')
+      .set('Authorization', `Bearer ${examCoordinatorToken}`)
+      .send({
+        schemeName: 'Apex Academy Standard Evaluation Scale',
+        passingPercentage: 35,
+        grades: getRes.body.data.grades,
+      });
+
+    expect(putRes.status).toBe(200);
+    expect(putRes.body.success).toBe(true);
+    expect(putRes.body.data.schemeName).toBe('Apex Academy Standard Evaluation Scale');
+  });
+
+  it('5h. Examination Coordinator can publish and unpublish exam results', async () => {
+    const pubRes = await request(app)
+      .patch('/api/v1/academic/exams/publish')
+      .set('Authorization', `Bearer ${examCoordinatorToken}`)
+      .send({
+        examScheduleId: coordinatorExamId,
+        publish: true,
+      });
+
+    expect(pubRes.status).toBe(200);
+    expect(pubRes.body.success).toBe(true);
+    expect(pubRes.body.data.status).toBe('PUBLISHED');
+
+    const unpubRes = await request(app)
+      .patch('/api/v1/academic/exams/publish')
+      .set('Authorization', `Bearer ${examCoordinatorToken}`)
+      .send({
+        examScheduleId: coordinatorExamId,
+        publish: false,
+      });
+
+    expect(unpubRes.status).toBe(200);
+    expect(unpubRes.body.success).toBe(true);
+    expect(unpubRes.body.data.status).toBe('MARKS_SUBMITTED');
+  });
+
+  it('5i. Student role attempting to access examination audit logs returns 403 FORBIDDEN_ROLE', async () => {
+    const res = await request(app)
+      .get('/api/v1/academic/exams/audit')
+      .set('Authorization', `Bearer ${studentAaravToken}`);
+
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('FORBIDDEN_ROLE');
+  });
+
+  it('5j. Cross-tenant isolation: Coordinator from greenwood cannot update Apex Academy exam schedule', async () => {
+    const res = await request(app)
+      .patch(`/api/v1/academic/exams/schedules/${coordinatorExamId}`)
+      .set('Authorization', `Bearer ${otherSchoolExamCoordinatorToken}`)
+      .send({
+        name: 'Hacked Name',
+      });
+
+    expect(res.status).toBe(404);
+  });
 });
+

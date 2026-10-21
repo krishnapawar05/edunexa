@@ -227,6 +227,16 @@ export class CoreSchoolController {
     }
   }
 
+  async updateStaff(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { id } = req.params;
+      const updated = await coreSchoolService.updateStaff(req.schoolId!, id, req.body);
+      res.status(200).json({ success: true, data: updated });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   async getTeacherProfile(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const profile = await coreSchoolService.getTeacherProfile(req.schoolId!, req.user!.userId);

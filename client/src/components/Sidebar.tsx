@@ -24,6 +24,8 @@ import {
   CheckCircle2,
   Receipt,
   FileCheck,
+  Edit3,
+  ShieldCheck,
   X,
 } from 'lucide-react';
 import { useSchoolBranding } from '../context/SchoolBrandingContext.js';
@@ -134,7 +136,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         return [
           { id: 'overview', path: '/examinations', label: 'Exam Workspace', icon: LayoutDashboard },
           { id: 'schedules', path: '/examinations/schedules', label: 'Examination Schedules', icon: FileSpreadsheet },
-          { id: 'marks-audit', path: '/examinations/marks-audit', label: 'Marks Entry Audit', icon: Award },
+          { id: 'marks', path: '/examinations/marks', label: 'Marks Entry & Grading', icon: Edit3 },
+          { id: 'marks-audit', path: '/examinations/marks-audit', label: 'Marks Entry Audit', icon: ShieldCheck },
           { id: 'grading', path: '/examinations/grading', label: 'Grading Schemes', icon: Layers },
           { id: 'publish', path: '/examinations/publish', label: 'Publish Results', icon: CheckCircle2 },
         ];

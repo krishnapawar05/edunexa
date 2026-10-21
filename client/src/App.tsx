@@ -68,8 +68,16 @@ import { ParentResultsPage } from './modules/parent/ParentResultsPage.js';
 import { ParentAttendancePage } from './modules/parent/ParentAttendancePage.js';
 import { ParentFeesPage } from './modules/parent/ParentFeesPage.js';
 import { ParentNoticesPage } from './modules/parent/ParentNoticesPage.js';
-import { ExaminationWorkflow } from './modules/examinations/ExaminationWorkflow.js';
-import { HrStaffDashboard } from './modules/hr/HrStaffDashboard.js';
+import { ExamOverviewPage } from './modules/examinations/ExamOverviewPage.js';
+import { ExamSchedulesPage } from './modules/examinations/ExamSchedulesPage.js';
+import { ExamMarksEntryPage } from './modules/examinations/ExamMarksEntryPage.js';
+import { ExamMarksAuditPage } from './modules/examinations/ExamMarksAuditPage.js';
+import { ExamGradingSchemesPage } from './modules/examinations/ExamGradingSchemesPage.js';
+import { ExamPublishResultsPage } from './modules/examinations/ExamPublishResultsPage.js';
+import { HrOverviewPage } from './modules/hr/HrOverviewPage.js';
+import { HrStaffRecordsPage } from './modules/hr/HrStaffRecordsPage.js';
+import { HrLeaveRequestsPage } from './modules/hr/HrLeaveRequestsPage.js';
+import { HrStaffTrainingPage } from './modules/hr/HrStaffTrainingPage.js';
 import { AccountsDashboard } from './modules/accounts/AccountsDashboard.js';
 
 export const App: React.FC = () => {
@@ -206,30 +214,34 @@ export const App: React.FC = () => {
         {/* Examination Coordinator Workspace */}
         <Route
           element={
-            <ProtectedRoute allowedRoles={['EXAM_COORDINATOR']}>
+            <ProtectedRoute allowedRoles={['EXAM_COORDINATOR', 'SCHOOL_ADMIN', 'PRINCIPAL']}>
               <ErpLayout />
             </ProtectedRoute>
           }
         >
-          <Route path="/examinations" element={<ExaminationWorkflow />} />
-          <Route path="/examinations/schedules" element={<ExaminationWorkflow />} />
-          <Route path="/examinations/marks-audit" element={<ExaminationWorkflow />} />
-          <Route path="/examinations/grading" element={<ExaminationWorkflow />} />
-          <Route path="/examinations/publish" element={<ExaminationWorkflow />} />
+          <Route path="/examinations" element={<ExamOverviewPage />} />
+          <Route path="/examinations/schedules" element={<ExamSchedulesPage />} />
+          <Route path="/examinations/marks" element={<ExamMarksEntryPage />} />
+          <Route path="/examinations/marks-entry" element={<ExamMarksEntryPage />} />
+          <Route path="/examinations/marks-audit" element={<ExamMarksAuditPage />} />
+          <Route path="/examinations/audit" element={<ExamMarksAuditPage />} />
+          <Route path="/examinations/grading" element={<ExamGradingSchemesPage />} />
+          <Route path="/examinations/publish" element={<ExamPublishResultsPage />} />
         </Route>
 
         {/* HR & Staff Admin Workspace */}
         <Route
           element={
-            <ProtectedRoute allowedRoles={['HR_STAFF']}>
+            <ProtectedRoute allowedRoles={['HR_STAFF', 'SCHOOL_ADMIN', 'PRINCIPAL', 'SUPER_ADMIN']}>
               <ErpLayout />
             </ProtectedRoute>
           }
         >
-          <Route path="/hr" element={<HrStaffDashboard />} />
-          <Route path="/hr/employees" element={<HrStaffDashboard />} />
-          <Route path="/hr/leaves" element={<HrStaffDashboard />} />
-          <Route path="/hr/training" element={<HrStaffDashboard />} />
+          <Route path="/hr" element={<HrOverviewPage />} />
+          <Route path="/hr/employees" element={<HrStaffRecordsPage />} />
+          <Route path="/hr/staff" element={<HrStaffRecordsPage />} />
+          <Route path="/hr/leaves" element={<HrLeaveRequestsPage />} />
+          <Route path="/hr/training" element={<HrStaffTrainingPage />} />
         </Route>
 
         {/* Accounts & Finance Workspace */}

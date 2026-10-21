@@ -112,6 +112,7 @@ router.get(
     PlatformRole.TEACHER,
     PlatformRole.HR_STAFF,
     PlatformRole.ACCOUNTS,
+    PlatformRole.EXAM_COORDINATOR,
     PlatformRole.SUPER_ADMIN
   ),
   (req, res, next) => {
@@ -138,6 +139,7 @@ router.get(
     PlatformRole.ACCOUNTS,
     PlatformRole.STUDENT,
     PlatformRole.PARENT,
+    PlatformRole.EXAM_COORDINATOR,
     PlatformRole.SUPER_ADMIN
   ),
   enforceStudentIsolation,
@@ -190,6 +192,14 @@ router.patch(
   requireRole(PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.HR_STAFF, PlatformRole.SUPER_ADMIN),
   (req, res, next) => {
     coreSchoolController.updateStaffStatus(req, res, next);
+  }
+);
+
+router.patch(
+  '/staff/:id',
+  requireRole(PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.HR_STAFF, PlatformRole.SUPER_ADMIN),
+  (req, res, next) => {
+    coreSchoolController.updateStaff(req, res, next);
   }
 );
 

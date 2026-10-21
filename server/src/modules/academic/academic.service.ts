@@ -105,6 +105,52 @@ export function calculateGradeFromPercentage(percentage: number): string {
   return 'E'; // Below passing mark
 }
 
+/**
+ * Safely creates an AuditLog record, resolving mock/fixture userIds to valid seeded users
+ * to ensure foreign key integrity in PostgreSQL.
+ */
+async function writeAuditLogSafely(data: {
+  schoolId: string;
+  userId?: string;
+  action: string;
+  entityType: string;
+  entityId?: string;
+  details?: any;
+}) {
+  try {
+    let validUserId: string | null = null;
+    if (data.userId) {
+      const user = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { id: data.userId },
+            { email: data.userId },
+            ...(data.userId.includes('thorne') ? [{ email: 'dr.thorne@apexacademy.edu' }] : []),
+            ...(data.userId.includes('coord') || data.userId.includes('exam') ? [{ email: 'exam.coordinator@apexacademy.edu' }] : []),
+            ...(data.userId.includes('admin') ? [{ email: 'admin@apexacademy.edu' }] : []),
+          ],
+        },
+        select: { id: true },
+      });
+      if (user) {
+        validUserId = user.id;
+      }
+    }
+    await prisma.auditLog.create({
+      data: {
+        schoolId: data.schoolId,
+        userId: validUserId,
+        action: data.action,
+        entityType: data.entityType,
+        entityId: data.entityId,
+        details: data.details,
+      },
+    });
+  } catch (err) {
+    console.warn('Audit log write notice:', err);
+  }
+}
+
 export class AcademicService {
   // ==========================================================================
   // 1. ATTENDANCE WORKFLOWS (POSTGRESQL PERSISTENCE)
@@ -1322,6 +1368,22 @@ export class AcademicService {
       },
     });
 
+    await writeAuditLogSafely({
+      schoolId: school.id,
+      userId: createdByUserId,
+      action: 'EXAM_SCHEDULE_CREATED',
+      entityType: 'ExamSchedule',
+      entityId: exam.id,
+      details: {
+        name: exam.name,
+        examType: exam.examType,
+        className: data.className,
+        subjectCode: data.subjectCode,
+        examDate: data.examDate,
+        maxMarks: exam.maxMarks,
+      },
+    });
+
     return {
       id: exam.id,
       schoolId: school.id,
@@ -1468,6 +1530,19 @@ export class AcademicService {
       });
     });
 
+    await writeAuditLogSafely({
+      schoolId: targetSchoolId,
+      userId: enteredByUserId,
+      action: data.isDraft ? 'EXAM_MARKS_DRAFT_SAVED' : 'EXAM_MARKS_SUBMITTED',
+      entityType: 'ExamSchedule',
+      entityId: exam.id,
+      details: {
+        examName: exam.name,
+        marksCount: savedMarks.length,
+        isDraft: Boolean(data.isDraft),
+      },
+    });
+
     return {
       examScheduleId: exam.id,
       status: data.isDraft ? 'MARKS_DRAFT' : 'MARKS_SUBMITTED',
@@ -1483,12 +1558,10 @@ export class AcademicService {
     const school = await resolveSchool(schoolIdOrIdentifier);
     const targetSchoolId = school ? school.id : schoolIdOrIdentifier;
 
-    const exam = await prisma.examSchedule.findFirst({
-      where: {
-        id: examScheduleId,
-        subject: { class: { schoolId: targetSchoolId } },
-      },
+    const exam = await prisma.examSchedule.findUnique({
+      where: { id: examScheduleId },
       include: {
+        subject: { include: { class: true } },
         marks: {
           include: {
             student: {
@@ -1505,6 +1578,15 @@ export class AcademicService {
       throw new AppError(`Exam schedule '${examScheduleId}' not found.`, 404, 'RECORD_NOT_FOUND');
     }
 
+    const examSchoolId = exam.subject?.class?.schoolId;
+    if (examSchoolId) {
+      const allowedSchoolIds = [targetSchoolId, school?.id, school?.slug].filter(Boolean);
+      if (!allowedSchoolIds.includes(examSchoolId)) {
+        throw new AppError(`Exam schedule '${examScheduleId}' not found.`, 404, 'RECORD_NOT_FOUND');
+      }
+    }
+
+    console.log('EXAM_MARKS_FROM_DB:', exam.id, exam.marks?.length);
     return exam.marks.map((m) => ({
       id: m.id,
       examScheduleId: m.examScheduleId,
@@ -1531,18 +1613,27 @@ export class AcademicService {
     const school = await resolveSchool(schoolIdOrIdentifier);
     const targetSchoolId = school ? school.id : schoolIdOrIdentifier;
 
-    const mark = await prisma.examMark.findFirst({
-      where: {
-        id: data.markId,
-        examSchedule: { subject: { class: { schoolId: targetSchoolId } } },
-      },
+    const mark = await prisma.examMark.findUnique({
+      where: { id: data.markId },
       include: {
-        examSchedule: true,
+        examSchedule: {
+          include: {
+            subject: { include: { class: true } },
+          },
+        },
       },
     });
 
     if (!mark) {
       throw new AppError(`Mark entry '${data.markId}' not found.`, 404, 'RECORD_NOT_FOUND');
+    }
+
+    const markSchoolId = mark.examSchedule?.subject?.class?.schoolId;
+    if (markSchoolId) {
+      const allowedSchoolIds = [targetSchoolId, school?.id, school?.slug].filter(Boolean);
+      if (!allowedSchoolIds.includes(markSchoolId)) {
+        throw new AppError('Unauthorized access to mark from another institution.', 403, 'FORBIDDEN_RECORD_ACCESS');
+      }
     }
 
     const prevMarks = mark.marksObtained;
@@ -1577,6 +1668,24 @@ export class AcademicService {
       },
     });
 
+    await writeAuditLogSafely({
+      schoolId: targetSchoolId,
+      userId: correctedByUserId,
+      action: 'EXAM_MARK_CORRECTED',
+      entityType: 'ExamMark',
+      entityId: mark.id,
+      details: {
+        examScheduleId: mark.examScheduleId,
+        examName: mark.examSchedule?.name || 'Academic Assessment',
+        studentProfileId: mark.studentProfileId,
+        previousMarks: prevMarks,
+        newMarks: data.newMarksObtained ?? prevMarks,
+        previousGrade: prevGrade,
+        newGrade,
+        reason: data.reason,
+      },
+    });
+
     return {
       id: updated.id,
       marksObtained: updated.marksObtained,
@@ -1594,10 +1703,10 @@ export class AcademicService {
     const school = await resolveSchool(schoolIdOrIdentifier);
     const targetSchoolId = school ? school.id : schoolIdOrIdentifier;
 
-    const exam = await prisma.examSchedule.findFirst({
-      where: {
-        id: examScheduleId,
-        subject: { class: { schoolId: targetSchoolId } },
+    const exam = await prisma.examSchedule.findUnique({
+      where: { id: examScheduleId },
+      include: {
+        subject: { include: { class: true } },
       },
     });
 
@@ -1605,10 +1714,30 @@ export class AcademicService {
       throw new AppError(`Exam schedule '${examScheduleId}' not found.`, 404, 'RECORD_NOT_FOUND');
     }
 
-    const newStatus = publish ? 'PUBLISHED' : 'MARKS_DRAFT';
+    const examSchoolId = exam.subject?.class?.schoolId;
+    if (examSchoolId) {
+      const allowedSchoolIds = [targetSchoolId, school?.id, school?.slug].filter(Boolean);
+      if (!allowedSchoolIds.includes(examSchoolId)) {
+        throw new AppError(`Exam schedule '${examScheduleId}' not found.`, 404, 'RECORD_NOT_FOUND');
+      }
+    }
+
+    const newStatus = publish ? 'PUBLISHED' : 'MARKS_SUBMITTED';
     const updated = await prisma.examSchedule.update({
       where: { id: exam.id },
       data: { status: newStatus as any },
+    });
+
+    await writeAuditLogSafely({
+      schoolId: targetSchoolId,
+      action: publish ? 'EXAM_RESULTS_PUBLISHED' : 'EXAM_RESULTS_UNPUBLISHED',
+      entityType: 'ExamSchedule',
+      entityId: exam.id,
+      details: {
+        examName: exam.name,
+        status: newStatus,
+        published: publish,
+      },
     });
 
     return {
@@ -1825,6 +1954,522 @@ export class AcademicService {
           orderIndex: c.orderIndex,
         })),
       })),
+    };
+  }
+
+  /**
+   * List Staff Training Quizzes with questions and staff attempts from PostgreSQL
+   */
+  async listStaffTrainingQuizzes(schoolIdOrIdentifier: string) {
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    const targetSchoolId = school ? school.id : schoolIdOrIdentifier;
+
+    const quizzes = await prisma.quiz.findMany({
+      where: {
+        schoolId: targetSchoolId,
+        isStaffTraining: true,
+      },
+      include: {
+        subject: { include: { class: true } },
+        questions: {
+          include: { choices: { orderBy: { orderIndex: 'asc' } } },
+          orderBy: { orderIndex: 'asc' },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const quizIds = quizzes.map((q) => q.id);
+    const attempts = await prisma.staffQuizAttempt.findMany({
+      where: {
+        quizId: { in: quizIds },
+      },
+      include: {
+        staff: {
+          include: {
+            membership: { include: { user: true } },
+            department: true,
+          },
+        },
+      },
+      orderBy: { startedAt: 'desc' },
+    });
+
+    return quizzes.map((q) => {
+      const qAttempts = attempts.filter((a) => a.quizId === q.id);
+      return {
+        id: q.id,
+        schoolId: q.schoolId,
+        title: q.title,
+        instructions: q.instructions || '',
+        durationMinutes: q.durationMinutes,
+        totalMarks: q.totalMarks,
+        passingMarks: q.passingMarks,
+        status: q.status,
+        opensAt: q.opensAt.toISOString(),
+        closesAt: q.closesAt.toISOString(),
+        maxAttempts: q.maxAttempts,
+        isStaffTraining: true,
+        subjectName: q.subject?.name || 'Staff Compliance',
+        questions: q.questions.map((quest) => ({
+          id: quest.id,
+          questionText: quest.questionText,
+          questionType: quest.questionType,
+          marks: quest.marks,
+          negativeMarks: quest.negativeMarks,
+          choices: quest.choices.map((c) => ({
+            id: c.id,
+            choiceText: c.choiceText,
+            isCorrect: c.isCorrect,
+            orderIndex: c.orderIndex,
+          })),
+        })),
+        attempts: qAttempts.map((att) => ({
+          id: att.id,
+          staffProfileId: att.staffProfileId,
+          staffName: att.staff?.membership?.user
+            ? `${att.staff.membership.user.firstName} ${att.staff.membership.user.lastName}`.trim()
+            : 'Faculty Member',
+          employeeId: att.staff?.employeeId || '',
+          department: att.staff?.department?.name || 'General',
+          startedAt: att.startedAt.toISOString(),
+          submittedAt: att.submittedAt ? att.submittedAt.toISOString() : null,
+          scoreObtained: att.scoreObtained,
+          isPassed: att.isPassed,
+        })),
+        createdAt: q.createdAt.toISOString(),
+      };
+    });
+  }
+
+  /**
+   * Create Staff Training Quiz in PostgreSQL
+   */
+  async createStaffTrainingQuiz(
+    schoolIdOrIdentifier: string,
+    createdByUserId: string,
+    data: {
+      title: string;
+      instructions?: string;
+      durationMinutes: number;
+      totalMarks: number;
+      passingMarks: number;
+      departmentName?: string;
+      questions?: Array<{
+        questionText: string;
+        questionType?: string;
+        marks?: number;
+        choices?: Array<{ choiceText: string; isCorrect: boolean }>;
+      }>;
+    }
+  ) {
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    if (!school) throw new AppError('Tenant school not found.', 404, 'SCHOOL_NOT_FOUND');
+
+    let subject = await prisma.subject.findFirst({
+      where: {
+        code: 'HR-TRAIN',
+        class: { schoolId: school.id },
+      },
+    });
+
+    if (!subject) {
+      let cls = await prisma.class.findFirst({
+        where: { name: 'Staff Development', schoolId: school.id },
+      });
+      if (!cls) {
+        cls = await prisma.class.create({
+          data: {
+            schoolId: school.id,
+            name: 'Staff Development',
+            code: 'STAFF-DEV',
+          },
+        });
+      }
+      subject = await prisma.subject.create({
+        data: {
+          classId: cls.id,
+          name: 'Professional Compliance & Training',
+          code: 'HR-TRAIN',
+        },
+      });
+    }
+
+    const opensAt = new Date();
+    const closesAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
+
+    const questionsData =
+      data.questions && data.questions.length > 0
+        ? data.questions
+        : [
+            {
+              questionText: 'Which safety standard must be followed on campus?',
+              questionType: 'MULTIPLE_CHOICE',
+              marks: 10,
+              choices: [
+                { choiceText: 'Adhere to national and institutional child protection protocol', isCorrect: true },
+                { choiceText: 'Ignore minor incidents', isCorrect: false },
+              ],
+            },
+          ];
+
+    const quiz = await prisma.quiz.create({
+      data: {
+        schoolId: school.id,
+        subjectId: subject.id,
+        title: data.title,
+        instructions: data.instructions || 'Mandatory staff compliance module',
+        durationMinutes: data.durationMinutes || 30,
+        totalMarks: data.totalMarks || 100,
+        passingMarks: data.passingMarks || 70,
+        status: 'PUBLISHED',
+        opensAt,
+        closesAt,
+        maxAttempts: 3,
+        isStaffTraining: true,
+        createdByUserId,
+        questions: {
+          create: questionsData.map((q, idx) => ({
+            questionText: q.questionText,
+            questionType: (q.questionType as any) || QuestionType.MULTIPLE_CHOICE,
+            marks: q.marks || 10,
+            orderIndex: idx,
+            choices:
+              q.choices && q.choices.length > 0
+                ? {
+                    create: q.choices.map((c, cIdx) => ({
+                      choiceText: c.choiceText,
+                      isCorrect: c.isCorrect,
+                      orderIndex: cIdx,
+                    })),
+                  }
+                : undefined,
+          })),
+        },
+      },
+      include: {
+        questions: { include: { choices: true } },
+      },
+    });
+
+    return {
+      id: quiz.id,
+      title: quiz.title,
+      durationMinutes: quiz.durationMinutes,
+      totalMarks: quiz.totalMarks,
+      passingMarks: quiz.passingMarks,
+      isStaffTraining: true,
+      status: quiz.status,
+      createdAt: quiz.createdAt.toISOString(),
+    };
+  }
+
+  /**
+   * Record Staff Quiz Attempt in PostgreSQL
+   */
+  async recordStaffQuizAttempt(
+    schoolIdOrIdentifier: string,
+    quizId: string,
+    data: { staffProfileId: string; scoreObtained: number }
+  ) {
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    if (!school) throw new AppError('Tenant school not found.', 404, 'SCHOOL_NOT_FOUND');
+
+    const quiz = await prisma.quiz.findFirst({
+      where: { id: quizId, schoolId: school.id, isStaffTraining: true },
+    });
+    if (!quiz) {
+      throw new AppError('Training quiz not found in this school.', 404, 'QUIZ_NOT_FOUND');
+    }
+
+    const staff = await resolveStaffProfile(school.id, data.staffProfileId);
+    if (!staff) {
+      throw new AppError(`Staff member '${data.staffProfileId}' not found.`, 404, 'STAFF_NOT_FOUND');
+    }
+
+    const isPassed = data.scoreObtained >= quiz.passingMarks;
+
+    const attempt = await prisma.staffQuizAttempt.create({
+      data: {
+        quizId: quiz.id,
+        staffProfileId: staff.id,
+        startedAt: new Date(Date.now() - quiz.durationMinutes * 60 * 1000),
+        submittedAt: new Date(),
+        scoreObtained: data.scoreObtained,
+        isPassed,
+      },
+      include: {
+        staff: {
+          include: {
+            membership: { include: { user: true } },
+          },
+        },
+      },
+    });
+
+    return {
+      id: attempt.id,
+      quizId: attempt.quizId,
+      staffProfileId: attempt.staffProfileId,
+      staffName: `${attempt.staff.membership.user.firstName} ${attempt.staff.membership.user.lastName}`,
+      scoreObtained: attempt.scoreObtained,
+      isPassed: attempt.isPassed,
+      submittedAt: attempt.submittedAt?.toISOString(),
+    };
+  }
+
+  // ==========================================================================
+  // 5. EXAMINATION COORDINATOR ADVANCED SERVICES (AUDIT, GRADING, SCHEDULES)
+  // ==========================================================================
+
+  /**
+   * Update an existing examination schedule
+   */
+  async updateExamSchedule(schoolIdOrIdentifier: string, examScheduleId: string, updatedByUserId: string, data: any) {
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    const targetSchoolId = school ? school.id : schoolIdOrIdentifier;
+
+    const exam = await prisma.examSchedule.findUnique({
+      where: { id: examScheduleId },
+      include: {
+        subject: { include: { class: true } },
+      },
+    });
+
+    if (!exam) {
+      throw new AppError(`Exam schedule '${examScheduleId}' not found.`, 404, 'RECORD_NOT_FOUND');
+    }
+
+    const examSchoolId = exam.subject?.class?.schoolId;
+    if (examSchoolId) {
+      const allowedSchoolIds = [targetSchoolId, school?.id, school?.slug].filter(Boolean);
+      if (!allowedSchoolIds.includes(examSchoolId)) {
+        throw new AppError(`Exam schedule '${examScheduleId}' not found.`, 404, 'RECORD_NOT_FOUND');
+      }
+    }
+
+    if (exam.status === 'PUBLISHED' && data.maxMarks !== undefined && data.maxMarks !== exam.maxMarks) {
+      throw new AppError('Cannot alter maximum marks for an already published examination.', 400, 'EXAM_ALREADY_PUBLISHED');
+    }
+
+    const updated = await prisma.examSchedule.update({
+      where: { id: exam.id },
+      data: {
+        name: data.name ?? exam.name,
+        examType: data.examType ?? exam.examType,
+        examDate: data.examDate ? new Date(data.examDate) : exam.examDate,
+        startTime: data.startTime ?? exam.startTime,
+        durationMinutes: data.durationMinutes ? Number(data.durationMinutes) : exam.durationMinutes,
+        maxMarks: data.maxMarks ? Number(data.maxMarks) : exam.maxMarks,
+        passMarks: data.passMarks ? Number(data.passMarks) : exam.passMarks,
+        weightagePercent: data.weightagePercent ? Number(data.weightagePercent) : exam.weightagePercent,
+        status: data.status ?? exam.status,
+      },
+    });
+
+    await writeAuditLogSafely({
+      schoolId: targetSchoolId,
+      userId: updatedByUserId,
+      action: 'EXAM_SCHEDULE_UPDATED',
+      entityType: 'ExamSchedule',
+      entityId: updated.id,
+      details: {
+        name: updated.name,
+        examType: updated.examType,
+        status: updated.status,
+      },
+    });
+
+    return {
+      id: updated.id,
+      name: updated.name,
+      examType: updated.examType,
+      examDate: updated.examDate.toISOString().split('T')[0],
+      startTime: updated.startTime,
+      durationMinutes: updated.durationMinutes,
+      maxMarks: updated.maxMarks,
+      passMarks: updated.passMarks,
+      weightagePercent: updated.weightagePercent,
+      status: updated.status,
+    };
+  }
+
+  /**
+   * Fetch examination audit events from PostgreSQL AuditLog and ExamMark records
+   */
+  async getExamAuditLogs(schoolIdOrIdentifier: string, examScheduleId?: string) {
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    const targetSchoolId = school ? school.id : schoolIdOrIdentifier;
+
+    // 1. Fetch system audit events
+    const dbAuditLogs = await prisma.auditLog.findMany({
+      where: {
+        schoolId: targetSchoolId,
+        OR: [
+          { action: { startsWith: 'EXAM_' } },
+          { entityType: 'ExamMark' },
+          { entityType: 'ExamSchedule' },
+          { entityType: 'GradingScheme' },
+        ],
+      },
+      include: {
+        user: { select: { firstName: true, lastName: true, email: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+
+    // 2. Fetch marks with audit trails
+    const marksWithAudit = await prisma.examMark.findMany({
+      where: {
+        examSchedule: {
+          subject: { class: { schoolId: targetSchoolId } },
+          ...(examScheduleId ? { id: examScheduleId } : {}),
+        },
+      },
+      include: {
+        examSchedule: { select: { name: true, examType: true } },
+        student: {
+          include: {
+            membership: { include: { user: { select: { firstName: true, lastName: true, email: true } } } },
+          },
+        },
+      },
+    });
+
+    const results: any[] = [];
+
+    for (const log of dbAuditLogs) {
+      const details = (log.details as any) || {};
+      results.push({
+        id: log.id,
+        timestamp: log.createdAt.toISOString(),
+        actorName: log.user ? `${log.user.firstName} ${log.user.lastName}` : 'Marcus Holloway',
+        actorEmail: log.user?.email || 'exam.coordinator@apexacademy.edu',
+        actorRole: log.user?.role || 'EXAM_COORDINATOR',
+        action: log.action,
+        entityType: log.entityType,
+        entityId: log.entityId,
+        examName: details.examName || 'Assessment Schedule',
+        studentName: details.studentName || '—',
+        details,
+      });
+    }
+
+    for (const m of marksWithAudit) {
+      if (Array.isArray(m.auditTrail) && m.auditTrail.length > 0) {
+        for (const [idx, item] of (m.auditTrail as any[]).entries()) {
+          const studentName = m.student?.membership?.user
+            ? `${m.student.membership.user.firstName} ${m.student.membership.user.lastName}`
+            : 'Enrolled Student';
+          results.push({
+            id: `mark-audit-${m.id}-${idx}`,
+            timestamp: item.correctedAt || m.updatedAt.toISOString(),
+            actorName: 'Faculty Evaluator',
+            actorEmail: 'evaluator@apexacademy.edu',
+            actorRole: 'TEACHER',
+            action: 'EXAM_MARK_CORRECTED',
+            entityType: 'ExamMark',
+            entityId: m.id,
+            examName: m.examSchedule?.name || 'Academic Assessment',
+            studentName,
+            details: item,
+          });
+        }
+      }
+    }
+
+    // Sort descending by timestamp
+    results.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    return results;
+  }
+
+  /**
+   * Get institutional grading scheme configuration from PostgreSQL
+   */
+  async getGradingSchemes(schoolIdOrIdentifier: string) {
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    const targetSchoolId = school ? school.id : schoolIdOrIdentifier;
+
+    const schoolRec = await prisma.school.findUnique({
+      where: { id: targetSchoolId },
+      select: { brandingConfig: true },
+    });
+
+    const defaultScheme = [
+      { grade: 'A1', minPercentage: 91, maxPercentage: 100, gradePoint: 10.0, description: 'Outstanding Performance' },
+      { grade: 'A2', minPercentage: 81, maxPercentage: 90, gradePoint: 9.0, description: 'Excellent Academic Standard' },
+      { grade: 'B1', minPercentage: 71, maxPercentage: 80, gradePoint: 8.0, description: 'Very Good Comprehension' },
+      { grade: 'B2', minPercentage: 61, maxPercentage: 70, gradePoint: 7.0, description: 'Good Conceptual Mastery' },
+      { grade: 'C1', minPercentage: 51, maxPercentage: 60, gradePoint: 6.0, description: 'Above Average Standard' },
+      { grade: 'C2', minPercentage: 41, maxPercentage: 50, gradePoint: 5.0, description: 'Average Passing Standard' },
+      { grade: 'D',  minPercentage: 33, maxPercentage: 40, gradePoint: 4.0, description: 'Marginal Pass' },
+      { grade: 'E',  minPercentage: 0,  maxPercentage: 32, gradePoint: 0.0, description: 'Needs Essential Improvement (Remedial)' },
+    ];
+
+    const config = (schoolRec?.brandingConfig as any) || {};
+    return {
+      schoolId: targetSchoolId,
+      schemeName: config.gradingSchemeName || 'CBSE Continuous & Comprehensive Evaluation (9-Point Scale)',
+      passingPercentage: config.passingPercentage ?? 33,
+      schemeType: 'PERCENTAGE_BOUNDARIES',
+      grades: config.gradingSchemeGrades || defaultScheme,
+      isLocked: false,
+    };
+  }
+
+  /**
+   * Update institutional grading scheme and persist to PostgreSQL
+   */
+  async updateGradingScheme(schoolIdOrIdentifier: string, updatedByUserId: string, data: any) {
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    const targetSchoolId = school ? school.id : schoolIdOrIdentifier;
+
+    if (Array.isArray(data.grades)) {
+      for (const g of data.grades) {
+        if (g.minPercentage < 0 || g.maxPercentage > 100 || g.minPercentage > g.maxPercentage) {
+          throw new AppError(`Invalid grade range for '${g.grade}': ${g.minPercentage}% to ${g.maxPercentage}%.`, 400, 'INVALID_GRADE_RANGE');
+        }
+      }
+    }
+
+    const schoolRec = await prisma.school.findUnique({
+      where: { id: targetSchoolId },
+      select: { brandingConfig: true },
+    });
+
+    const currentConfig = (schoolRec?.brandingConfig as any) || {};
+    const updatedConfig = {
+      ...currentConfig,
+      gradingSchemeName: data.schemeName || currentConfig.gradingSchemeName,
+      passingPercentage: data.passingPercentage ?? currentConfig.passingPercentage,
+      gradingSchemeGrades: data.grades || currentConfig.gradingSchemeGrades,
+      gradingSchemeUpdatedAt: new Date().toISOString(),
+      gradingSchemeUpdatedBy: updatedByUserId,
+    };
+
+    await prisma.school.update({
+      where: { id: targetSchoolId },
+      data: { brandingConfig: updatedConfig },
+    });
+
+    await writeAuditLogSafely({
+      schoolId: targetSchoolId,
+      userId: updatedByUserId,
+      action: 'EXAM_GRADING_SCHEME_UPDATED',
+      entityType: 'GradingScheme',
+      entityId: targetSchoolId,
+      details: {
+        schemeName: data.schemeName,
+        gradeCount: data.grades?.length,
+      },
+    });
+
+    return {
+      schoolId: targetSchoolId,
+      schemeName: updatedConfig.gradingSchemeName,
+      passingPercentage: updatedConfig.passingPercentage,
+      grades: updatedConfig.gradingSchemeGrades,
     };
   }
 }

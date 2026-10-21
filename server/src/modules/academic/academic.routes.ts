@@ -99,6 +99,25 @@ router.patch(
   academicController.reviewQuizSubjective
 );
 
+// Staff Training & Policy Compliance Quizzes
+router.get(
+  '/training/quizzes',
+  requireRole(PlatformRole.HR_STAFF, PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.TEACHER, PlatformRole.SUPER_ADMIN),
+  academicController.listStaffTrainingQuizzes
+);
+
+router.post(
+  '/training/quizzes',
+  requireRole(PlatformRole.HR_STAFF, PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.SUPER_ADMIN),
+  academicController.createStaffTrainingQuiz
+);
+
+router.post(
+  '/training/quizzes/:id/attempts',
+  requireRole(PlatformRole.HR_STAFF, PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.TEACHER, PlatformRole.SUPER_ADMIN),
+  academicController.recordStaffQuizAttempt
+);
+
 // ============================================================================
 // 3. EXAMINATIONS & MARKS ROUTES
 // ============================================================================
@@ -135,6 +154,33 @@ router.patch(
   '/exams/publish',
   requireRole(PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.EXAM_COORDINATOR),
   academicController.publishExamResults
+);
+
+// Update exam schedule (School Admin, Principal, Exam Coordinator)
+router.patch(
+  '/exams/schedules/:id',
+  requireRole(PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.EXAM_COORDINATOR),
+  academicController.updateExamSchedule
+);
+
+// Examination Audit Trail (Exam Coordinator, School Admin, Principal, Super Admin)
+router.get(
+  '/exams/audit',
+  requireRole(PlatformRole.EXAM_COORDINATOR, PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.SUPER_ADMIN),
+  academicController.getExamAuditLogs
+);
+
+// Institutional Grading Schemes (Exam Coordinator, School Admin, Principal, Super Admin, Teacher)
+router.get(
+  '/exams/grading-schemes',
+  requireRole(PlatformRole.EXAM_COORDINATOR, PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.TEACHER, PlatformRole.SUPER_ADMIN),
+  academicController.getGradingSchemes
+);
+
+router.put(
+  '/exams/grading-schemes',
+  requireRole(PlatformRole.EXAM_COORDINATOR, PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.SUPER_ADMIN),
+  academicController.updateGradingScheme
 );
 
 // ============================================================================

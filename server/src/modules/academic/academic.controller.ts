@@ -143,7 +143,11 @@ export class AcademicController {
 
   async submitStaffLeaveRequest(req: Request, res: Response, next: NextFunction) {
     try {
-      const parsed = StaffLeaveRequestSchema.parse(req.body);
+      const staffProfileId = req.body.staffProfileId || req.user?.staffProfileId || 'staff-thorne-01';
+      const parsed = StaffLeaveRequestSchema.parse({
+        ...req.body,
+        staffProfileId,
+      });
       const schoolId = req.user!.schoolId!;
 
       const result = await academicService.submitStaffLeaveRequest(schoolId, parsed.staffProfileId, parsed);
@@ -405,6 +409,90 @@ export class AcademicController {
         data: result,
       };
       res.status(200).json(response);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // ==========================================================================
+  // STAFF TRAINING & COMPLIANCE QUIZZES
+  // ==========================================================================
+
+  async listStaffTrainingQuizzes(req: Request, res: Response, next: NextFunction) {
+    try {
+      const schoolId = req.user!.schoolId!;
+      const result = await academicService.listStaffTrainingQuizzes(schoolId);
+      res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async createStaffTrainingQuiz(req: Request, res: Response, next: NextFunction) {
+    try {
+      const schoolId = req.user!.schoolId!;
+      const createdByUserId = req.user!.userId;
+      const result = await academicService.createStaffTrainingQuiz(schoolId, createdByUserId, req.body);
+      res.status(201).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async recordStaffQuizAttempt(req: Request, res: Response, next: NextFunction) {
+    try {
+      const schoolId = req.user!.schoolId!;
+      const { id } = req.params;
+      const result = await academicService.recordStaffQuizAttempt(schoolId, id, req.body);
+      res.status(201).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // ==========================================================================
+  // EXAMINATION COORDINATOR ADVANCED CONTROLLERS
+  // ==========================================================================
+
+  async updateExamSchedule(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const schoolId = req.user!.schoolId!;
+      const updatedByUserId = req.user!.userId;
+      const result = await academicService.updateExamSchedule(schoolId, id, updatedByUserId, req.body);
+      res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getExamAuditLogs(req: Request, res: Response, next: NextFunction) {
+    try {
+      const schoolId = req.user!.schoolId!;
+      const examScheduleId = req.query.examScheduleId as string | undefined;
+      const result = await academicService.getExamAuditLogs(schoolId, examScheduleId);
+      res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getGradingSchemes(req: Request, res: Response, next: NextFunction) {
+    try {
+      const schoolId = req.user!.schoolId!;
+      const result = await academicService.getGradingSchemes(schoolId);
+      res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateGradingScheme(req: Request, res: Response, next: NextFunction) {
+    try {
+      const schoolId = req.user!.schoolId!;
+      const updatedByUserId = req.user!.userId;
+      const result = await academicService.updateGradingScheme(schoolId, updatedByUserId, req.body);
+      res.status(200).json({ success: true, data: result });
     } catch (error) {
       next(error);
     }

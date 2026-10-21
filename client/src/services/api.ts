@@ -267,6 +267,12 @@ export const coreApi = {
       body: JSON.stringify(data),
     }),
 
+  updateStaff: (staffId: string, data: any) =>
+    apiRequest<any>(`/api/v1/core/staff/${staffId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
   assignTeacher: (data: any) =>
     apiRequest<any>('/api/v1/core/staff/assignments', {
       method: 'POST',
@@ -479,6 +485,21 @@ export const academicApi = {
     return apiRequest<any[]>(url);
   },
 
+  listStaffTrainingQuizzes: () =>
+    apiRequest<any[]>('/api/v1/academic/training/quizzes'),
+
+  createStaffTrainingQuiz: (data: any) =>
+    apiRequest<any>('/api/v1/academic/training/quizzes', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  recordStaffQuizAttempt: (quizId: string, data: { staffProfileId: string; scoreObtained: number }) =>
+    apiRequest<any>(`/api/v1/academic/training/quizzes/${quizId}/attempts`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
   listQuizzes: (params: { subjectCode?: string; className?: string; status?: string } = {}) => {
     const query = new URLSearchParams();
     if (params.subjectCode) query.set('subjectCode', params.subjectCode);
@@ -517,28 +538,84 @@ export const academicApi = {
       body: JSON.stringify(data),
     }),
 
-  submitExamMarksBatch: (data: { examScheduleId: string; marks: Array<{ studentProfileId: string; marksObtained: number; isAbsent?: boolean; teacherRemarks?: string }> }) =>
+  submitExamMarksBatch: (data: { examScheduleId: string; isDraft?: boolean; marks: Array<{ studentProfileId: string; marksObtained?: number | ''; isAbsent?: boolean; isExempt?: boolean; teacherRemarks?: string }> }) =>
     apiRequest<any>('/api/v1/academic/exams/marks/batch', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify({
+        examScheduleId: data.examScheduleId,
+        isDraft: Boolean(data.isDraft),
+        marks: data.marks.map((m) => ({
+          studentProfileId: m.studentProfileId,
+          marksObtained: m.marksObtained === '' || m.isAbsent || m.isExempt ? undefined : Number(m.marksObtained),
+          isAbsent: Boolean(m.isAbsent),
+          isExempt: Boolean(m.isExempt),
+          teacherRemarks: m.teacherRemarks,
+        })),
+      }),
     }),
 
   getExamMarks: (examScheduleId: string) =>
     apiRequest<any[]>(`/api/v1/academic/exams/schedules/${examScheduleId}/marks`),
 
-  correctExamMark: (data: { markId: string; newMarks: number; rationale: string }) =>
+  correctExamMark: (data: { markId: string; newMarksObtained?: number; newMarks?: number; reason?: string; rationale?: string; isAbsent?: boolean; isExempt?: boolean; teacherRemarks?: string }) =>
     apiRequest<any>('/api/v1/academic/exams/marks/correct', {
+      method: 'PATCH',
+      body: JSON.stringify({
+        markId: data.markId,
+        newMarksObtained: data.newMarksObtained !== undefined ? data.newMarksObtained : data.newMarks,
+        reason: data.reason || data.rationale || 'Audited marks entry correction',
+        isAbsent: data.isAbsent,
+        isExempt: data.isExempt,
+        teacherRemarks: data.teacherRemarks,
+      }),
+    }),
+
+  updateExamSchedule: (id: string, data: any) =>
+    apiRequest<any>(`/api/v1/academic/exams/schedules/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     }),
 
-  publishExamResults: (data: { examScheduleId: string; isPublished: boolean }) =>
-    apiRequest<any>('/api/v1/academic/exams/publish', {
+  publishExamResults: (
+    dataOrId: string | { examScheduleId: string; publish?: boolean; isPublished?: boolean },
+    maybePublish?: boolean
+  ) => {
+    const payload =
+      typeof dataOrId === 'string'
+        ? { examScheduleId: dataOrId, publish: Boolean(maybePublish) }
+        : {
+            examScheduleId: dataOrId.examScheduleId,
+            publish: dataOrId.publish !== undefined ? dataOrId.publish : Boolean(dataOrId.isPublished),
+          };
+    return apiRequest<any>('/api/v1/academic/exams/publish', {
       method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  getExamAuditLogs: (paramsOrScheduleId?: string | { examScheduleId?: string }) => {
+    const query = new URLSearchParams();
+    const scheduleId =
+      typeof paramsOrScheduleId === 'string'
+        ? paramsOrScheduleId
+        : paramsOrScheduleId?.examScheduleId;
+    if (scheduleId) query.set('examScheduleId', scheduleId);
+    return apiRequest<any[]>(`/api/v1/academic/exams/audit?${query.toString()}`);
+  },
+
+  getGradingSchemes: () =>
+    apiRequest<any>('/api/v1/academic/exams/grading-schemes'),
+
+  updateGradingScheme: (data: any) =>
+    apiRequest<any>('/api/v1/academic/exams/grading-schemes', {
+      method: 'PUT',
       body: JSON.stringify(data),
     }),
 
   getReportCard: (studentProfileId: string) =>
+    apiRequest<any>(`/api/v1/academic/report-cards/${studentProfileId}`),
+
+  getStudentReportCard: (studentProfileId: string) =>
     apiRequest<any>(`/api/v1/academic/report-cards/${studentProfileId}`),
 };
 

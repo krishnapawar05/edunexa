@@ -243,6 +243,12 @@ a:hover {
   color: var(--text-muted);
 }
 
+.ed-badge-teal {
+  background-color: var(--teal-subtle);
+  border: 1px solid var(--teal-border);
+  color: var(--teal-text);
+}
+
 /* Form Controls */
 .ed-input-group {
   display: flex;
@@ -288,22 +294,45 @@ a:hover {
   padding: var(--space-4) var(--space-5);
   display: flex;
   flex-direction: column;
+  justify-content: space-between;
+  min-height: 110px;
   gap: 4px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.ed-metric-tile:hover {
+  border-color: var(--border-strong);
+}
+
+.ed-metric-tile.clickable {
+  cursor: pointer;
+}
+
+.ed-metric-tile.clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+  border-color: var(--primary-300, #93c5fd);
+}
+
+[data-theme="dark"] .ed-metric-tile.clickable:hover,
+html.dark .ed-metric-tile.clickable:hover {
+  border-color: var(--primary-600);
 }
 
 .ed-metric-tile .label {
-  font-size: 0.8rem;
-  font-weight: 500;
+  font-size: 0.76rem;
+  font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
 }
 
 .ed-metric-tile .value {
   font-family: var(--font-display);
-  font-size: 1.6rem;
+  font-size: 1.7rem;
   font-weight: 700;
   color: var(--text-primary);
+  line-height: 1.2;
 }
 
 .ed-metric-tile .subtitle {
@@ -311,7 +340,7 @@ a:hover {
   color: var(--text-muted);
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
 }
 
 /* Layout Utilities */
@@ -333,12 +362,18 @@ a:hover {
   gap: var(--space-4);
 }
 
-@media (max-width: 1024px) {
+@media (max-width: 1200px) and (min-width: 769px) {
   .ed-grid-4 { grid-template-columns: repeat(2, 1fr); }
-  .ed-grid-3 { grid-template-columns: repeat(1, 1fr); }
+}
+
+@media (max-width: 1024px) and (min-width: 641px) {
+  .ed-grid-3 { grid-template-columns: repeat(2, 1fr); }
 }
 
 @media (max-width: 768px) {
+  .ed-grid-4 { grid-template-columns: repeat(2, 1fr); }
+  .ed-grid-2 { grid-template-columns: 1fr; }
+
   .ed-mobile-toggle {
     display: inline-flex !important;
   }
@@ -363,7 +398,110 @@ a:hover {
 }
 
 @media (max-width: 640px) {
-  .ed-grid-4, .ed-grid-2 { grid-template-columns: 1fr; }
+  .ed-grid-4, .ed-grid-3, .ed-grid-2 { grid-template-columns: 1fr; }
+}
+
+/* Workflow Navigation Cards */
+.ed-workflow-card {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 100%;
+  box-shadow: var(--shadow-xs);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  cursor: pointer;
+}
+
+.ed-workflow-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--primary-300, #93c5fd);
+}
+
+[data-theme="dark"] .ed-workflow-card:hover,
+html.dark .ed-workflow-card:hover {
+  border-color: var(--primary-600);
+}
+
+.ed-workflow-icon-box {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ed-workflow-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-light);
+  margin-top: var(--space-4);
+  transition: gap 0.15s ease, color 0.15s ease;
+}
+
+.ed-workflow-card:hover .ed-workflow-link {
+  gap: 10px;
+}
+
+/* Compliance Status Row */
+.ed-compliance-row {
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  background-color: var(--bg-surface-elevated);
+  border: 1px solid var(--border-default);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ed-compliance-row:hover {
+  border-color: var(--border-strong);
+}
+
+/* Training Module Cards */
+.ed-training-card {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xs);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 100%;
+  transition: box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.ed-training-card:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-sm);
+}
+
+.ed-training-card-body {
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.ed-training-card-footer {
+  padding: var(--space-3) var(--space-5);
+  border-top: 1px solid var(--border-default);
+  background-color: var(--bg-subtle);
+  border-bottom-left-radius: var(--radius-md);
+  border-bottom-right-radius: var(--radius-md);
+  display: flex;
+  gap: var(--space-2);
 }
 
 /* Modal and Dropdown Solid Backing Enforcement */
