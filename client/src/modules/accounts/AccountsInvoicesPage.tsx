@@ -21,6 +21,7 @@ import { Button } from '../../components/ui/Button.js';
 import { Modal } from '../../components/ui/Modal.js';
 import { useSchoolBranding } from '../../context/SchoolBrandingContext.js';
 import { operationsApi, coreApi } from '../../services/api.js';
+import { downloadFeeReceiptPdf, downloadFeeInvoicePdf } from '../../services/pdfGenerator.js';
 
 interface InvoiceRecord {
   id: string;
@@ -512,6 +513,29 @@ export const AccountsInvoicesPage: React.FC = () => {
                           >
                             <History size={12} />
                           </button>
+
+                          <button
+                            onClick={() => {
+                              downloadFeeInvoicePdf({
+                                schoolName: branding.schoolName || 'Apex Academy of Sciences & Arts',
+                                invoiceNumber: inv.invoiceNumber,
+                                dueDate: inv.dueDate,
+                                studentName: inv.studentName,
+                                admissionNumber: inv.studentProfileId,
+                                className: inv.className,
+                                feeHead: inv.feeStructureHead,
+                                amountDue: inv.amountDue,
+                                amountPaid: inv.amountPaid,
+                                balanceDue: balance,
+                                status: inv.status,
+                              });
+                            }}
+                            title="Download Official Invoice PDF"
+                            className="ed-btn ed-btn-secondary"
+                            style={{ padding: '4px 6px', fontSize: '0.74rem' }}
+                          >
+                            <Download size={12} />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -851,6 +875,28 @@ export const AccountsInvoicesPage: React.FC = () => {
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)', marginTop: 'var(--space-3)' }}>
               <Button variant="secondary" onClick={() => setActiveReceipt(null)}>
                 Close
+              </Button>
+              <Button
+                variant="secondary"
+                icon={<Download size={14} />}
+                onClick={() => {
+                  downloadFeeReceiptPdf({
+                    schoolName: branding.schoolName || 'Apex Academy of Sciences & Arts',
+                    receiptNumber: activeReceipt.receiptNo,
+                    invoiceNumber: activeReceipt.invoiceNo,
+                    date: activeReceipt.date,
+                    studentName: activeReceipt.studentName,
+                    admissionNumber: activeReceipt.admissionNo,
+                    className: 'Secondary Wing',
+                    feeHead: 'Tuition & Academic Development',
+                    amountPaid: activeReceipt.amount,
+                    paymentMethod: activeReceipt.method,
+                    transactionRef: 'ACCOUNTS-OFFICE-CLEARING',
+                    balanceRemaining: 0,
+                  });
+                }}
+              >
+                Download PDF
               </Button>
               <Button variant="primary" icon={<Printer size={14} />} onClick={() => window.print()}>
                 Print Official Receipt

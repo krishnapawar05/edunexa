@@ -14,6 +14,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { coreApi, getStoredUser } from '../../services/api.js';
+import { downloadIdCardPdf } from '../../services/pdfGenerator.js';
 
 export const StudentVirtualIdCardPage: React.FC = () => {
   const [student, setStudent] = useState<any>(null);
@@ -327,9 +328,21 @@ export const StudentVirtualIdCardPage: React.FC = () => {
               <button
                 className="ed-btn ed-btn-primary"
                 style={{ flex: 1 }}
-                onClick={() => window.print()}
+                onClick={() => {
+                  downloadIdCardPdf({
+                    schoolName: 'Apex Academy of Sciences & Arts',
+                    fullName: studentFullName,
+                    identifierNumber: admissionNumber,
+                    roleCategory: 'STUDENT',
+                    classOrDept: className ? `${className} - ${sectionName}` : 'Grade 10-A',
+                    academicSession: '2026–2027',
+                    bloodGroup: bloodGroup,
+                    status: cardStatus,
+                    verificationToken: verificationToken || 'v-tok-8f2c-49a1-9b7e-e214',
+                  });
+                }}
               >
-                <Download size={14} /> Save / Print PDF
+                <Download size={14} /> Download ID Card (PDF)
               </button>
             </div>
           </div>

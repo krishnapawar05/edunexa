@@ -13,6 +13,7 @@ import {
   Building2,
 } from 'lucide-react';
 import { academicApi, coreApi, getStoredUser } from '../../services/api.js';
+import { downloadReportCardPdf } from '../../services/pdfGenerator.js';
 
 export const StudentResultsPage: React.FC = () => {
   const [reportCard, setReportCard] = useState<any | null>(null);
@@ -92,6 +93,35 @@ export const StudentResultsPage: React.FC = () => {
             disabled={loading}
           >
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh Results
+          </button>
+          <button
+            className="ed-btn ed-btn-secondary"
+            onClick={() => {
+              if (!reportCard) return;
+              downloadReportCardPdf({
+                schoolName: 'Apex Academy of Sciences & Arts',
+                studentName: studentFullName,
+                admissionNumber: admissionNumber,
+                className: className ? `${className} - ${sectionName}` : 'Grade 10-A',
+                rollNumber: rollNumber,
+                academicSession: 'Academic Year 2026–2027',
+                subjects: (reportCard.subjects || []).map((s: any) => ({
+                  subjectName: s.subjectName,
+                  marksObtained: s.marksObtained,
+                  maxMarks: s.maxMarks,
+                  grade: s.grade,
+                  teacherRemarks: s.teacherRemarks,
+                })),
+                overallPercentage: reportCard.overallPercentage,
+                overallGrade: reportCard.overallGrade,
+                attendancePercentage: 96,
+                principalRemarks: 'Promoted with exemplary analytical aptitude and distinction.',
+              });
+            }}
+            disabled={!reportCard || loading}
+          >
+            <Printer size={14} style={{ display: 'none' }} />
+            Download PDF
           </button>
           <button
             className="ed-btn ed-btn-primary"

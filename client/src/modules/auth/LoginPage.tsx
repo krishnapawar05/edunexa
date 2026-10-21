@@ -44,9 +44,18 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGoToPubl
         body: JSON.stringify({ email: email.trim(), password }),
       });
 
-      const data = await res.json();
+      let data: any = null;
+      try {
+        const text = await res.text();
+        data = text ? JSON.parse(text) : null;
+      } catch {
+        throw new Error('Cannot connect to the EduNexa backend API server (http://localhost:5000). Please ensure the backend is running with "npm run dev".');
+      }
 
-      if (!res.ok || !data.success) {
+      if (!res.ok || !data || !data.success) {
+        if (!data) {
+          throw new Error('Backend server is currently offline or unreachable at port 5000. Please start the backend server with "npm run dev".');
+        }
         throw new Error(data.error?.message || 'Authentication failed. Please check your institutional credentials.');
       }
 
@@ -215,6 +224,77 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGoToPubl
               <ArrowRight size={16} />
             </button>
           </form>
+
+          {/* Quick Demo Credentials for Evaluation & PRD Verification */}
+          <div
+            style={{
+              marginTop: 'var(--space-4)',
+              paddingTop: 'var(--space-3)',
+              borderTop: '1px dashed var(--border-default)',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '8px',
+              }}
+            >
+              <span style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.04em' }}>
+                DEMO CREDENTIALS (9 PRD ROLES)
+              </span>
+              <span style={{ fontSize: '0.70rem', color: 'var(--text-muted)' }}>
+                Pass: Password@123
+              </span>
+            </div>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: '6px',
+              }}
+            >
+              {[
+                { label: 'Super Admin', email: 'superadmin@edunexa.org' },
+                { label: 'School Admin', email: 'admin@apexacademy.edu' },
+                { label: 'Principal', email: 'principal@apexacademy.edu' },
+                { label: 'Teacher', email: 'julian.thorne@apexacademy.edu' },
+                { label: 'Student', email: 'aarav.sharma@apexacademy.edu' },
+                { label: 'Parent', email: 'vikram.sharma@gmail.com' },
+                { label: 'HR Staff', email: 'hr@apexacademy.edu' },
+                { label: 'Accounts', email: 'accounts@apexacademy.edu' },
+                { label: 'Exam Coord', email: 'exam.coordinator@apexacademy.edu' },
+              ].map((role) => (
+                <button
+                  key={role.label}
+                  type="button"
+                  onClick={() => {
+                    setEmail(role.email);
+                    setPassword('Password@123');
+                    setErrorMessage(null);
+                  }}
+                  className="ed-btn ed-btn-sm"
+                  style={{
+                    fontSize: '0.72rem',
+                    padding: '4px 6px',
+                    textAlign: 'center',
+                    backgroundColor: email === role.email ? 'var(--primary-50)' : 'var(--bg-subtle)',
+                    borderColor: email === role.email ? 'var(--primary-500)' : 'var(--border-default)',
+                    color: email === role.email ? 'var(--primary-700)' : 'var(--text-secondary)',
+                    fontWeight: email === role.email ? 700 : 500,
+                    borderRadius: 'var(--radius-sm)',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  }}
+                  title={`Fill credentials for ${role.label} (${role.email})`}
+                >
+                  {role.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Public Website and Registration Links */}

@@ -99,6 +99,60 @@ async function main() {
       role: PlatformRole.PARENT,
     },
     {
+      email: 'principal@apexacademy.edu',
+      firstName: 'Dr. Alistair',
+      lastName: 'Vance',
+      role: PlatformRole.PRINCIPAL,
+    },
+    {
+      email: 'hr@apexacademy.edu',
+      firstName: 'Elena',
+      lastName: 'Rostova',
+      role: PlatformRole.HR_STAFF,
+    },
+    {
+      email: 'rebecca.vance@apexacademy.edu',
+      firstName: 'Rebecca',
+      lastName: 'Vance',
+      role: PlatformRole.TEACHER,
+    },
+    {
+      email: 'rohan.verma@apexacademy.edu',
+      firstName: 'Rohan',
+      lastName: 'Verma',
+      role: PlatformRole.STUDENT,
+    },
+    {
+      email: 'meera.iyer@apexacademy.edu',
+      firstName: 'Meera',
+      lastName: 'Iyer',
+      role: PlatformRole.STUDENT,
+    },
+    {
+      email: 'kabir.sen@apexacademy.edu',
+      firstName: 'Kabir',
+      lastName: 'Sen',
+      role: PlatformRole.STUDENT,
+    },
+    {
+      email: 'rajesh.verma@parent.apex.edu',
+      firstName: 'Rajesh',
+      lastName: 'Verma',
+      role: PlatformRole.PARENT,
+    },
+    {
+      email: 'sunita.iyer@parent.apex.edu',
+      firstName: 'Sunita',
+      lastName: 'Iyer',
+      role: PlatformRole.PARENT,
+    },
+    {
+      email: 'exam.coordinator@apexacademy.edu',
+      firstName: 'Dr. Marcus',
+      lastName: 'Brody',
+      role: PlatformRole.EXAM_COORDINATOR,
+    },
+    {
       email: 'superadmin@edunexa.org',
       firstName: 'System',
       lastName: 'SuperAdmin',
@@ -160,6 +214,7 @@ async function main() {
 
   // 4. Create Departments
   const deptData = [
+    { name: 'Administration & Governance', description: 'Institutional leadership, academic coordination, and human resources' },
     { name: 'Science & Physics', description: 'Physics, Chemistry, Biology' },
     { name: 'Mathematics', description: 'Pure & Applied Mathematics' },
     { name: 'Humanities & Social Sciences', description: 'History, Civics, Geography' },
@@ -241,6 +296,65 @@ async function main() {
 
   console.log(`✓ Classes, Sections, and Subjects seeded.`);
 
+  // Helper functions for idempotent Virtual ID Card upsert
+  async function upsertStaffCard(staffProfileId: string, cardNumber: string, verificationToken: string) {
+    const existing = await prisma.virtualIdCard.findFirst({
+      where: {
+        OR: [{ staffProfileId }, { cardNumber }, { verificationToken }],
+      },
+    });
+    if (existing) {
+      return prisma.virtualIdCard.update({
+        where: { id: existing.id },
+        data: {
+          staffProfileId,
+          cardNumber,
+          verificationToken,
+          status: CardStatus.ACTIVE,
+          expiresAt: new Date('2028-06-30'),
+        },
+      });
+    }
+    return prisma.virtualIdCard.create({
+      data: {
+        staffProfileId,
+        cardNumber,
+        verificationToken,
+        status: CardStatus.ACTIVE,
+        expiresAt: new Date('2028-06-30'),
+      },
+    });
+  }
+
+  async function upsertStudentCard(studentProfileId: string, cardNumber: string, verificationToken: string) {
+    const existing = await prisma.virtualIdCard.findFirst({
+      where: {
+        OR: [{ studentProfileId }, { cardNumber }, { verificationToken }],
+      },
+    });
+    if (existing) {
+      return prisma.virtualIdCard.update({
+        where: { id: existing.id },
+        data: {
+          studentProfileId,
+          cardNumber,
+          verificationToken,
+          status: CardStatus.ACTIVE,
+          expiresAt: new Date('2027-03-31'),
+        },
+      });
+    }
+    return prisma.virtualIdCard.create({
+      data: {
+        studentProfileId,
+        cardNumber,
+        verificationToken,
+        status: CardStatus.ACTIVE,
+        expiresAt: new Date('2027-03-31'),
+      },
+    });
+  }
+
   // 6. Create Staff Profiles
   const teacherMembership = userMap['julian.thorne@apexacademy.edu']?.membership;
   let teacherStaffProfile: any = null;
@@ -277,17 +391,85 @@ async function main() {
     }
 
     // ID Card for Julian Thorne
-    await prisma.virtualIdCard.upsert({
-      where: { cardNumber: 'CR80-2026-0012' },
+    await upsertStaffCard(teacherStaffProfile.id, 'CR80-2026-0012', 'v-tok-7a1b-3c4d-5e6f-9912');
+  }
+
+  // Principal Staff Profile
+  const principalMembership = userMap['principal@apexacademy.edu']?.membership;
+  if (principalMembership) {
+    const principalProfile = await prisma.staffProfile.upsert({
+      where: { employeeId: 'EMP-2026-0001' },
       update: {},
       create: {
-        staffProfileId: teacherStaffProfile.id,
-        cardNumber: 'CR80-2026-0012',
-        verificationToken: 'v-tok-7a1b-3c4d-5e6f-9912',
-        status: CardStatus.ACTIVE,
-        expiresAt: new Date('2028-06-30'),
+        membershipId: principalMembership.id,
+        employeeId: 'EMP-2026-0001',
+        designation: 'Principal & Head of School',
+        departmentId: deptMap['Administration & Governance']?.id,
+        joiningDate: new Date('2020-04-01'),
+        employmentStatus: EmploymentStatus.ACTIVE,
       },
     });
+
+    await upsertStaffCard(principalProfile.id, 'CR80-2026-0001', 'v-tok-1a2b-3c4d-5e6f-0001');
+  }
+
+  // HR Staff Profile
+  const hrMembership = userMap['hr@apexacademy.edu']?.membership;
+  if (hrMembership) {
+    const hrProfile = await prisma.staffProfile.upsert({
+      where: { employeeId: 'EMP-2026-0005' },
+      update: {},
+      create: {
+        membershipId: hrMembership.id,
+        employeeId: 'EMP-2026-0005',
+        designation: 'HR Director & Staff Admin',
+        departmentId: deptMap['Administration & Governance']?.id,
+        joiningDate: new Date('2022-01-15'),
+        employmentStatus: EmploymentStatus.ACTIVE,
+      },
+    });
+
+    await upsertStaffCard(hrProfile.id, 'CR80-2026-0005', 'v-tok-5a6b-7c8d-9e0f-0005');
+  }
+
+  // Accounts Staff Profile
+  const accountsMembership = userMap['accounts@apexacademy.edu']?.membership;
+  if (accountsMembership) {
+    const accountsProfile = await prisma.staffProfile.upsert({
+      where: { employeeId: 'EMP-2026-0008' },
+      update: {},
+      create: {
+        membershipId: accountsMembership.id,
+        employeeId: 'EMP-2026-0008',
+        designation: 'Bursar & Finance Officer',
+        departmentId: deptMap['Administration & Governance']?.id,
+        joiningDate: new Date('2021-06-01'),
+        employmentStatus: EmploymentStatus.ACTIVE,
+      },
+    });
+
+    await upsertStaffCard(accountsProfile.id, 'CR80-2026-0008', 'v-tok-8a9b-0c1d-2e3f-0008');
+  }
+
+  // Exam Coordinator Staff Profile
+  const examCoordMembership = userMap['exam.coordinator@apexacademy.edu']?.membership;
+  if (examCoordMembership) {
+    const examCoordProfile = await prisma.staffProfile.upsert({
+      where: { employeeId: 'EMP-2026-0009' },
+      update: {
+        departmentId: deptMap['Administration & Governance']?.id,
+      },
+      create: {
+        membershipId: examCoordMembership.id,
+        employeeId: 'EMP-2026-0009',
+        designation: 'Examination Coordinator',
+        departmentId: deptMap['Administration & Governance']?.id,
+        joiningDate: new Date('2021-09-01'),
+        employmentStatus: EmploymentStatus.ACTIVE,
+      },
+    });
+
+    await upsertStaffCard(examCoordProfile.id, 'CR80-2026-0009', 'v-tok-9a0b-1c2d-3e4f-0009');
   }
 
   // 7. Create Student Profiles (Aarav & Ananya)
@@ -332,17 +514,7 @@ async function main() {
     }
 
     // ID Card for Aarav
-    await prisma.virtualIdCard.upsert({
-      where: { cardNumber: 'CR80-2026-0042' },
-      update: {},
-      create: {
-        studentProfileId: aaravProfile.id,
-        cardNumber: 'CR80-2026-0042',
-        verificationToken: 'v-tok-8f2c-49a1-9b7e-e214',
-        status: CardStatus.ACTIVE,
-        expiresAt: new Date('2027-03-31'),
-      },
-    });
+    await upsertStudentCard(aaravProfile.id, 'CR80-2026-0042', 'v-tok-8f2c-49a1-9b7e-e214');
 
     // Parent link: Vikram Sharma -> Aarav
     const parentMembership = userMap['vikram.sharma@gmail.com']?.membership;
@@ -442,7 +614,199 @@ async function main() {
     }
   }
 
-  console.log(`✓ Staff & Student Profiles with ID Cards & Enrollments seeded.`);
+  // Rebecca Vance Staff Profile
+  const rebeccaMembership = userMap['rebecca.vance@apexacademy.edu']?.membership;
+  if (rebeccaMembership) {
+    const rebeccaProfile = await prisma.staffProfile.upsert({
+      where: { employeeId: 'EMP-2026-0014' },
+      update: {},
+      create: {
+        membershipId: rebeccaMembership.id,
+        employeeId: 'EMP-2026-0014',
+        designation: 'Faculty - Mathematics',
+        departmentId: deptMap['Mathematics']?.id,
+        joiningDate: new Date('2023-09-01'),
+        employmentStatus: EmploymentStatus.ACTIVE,
+      },
+    });
+    if (subjectMap['MATH-10']) {
+      await prisma.teacherAssignment.upsert({
+        where: {
+          staffProfileId_subjectId: {
+            staffProfileId: rebeccaProfile.id,
+            subjectId: subjectMap['MATH-10'].id,
+          },
+        },
+        update: {},
+        create: {
+          staffProfileId: rebeccaProfile.id,
+          subjectId: subjectMap['MATH-10'].id,
+          isLeadTeacher: true,
+        },
+      });
+    }
+    await upsertStaffCard(rebeccaProfile.id, 'CR80-2026-0014', 'v-tok-2c3d-4e5f-6a7b-0014');
+  }
+
+  // Rohan Verma (Grade 10-A)
+  const rohanMembership = userMap['rohan.verma@apexacademy.edu']?.membership;
+  let rohanProfile: any = null;
+  if (rohanMembership) {
+    rohanProfile = await prisma.studentProfile.upsert({
+      where: { admissionNumber: 'ADM-2026-0104' },
+      update: {},
+      create: {
+        membershipId: rohanMembership.id,
+        admissionNumber: 'ADM-2026-0104',
+        gender: 'Male',
+        dateOfBirth: new Date('2010-07-14'),
+        bloodGroup: 'A+',
+        address: 'Sector 22, Institutional Area, New Delhi',
+        emergencyPhone: '+91 98300 12345',
+        status: StudentStatus.ACTIVE,
+      },
+    });
+    const grade10SecA = sectionMap['Grade 10-A'];
+    if (grade10SecA) {
+      await prisma.studentEnrollment.upsert({
+        where: {
+          studentProfileId_academicSessionId: {
+            studentProfileId: rohanProfile.id,
+            academicSessionId: session.id,
+          },
+        },
+        update: {},
+        create: {
+          studentProfileId: rohanProfile.id,
+          academicSessionId: session.id,
+          classId: grade10SecA.classId,
+          sectionId: grade10SecA.id,
+          rollNumber: 3,
+        },
+      });
+    }
+    await upsertStudentCard(rohanProfile.id, 'CR80-2026-0104', 'v-tok-3d4e-5f6a-7b8c-0104');
+
+    const rajeshMembership = userMap['rajesh.verma@parent.apex.edu']?.membership;
+    if (rajeshMembership) {
+      await prisma.parentStudentLink.upsert({
+        where: {
+          parentMembershipId_studentProfileId: {
+            parentMembershipId: rajeshMembership.id,
+            studentProfileId: rohanProfile.id,
+          },
+        },
+        update: {},
+        create: {
+          parentMembershipId: rajeshMembership.id,
+          studentProfileId: rohanProfile.id,
+          relationship: 'Father',
+          isPrimaryContact: true,
+        },
+      });
+    }
+  }
+
+  // Meera Iyer (Grade 9-A)
+  const meeraMembership = userMap['meera.iyer@apexacademy.edu']?.membership;
+  let meeraProfile: any = null;
+  if (meeraMembership) {
+    meeraProfile = await prisma.studentProfile.upsert({
+      where: { admissionNumber: 'ADM-2026-0155' },
+      update: {},
+      create: {
+        membershipId: meeraMembership.id,
+        admissionNumber: 'ADM-2026-0155',
+        gender: 'Female',
+        dateOfBirth: new Date('2011-03-29'),
+        bloodGroup: 'AB+',
+        address: 'Safdarjung Enclave, New Delhi',
+        emergencyPhone: '+91 98400 67890',
+        status: StudentStatus.ACTIVE,
+      },
+    });
+    const grade9SecA = sectionMap['Grade 9-A'];
+    if (grade9SecA) {
+      await prisma.studentEnrollment.upsert({
+        where: {
+          studentProfileId_academicSessionId: {
+            studentProfileId: meeraProfile.id,
+            academicSessionId: session.id,
+          },
+        },
+        update: {},
+        create: {
+          studentProfileId: meeraProfile.id,
+          academicSessionId: session.id,
+          classId: grade9SecA.classId,
+          sectionId: grade9SecA.id,
+          rollNumber: 1,
+        },
+      });
+    }
+    await upsertStudentCard(meeraProfile.id, 'CR80-2026-0155', 'v-tok-4e5f-6a7b-8c9d-0155');
+
+    const sunitaMembership = userMap['sunita.iyer@parent.apex.edu']?.membership;
+    if (sunitaMembership) {
+      await prisma.parentStudentLink.upsert({
+        where: {
+          parentMembershipId_studentProfileId: {
+            parentMembershipId: sunitaMembership.id,
+            studentProfileId: meeraProfile.id,
+          },
+        },
+        update: {},
+        create: {
+          parentMembershipId: sunitaMembership.id,
+          studentProfileId: meeraProfile.id,
+          relationship: 'Mother',
+          isPrimaryContact: true,
+        },
+      });
+    }
+  }
+
+  // Kabir Sen (Grade 11-A)
+  const kabirMembership = userMap['kabir.sen@apexacademy.edu']?.membership;
+  let kabirProfile: any = null;
+  if (kabirMembership) {
+    kabirProfile = await prisma.studentProfile.upsert({
+      where: { admissionNumber: 'ADM-2026-0210' },
+      update: {},
+      create: {
+        membershipId: kabirMembership.id,
+        admissionNumber: 'ADM-2026-0210',
+        gender: 'Male',
+        dateOfBirth: new Date('2009-11-08'),
+        bloodGroup: 'O-',
+        address: 'Anand Lok, New Delhi',
+        emergencyPhone: '+91 98500 11223',
+        status: StudentStatus.ACTIVE,
+      },
+    });
+    const grade11SecA = sectionMap['Grade 11-A'];
+    if (grade11SecA) {
+      await prisma.studentEnrollment.upsert({
+        where: {
+          studentProfileId_academicSessionId: {
+            studentProfileId: kabirProfile.id,
+            academicSessionId: session.id,
+          },
+        },
+        update: {},
+        create: {
+          studentProfileId: kabirProfile.id,
+          academicSessionId: session.id,
+          classId: grade11SecA.classId,
+          sectionId: grade11SecA.id,
+          rollNumber: 1,
+        },
+      });
+    }
+    await upsertStudentCard(kabirProfile.id, 'CR80-2026-0210', 'v-tok-5f6a-7b8c-9d0e-0210');
+  }
+
+  console.log(`✓ 5 Canonical Staff & 5 Canonical Student Profiles with ID Cards & Enrollments seeded.`);
 
   // 8. Create Admission Application
   await prisma.admissionApplication.upsert({
@@ -612,6 +976,96 @@ async function main() {
         },
       });
     }
+
+    const existingChemQ = await prisma.quiz.findFirst({ where: { id: 'quiz-chem-01' } });
+    if (!existingChemQ && subjectMap['CHEM-10']) {
+      await prisma.quiz.create({
+        data: {
+          id: 'quiz-chem-01',
+          schoolId: school.id,
+          subjectId: subjectMap['CHEM-10'].id,
+          sectionId: grade10SecA?.id,
+          title: 'Chemistry Chapter 2: Periodic Classification & Chemical Bonds',
+          instructions: 'Objective review with electrovalent and covalent bonding questions.',
+          durationMinutes: 30,
+          totalMarks: 20,
+          passingMarks: 8,
+          status: 'PUBLISHED',
+          opensAt: new Date(Date.now() - 12 * 3600 * 1000),
+          closesAt: new Date(Date.now() + 5 * 24 * 3600 * 1000),
+          maxAttempts: 1,
+          randomizeQuestions: true,
+          negativeMarking: 0.0,
+          releaseGradesImmediately: true,
+          createdByUserId: teacherMembership?.userId || 'usr-thorne-01',
+        },
+      });
+    }
+
+    const existingCsQ = await prisma.quiz.findFirst({ where: { id: 'quiz-cs-01' } });
+    if (!existingCsQ && subjectMap['PHY-10']) {
+      await prisma.quiz.create({
+        data: {
+          id: 'quiz-cs-01',
+          schoolId: school.id,
+          subjectId: subjectMap['PHY-10'].id,
+          sectionId: grade10SecA?.id,
+          title: 'Computer Science & AI: Data Structures & Python Algorithms',
+          instructions: 'Assessment on lists, dictionaries, time complexity, and search routines.',
+          durationMinutes: 40,
+          totalMarks: 25,
+          passingMarks: 10,
+          status: 'PUBLISHED',
+          opensAt: new Date(Date.now() - 6 * 3600 * 1000),
+          closesAt: new Date(Date.now() + 10 * 24 * 3600 * 1000),
+          maxAttempts: 1,
+          randomizeQuestions: true,
+          negativeMarking: 0.25,
+          releaseGradesImmediately: true,
+          createdByUserId: teacherMembership?.userId || 'usr-thorne-01',
+        },
+      });
+    }
+
+    const existingTrainingQ = await prisma.quiz.findFirst({ where: { id: 'quiz-training-01' } });
+    if (!existingTrainingQ) {
+      await prisma.quiz.create({
+        data: {
+          id: 'quiz-training-01',
+          schoolId: school.id,
+          subjectId: subjectMap['PHY-10'].id,
+          title: 'Mandatory Institutional Child Protection & Safety Protocols (2026–2027)',
+          instructions: 'Annual compliance assessment for all faculty and administrative personnel.',
+          durationMinutes: 30,
+          totalMarks: 100,
+          passingMarks: 75,
+          status: 'PUBLISHED',
+          isStaffTraining: true,
+          opensAt: new Date(Date.now() - 30 * 24 * 3600 * 1000),
+          closesAt: new Date(Date.now() + 365 * 24 * 3600 * 1000),
+          maxAttempts: 3,
+          createdByUserId: teacherMembership?.userId || 'usr-thorne-01',
+          questions: {
+            create: [
+              {
+                id: 'q-train-1',
+                questionText: 'What is the immediate protocol upon observing an unauthorized individual on school premises?',
+                questionType: 'MULTIPLE_CHOICE',
+                marks: 100,
+                explanation: 'Security and admin desk must be notified immediately.',
+                orderIndex: 0,
+                choices: {
+                  create: [
+                    { id: 'c-tr-1a', choiceText: 'Immediately notify security dispatch and escort students to secure rooms', isCorrect: true, orderIndex: 0 },
+                    { id: 'c-tr-1b', choiceText: 'Ignore unless individual approaches a classroom', isCorrect: false, orderIndex: 1 },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+      });
+    }
   }
 
   // 12. Exam Schedules & Marks
@@ -698,6 +1152,92 @@ async function main() {
         marksObtained: 88,
         grade: 'A2',
         teacherRemarks: 'Strong grasp of trigonometry and geometric proofs.',
+        enteredByUserId: teacherMembership?.userId || 'usr-thorne-01',
+      },
+    });
+
+    if (rohanProfile) {
+      await prisma.examMark.upsert({
+        where: { examScheduleId_studentProfileId: { examScheduleId: examMidMath.id, studentProfileId: rohanProfile.id } },
+        update: {},
+        create: {
+          id: 'mark-rohan-math-mid',
+          examScheduleId: examMidMath.id,
+          studentProfileId: rohanProfile.id,
+          marksObtained: 79,
+          grade: 'B1',
+          teacherRemarks: 'Consistent effort in algebraic simplifications.',
+          enteredByUserId: teacherMembership?.userId || 'usr-thorne-01',
+        },
+      });
+    }
+  }
+
+  if (subjectMap['CHEM-10'] && session && aaravProfile) {
+    const examMidChem = await prisma.examSchedule.upsert({
+      where: { id: 'exam-mid-chem-10' },
+      update: {},
+      create: {
+        id: 'exam-mid-chem-10',
+        academicSessionId: session.id,
+        subjectId: subjectMap['CHEM-10'].id,
+        name: 'Mid-Term Examination 2026: Chemistry',
+        examType: 'MID_TERM',
+        examDate: new Date('2026-09-24'),
+        startTime: '09:30 AM',
+        durationMinutes: 180,
+        maxMarks: 100,
+        passMarks: 35,
+        weightagePercent: 30,
+        status: 'PUBLISHED',
+      },
+    });
+
+    await prisma.examMark.upsert({
+      where: { examScheduleId_studentProfileId: { examScheduleId: examMidChem.id, studentProfileId: aaravProfile.id } },
+      update: {},
+      create: {
+        id: 'mark-aarav-chem-mid',
+        examScheduleId: examMidChem.id,
+        studentProfileId: aaravProfile.id,
+        marksObtained: 90,
+        grade: 'A2',
+        teacherRemarks: 'Excellent mastery of stoichiometry and chemical equations.',
+        enteredByUserId: teacherMembership?.userId || 'usr-thorne-01',
+      },
+    });
+  }
+
+  if (subjectMap['ENG-10'] && session && aaravProfile) {
+    const examMidEng = await prisma.examSchedule.upsert({
+      where: { id: 'exam-mid-eng-10' },
+      update: {},
+      create: {
+        id: 'exam-mid-eng-10',
+        academicSessionId: session.id,
+        subjectId: subjectMap['ENG-10'].id,
+        name: 'Mid-Term Examination 2026: English Literature',
+        examType: 'MID_TERM',
+        examDate: new Date('2026-09-26'),
+        startTime: '09:30 AM',
+        durationMinutes: 180,
+        maxMarks: 100,
+        passMarks: 35,
+        weightagePercent: 30,
+        status: 'PUBLISHED',
+      },
+    });
+
+    await prisma.examMark.upsert({
+      where: { examScheduleId_studentProfileId: { examScheduleId: examMidEng.id, studentProfileId: aaravProfile.id } },
+      update: {},
+      create: {
+        id: 'mark-aarav-eng-mid',
+        examScheduleId: examMidEng.id,
+        studentProfileId: aaravProfile.id,
+        marksObtained: 86,
+        grade: 'A2',
+        teacherRemarks: 'Insightful essay composition and literary analysis.',
         enteredByUserId: teacherMembership?.userId || 'usr-thorne-01',
       },
     });
@@ -835,7 +1375,35 @@ async function main() {
     },
   });
 
-  // 17. School Events
+  await prisma.notice.upsert({
+    where: { id: 'not-04' },
+    update: {},
+    create: {
+      id: 'not-04',
+      schoolId: school.id,
+      title: 'Parent-Teacher Academic Progress Conference (Term 2)',
+      content: 'Individual consultations with class counselors and subject heads scheduled for November 5, 2026 in the Central Hall.',
+      audience: 'PARENTS_ONLY',
+      isUrgent: false,
+      createdByUserId: userMap['admin@apexacademy.edu']?.user.id,
+    },
+  });
+
+  await prisma.notice.upsert({
+    where: { id: 'not-05' },
+    update: {},
+    create: {
+      id: 'not-05',
+      schoolId: school.id,
+      title: 'Campus Sports Complex & Swimming Pool Annual Maintenance',
+      content: 'Indoor aquatic complex will undergo water purification maintenance from October 28 to October 30. Physical education classes will relocate to the outdoor turf.',
+      audience: 'ALL',
+      isUrgent: false,
+      createdByUserId: userMap['admin@apexacademy.edu']?.user.id,
+    },
+  });
+
+  // 17. School Events (4 Canonical Records)
   await prisma.schoolEvent.upsert({
     where: { id: 'evt-01' },
     update: {},
@@ -852,7 +1420,55 @@ async function main() {
     },
   });
 
-  // 18. Fee Structures, Invoices, and Payments
+  await prisma.schoolEvent.upsert({
+    where: { id: 'evt-02' },
+    update: {},
+    create: {
+      id: 'evt-02',
+      schoolId: school.id,
+      title: 'Winter Cultural Festival & Performing Arts Gala 2026',
+      description: 'Classical orchestra, dramatic arts, dance ensembles, and contemporary fine arts exhibition.',
+      venue: 'Open Air Amphitheatre',
+      startDate: new Date('2026-12-18T16:00:00.000Z'),
+      endDate: new Date('2026-12-19T21:30:00.000Z'),
+      audience: 'ALL',
+      isPublic: true,
+    },
+  });
+
+  await prisma.schoolEvent.upsert({
+    where: { id: 'evt-03' },
+    update: {},
+    create: {
+      id: 'evt-03',
+      schoolId: school.id,
+      title: 'All-India Mathematics Olympiad Preliminary Round',
+      description: 'Proctored problem-solving competition for grades 9 through 12.',
+      venue: 'Ramanujan Examination Hall',
+      startDate: new Date('2026-11-28T09:30:00.000Z'),
+      endDate: new Date('2026-11-28T12:30:00.000Z'),
+      audience: 'STUDENTS_ONLY',
+      isPublic: false,
+    },
+  });
+
+  await prisma.schoolEvent.upsert({
+    where: { id: 'evt-04' },
+    update: {},
+    create: {
+      id: 'evt-04',
+      schoolId: school.id,
+      title: 'National Science Day Science Exhibition & AI Hackathon',
+      description: '24-hour student hackathon solving real-world challenges using edge AI and robotics.',
+      venue: 'Innovation & Robotics Lab 3',
+      startDate: new Date('2027-02-28T08:00:00.000Z'),
+      endDate: new Date('2027-03-01T14:00:00.000Z'),
+      audience: 'ALL',
+      isPublic: true,
+    },
+  });
+
+  // 18. Fee Structures, Invoices, and Payments (5 Canonical Invoices)
   const grade10Cls = await prisma.class.findFirst({ where: { schoolId: school.id, code: 'G10' } });
   if (grade10Cls) {
     const fsTuition = await prisma.feeStructure.upsert({
@@ -915,7 +1531,7 @@ async function main() {
     }
 
     if (ananyaProfile) {
-      await prisma.feeInvoice.upsert({
+      const invAnanya = await prisma.feeInvoice.upsert({
         where: { invoiceNumber: 'INV-2026-0413' },
         update: {},
         create: {
@@ -929,7 +1545,180 @@ async function main() {
           status: FeePaymentStatus.PARTIALLY_PAID,
         },
       });
+
+      await prisma.feePayment.upsert({
+        where: { receiptNumber: 'REC-2026-4012' },
+        update: {},
+        create: {
+          id: 'pay-02',
+          feeInvoiceId: invAnanya.id,
+          receiptNumber: 'REC-2026-4012',
+          amountPaid: 20000,
+          paymentMethod: 'NET_BANKING',
+          transactionRef: 'NB-HDFC-88123-SIM',
+          isSimulated: true,
+          collectedBy: userMap['accounts@apexacademy.edu']?.user.id,
+          paidAt: new Date('2026-10-16T14:30:00.000Z'),
+        },
+      });
     }
+
+    if (rohanProfile) {
+      const invRohan = await prisma.feeInvoice.upsert({
+        where: { invoiceNumber: 'INV-2026-0414' },
+        update: {},
+        create: {
+          id: 'inv-rohan-03',
+          feeStructureId: fsTuition.id,
+          studentProfileId: rohanProfile.id,
+          invoiceNumber: 'INV-2026-0414',
+          amountDue: 45000,
+          amountPaid: 45000,
+          dueDate: new Date('2026-10-15'),
+          status: FeePaymentStatus.PAID,
+        },
+      });
+
+      await prisma.feePayment.upsert({
+        where: { receiptNumber: 'REC-2026-4013' },
+        update: {},
+        create: {
+          id: 'pay-03',
+          feeInvoiceId: invRohan.id,
+          receiptNumber: 'REC-2026-4013',
+          amountPaid: 45000,
+          paymentMethod: 'CREDIT_CARD',
+          transactionRef: 'CC-ICICI-49120-SIM',
+          isSimulated: true,
+          collectedBy: userMap['accounts@apexacademy.edu']?.user.id,
+          paidAt: new Date('2026-10-14T11:20:00.000Z'),
+        },
+      });
+    }
+
+    if (meeraProfile) {
+      await prisma.feeInvoice.upsert({
+        where: { invoiceNumber: 'INV-2026-0415' },
+        update: {},
+        create: {
+          id: 'inv-meera-04',
+          feeStructureId: fsTuition.id,
+          studentProfileId: meeraProfile.id,
+          invoiceNumber: 'INV-2026-0415',
+          amountDue: 35000,
+          amountPaid: 0,
+          dueDate: new Date('2026-10-31'),
+          status: FeePaymentStatus.UNPAID,
+        },
+      });
+    }
+
+    if (kabirProfile) {
+      const invKabir = await prisma.feeInvoice.upsert({
+        where: { invoiceNumber: 'INV-2026-0416' },
+        update: {},
+        create: {
+          id: 'inv-kabir-05',
+          feeStructureId: fsTuition.id,
+          studentProfileId: kabirProfile.id,
+          invoiceNumber: 'INV-2026-0416',
+          amountDue: 45000,
+          amountPaid: 45000,
+          dueDate: new Date('2026-10-15'),
+          status: FeePaymentStatus.PAID,
+        },
+      });
+
+      await prisma.feePayment.upsert({
+        where: { receiptNumber: 'REC-2026-4014' },
+        update: {},
+        create: {
+          id: 'pay-04',
+          feeInvoiceId: invKabir.id,
+          receiptNumber: 'REC-2026-4014',
+          amountPaid: 45000,
+          paymentMethod: 'UPI',
+          transactionRef: 'UPI-SIM-44019-OKSBI',
+          isSimulated: true,
+          collectedBy: userMap['accounts@apexacademy.edu']?.user.id,
+          paidAt: new Date('2026-10-15T09:15:00.000Z'),
+        },
+      });
+    }
+  }
+
+  // 19. HR Staff Leave Requests (4 Canonical Records)
+  if (teacherStaffProfile) {
+    await prisma.staffLeaveRequest.upsert({
+      where: { id: 'leave-01' },
+      update: {},
+      create: {
+        id: 'leave-01',
+        staffProfileId: teacherStaffProfile.id,
+        leaveType: 'SICK_LEAVE',
+        startDate: new Date('2026-10-05'),
+        endDate: new Date('2026-10-06'),
+        reason: 'Viral respiratory infection and doctor-advised rest.',
+        status: 'APPROVED',
+        approvedBy: userMap['principal@apexacademy.edu']?.user.id,
+        approvedAt: new Date('2026-10-05T09:00:00.000Z'),
+      },
+    });
+  }
+
+  const hrStaff = await prisma.staffProfile.findFirst({ where: { employeeId: 'EMP-2026-0005' } });
+  if (hrStaff) {
+    await prisma.staffLeaveRequest.upsert({
+      where: { id: 'leave-02' },
+      update: {},
+      create: {
+        id: 'leave-02',
+        staffProfileId: hrStaff.id,
+        leaveType: 'CASUAL_LEAVE',
+        startDate: new Date('2026-10-12'),
+        endDate: new Date('2026-10-12'),
+        reason: 'Family urgent matter.',
+        status: 'APPROVED',
+        approvedBy: userMap['principal@apexacademy.edu']?.user.id,
+        approvedAt: new Date('2026-10-11T16:00:00.000Z'),
+      },
+    });
+  }
+
+  const examCoordStaff = await prisma.staffProfile.findFirst({ where: { employeeId: 'EMP-2026-0009' } });
+  if (examCoordStaff) {
+    await prisma.staffLeaveRequest.upsert({
+      where: { id: 'leave-03' },
+      update: {},
+      create: {
+        id: 'leave-03',
+        staffProfileId: examCoordStaff.id,
+        leaveType: 'DUTY_LEAVE',
+        startDate: new Date('2026-10-25'),
+        endDate: new Date('2026-10-26'),
+        reason: 'CBSE External Center Superintendent inspection committee.',
+        status: 'PENDING',
+      },
+    });
+  }
+
+  const accountsStaff = await prisma.staffProfile.findFirst({ where: { employeeId: 'EMP-2026-0008' } });
+  if (accountsStaff) {
+    await prisma.staffLeaveRequest.upsert({
+      where: { id: 'leave-04' },
+      update: {},
+      create: {
+        id: 'leave-04',
+        staffProfileId: accountsStaff.id,
+        leaveType: 'VACATION_LEAVE',
+        startDate: new Date('2026-11-01'),
+        endDate: new Date('2026-11-03'),
+        reason: 'Out of station personal travel during month-end audit.',
+        status: 'REJECTED',
+        approvedBy: userMap['principal@apexacademy.edu']?.user.id,
+        approvedAt: new Date('2026-10-20T11:00:00.000Z'),
+      },
+    });
   }
 
   // 19. In-app Notifications

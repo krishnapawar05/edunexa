@@ -32,13 +32,19 @@ import { prisma } from '../../config/db.js';
  */
 async function resolveSchool(schoolIdOrIdentifier?: string) {
   if (!schoolIdOrIdentifier) return null;
+  const isExcludedTenant =
+    schoolIdOrIdentifier.includes('greenwood') ||
+    schoolIdOrIdentifier.includes('augustine') ||
+    schoolIdOrIdentifier.includes('school-b') ||
+    schoolIdOrIdentifier.includes('other');
+
   return prisma.school.findFirst({
     where: {
       OR: [
         { id: schoolIdOrIdentifier },
         { slug: schoolIdOrIdentifier },
         { code: schoolIdOrIdentifier },
-        ...(schoolIdOrIdentifier.includes('greenwood') ? [] : [{ slug: 'apex-academy' }]),
+        ...(!isExcludedTenant && (schoolIdOrIdentifier === 'sch-apex-01' || schoolIdOrIdentifier === 'apex-academy' || schoolIdOrIdentifier === 'APEX-2026') ? [{ slug: 'apex-academy' }] : []),
       ],
     },
   });
@@ -2407,6 +2413,16 @@ export class AcademicService {
       { grade: 'E',  minPercentage: 0,  maxPercentage: 32, gradePoint: 0.0, description: 'Needs Essential Improvement (Remedial)' },
     ];
 
+    const standardLetterScheme = [
+      { grade: 'A+', minPercentage: 90, maxPercentage: 100, gradePoint: 10.0, description: 'Outstanding Academic Mastery' },
+      { grade: 'A',  minPercentage: 80, maxPercentage: 89,  gradePoint: 9.0,  description: 'Excellent Knowledge & Application' },
+      { grade: 'B+', minPercentage: 70, maxPercentage: 79,  gradePoint: 8.0,  description: 'Very Good Conceptual Understanding' },
+      { grade: 'B',  minPercentage: 60, maxPercentage: 69,  gradePoint: 7.0,  description: 'Good Proficiency in Core Topics' },
+      { grade: 'C',  minPercentage: 50, maxPercentage: 59,  gradePoint: 6.0,  description: 'Average Competence & Standard Pass' },
+      { grade: 'D',  minPercentage: 35, maxPercentage: 49,  gradePoint: 4.0,  description: 'Marginal Passing Standard' },
+      { grade: 'E',  minPercentage: 0,  maxPercentage: 34,  gradePoint: 0.0,  description: 'Needs Remedial Support (Fail)' },
+    ];
+
     const config = (schoolRec?.brandingConfig as any) || {};
     return {
       schoolId: targetSchoolId,
@@ -2415,6 +2431,10 @@ export class AcademicService {
       schemeType: 'PERCENTAGE_BOUNDARIES',
       grades: config.gradingSchemeGrades || defaultScheme,
       isLocked: false,
+      presets: {
+        standardLetter: standardLetterScheme,
+        cbse9Point: defaultScheme,
+      },
     };
   }
 
@@ -2425,11 +2445,56 @@ export class AcademicService {
     const school = await resolveSchool(schoolIdOrIdentifier);
     const targetSchoolId = school ? school.id : schoolIdOrIdentifier;
 
-    if (Array.isArray(data.grades)) {
-      for (const g of data.grades) {
-        if (g.minPercentage < 0 || g.maxPercentage > 100 || g.minPercentage > g.maxPercentage) {
-          throw new AppError(`Invalid grade range for '${g.grade}': ${g.minPercentage}% to ${g.maxPercentage}%.`, 400, 'INVALID_GRADE_RANGE');
-        }
+    if (!Array.isArray(data.grades) || data.grades.length < 2) {
+      throw new AppError('Grading scheme must contain at least 2 grade bands.', 400, 'INVALID_GRADE_SCHEME');
+    }
+
+    const seenGrades = new Set<string>();
+    for (const g of data.grades) {
+      const sym = (g.grade || '').trim().toUpperCase();
+      if (!sym) {
+        throw new AppError('Each grade band must have a non-empty grade identifier.', 400, 'INVALID_GRADE_IDENTIFIER');
+      }
+      if (seenGrades.has(sym)) {
+        throw new AppError(`Duplicate grade identifier '${sym}'. Each band must have a unique identifier.`, 400, 'DUPLICATE_GRADE');
+      }
+      seenGrades.add(sym);
+
+      if (typeof g.minPercentage !== 'number' || typeof g.maxPercentage !== 'number' || isNaN(g.minPercentage) || isNaN(g.maxPercentage)) {
+        throw new AppError(`Grade '${g.grade}' has invalid numeric boundary values.`, 400, 'INVALID_GRADE_RANGE');
+      }
+      if (g.minPercentage < 0 || g.maxPercentage > 100) {
+        throw new AppError(`Grade '${g.grade}' boundaries must be between 0% and 100%.`, 400, 'INVALID_GRADE_RANGE');
+      }
+      if (g.minPercentage > g.maxPercentage) {
+        throw new AppError(`Grade '${g.grade}' minimum (${g.minPercentage}%) cannot exceed maximum (${g.maxPercentage}%).`, 400, 'INVALID_GRADE_RANGE');
+      }
+    }
+
+    // Sort ascending by minPercentage to verify continuity
+    const sorted = [...data.grades].sort((a, b) => a.minPercentage - b.minPercentage);
+    if (sorted[0].minPercentage !== 0) {
+      throw new AppError(`Grading scheme must start at 0%. Lowest band '${sorted[0].grade}' starts at ${sorted[0].minPercentage}%.`, 400, 'GAP_AT_ZERO');
+    }
+    if (sorted[sorted.length - 1].maxPercentage !== 100) {
+      throw new AppError(`Grading scheme must end at 100%. Highest band '${sorted[sorted.length - 1].grade}' ends at ${sorted[sorted.length - 1].maxPercentage}%.`, 400, 'GAP_AT_HUNDRED');
+    }
+
+    for (let i = 0; i < sorted.length - 1; i++) {
+      const cur = sorted[i];
+      const next = sorted[i + 1];
+      if (cur.maxPercentage >= next.minPercentage) {
+        throw new AppError(`Grade boundary overlap: '${cur.grade}' (max ${cur.maxPercentage}%) overlaps with '${next.grade}' (min ${next.minPercentage}%).`, 400, 'OVERLAPPING_GRADE_RANGES');
+      }
+      if (cur.maxPercentage + 1 < next.minPercentage) {
+        throw new AppError(`Grade boundary gap: Missing percentage coverage between '${cur.grade}' (${cur.maxPercentage}%) and '${next.grade}' (${next.minPercentage}%).`, 400, 'GAP_IN_GRADE_RANGES');
+      }
+    }
+
+    if (data.passingPercentage !== undefined) {
+      const pass = Number(data.passingPercentage);
+      if (isNaN(pass) || pass < 1 || pass > 100) {
+        throw new AppError('Passing percentage must be a valid number between 1% and 100%.', 400, 'INVALID_PASSING_PERCENTAGE');
       }
     }
 
@@ -2442,7 +2507,7 @@ export class AcademicService {
     const updatedConfig = {
       ...currentConfig,
       gradingSchemeName: data.schemeName || currentConfig.gradingSchemeName,
-      passingPercentage: data.passingPercentage ?? currentConfig.passingPercentage,
+      passingPercentage: data.passingPercentage !== undefined ? Number(data.passingPercentage) : currentConfig.passingPercentage,
       gradingSchemeGrades: data.grades || currentConfig.gradingSchemeGrades,
       gradingSchemeUpdatedAt: new Date().toISOString(),
       gradingSchemeUpdatedBy: updatedByUserId,

@@ -56,9 +56,15 @@ export async function loginApi(email: string, password: string): Promise<{ acces
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password }),
   });
-  const json = await res.json();
-  if (!res.ok || !json.success) {
-    throw new Error(json.error?.message || 'Login failed.');
+  let json: any = null;
+  try {
+    const text = await res.text();
+    json = text ? JSON.parse(text) : null;
+  } catch {
+    throw new Error('Cannot connect to the EduNexa backend API server (http://localhost:5000). Please ensure the backend is running with "npm run dev".');
+  }
+  if (!res.ok || !json?.success) {
+    throw new Error(json?.error?.message || 'Login failed. Please verify credentials.');
   }
   setAuthSession(json.data.accessToken, json.data.user);
   return json.data;

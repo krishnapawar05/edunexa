@@ -92,6 +92,40 @@ export const ExamGradingSchemesPage: React.FC = () => {
     }
   }, [simScore, grades]);
 
+const STANDARD_LETTER_PRESET: GradeBoundary[] = [
+  { grade: 'A+', minPercentage: 90, maxPercentage: 100, gradePoint: 10.0, description: 'Outstanding Academic Mastery' },
+  { grade: 'A',  minPercentage: 80, maxPercentage: 89,  gradePoint: 9.0,  description: 'Excellent Knowledge & Application' },
+  { grade: 'B+', minPercentage: 70, maxPercentage: 79,  gradePoint: 8.0,  description: 'Very Good Conceptual Understanding' },
+  { grade: 'B',  minPercentage: 60, maxPercentage: 69,  gradePoint: 7.0,  description: 'Good Proficiency in Core Topics' },
+  { grade: 'C',  minPercentage: 50, maxPercentage: 59,  gradePoint: 6.0,  description: 'Average Competence & Standard Pass' },
+  { grade: 'D',  minPercentage: 35, maxPercentage: 49,  gradePoint: 4.0,  description: 'Marginal Passing Standard' },
+  { grade: 'E',  minPercentage: 0,  maxPercentage: 34,  gradePoint: 0.0,  description: 'Needs Remedial Support (Fail)' },
+];
+
+const CBSE_9POINT_PRESET: GradeBoundary[] = [
+  { grade: 'A1', minPercentage: 91, maxPercentage: 100, gradePoint: 10.0, description: 'Outstanding Performance' },
+  { grade: 'A2', minPercentage: 81, maxPercentage: 90,  gradePoint: 9.0,  description: 'Excellent Academic Standard' },
+  { grade: 'B1', minPercentage: 71, maxPercentage: 80,  gradePoint: 8.0,  description: 'Very Good Comprehension' },
+  { grade: 'B2', minPercentage: 61, maxPercentage: 70,  gradePoint: 7.0,  description: 'Good Conceptual Mastery' },
+  { grade: 'C1', minPercentage: 51, maxPercentage: 60,  gradePoint: 6.0,  description: 'Above Average Standard' },
+  { grade: 'C2', minPercentage: 41, maxPercentage: 50,  gradePoint: 5.0,  description: 'Average Passing Standard' },
+  { grade: 'D',  minPercentage: 33, maxPercentage: 40,  gradePoint: 4.0,  description: 'Marginal Pass' },
+  { grade: 'E',  minPercentage: 0,  maxPercentage: 32,  gradePoint: 0.0,  description: 'Needs Essential Improvement (Remedial)' },
+];
+
+  const handleApplyPreset = (type: 'letter' | 'cbse') => {
+    if (type === 'letter') {
+      setGrades([...STANDARD_LETTER_PRESET]);
+      setSchemeName('Apex Academy Standard Letter Scale (A+, A, B+, B, C, D, E)');
+      setPassingPercentage(35);
+    } else {
+      setGrades([...CBSE_9POINT_PRESET]);
+      setSchemeName('CBSE Continuous & Comprehensive Evaluation (9-Point Scale)');
+      setPassingPercentage(33);
+    }
+    setErrorMsg(null);
+  };
+
   const handleGradeChange = (index: number, field: keyof GradeBoundary, val: any) => {
     setGrades((prev) =>
       prev.map((item, idx) =>
@@ -112,6 +146,10 @@ export const ExamGradingSchemesPage: React.FC = () => {
   };
 
   const handleRemoveRow = (index: number) => {
+    if (grades.length <= 2) {
+      setErrorMsg('A valid grading scheme must contain at least 2 grade bands.');
+      return;
+    }
     setGrades((prev) => prev.filter((_, idx) => idx !== index));
   };
 
@@ -119,14 +157,55 @@ export const ExamGradingSchemesPage: React.FC = () => {
     e.preventDefault();
     setErrorMsg(null);
 
-    // Validate ranges
+    if (grades.length < 2) {
+      setErrorMsg('Grading scheme must contain at least 2 grade bands.');
+      return;
+    }
+
+    // Check unique symbols
+    const seen = new Set<string>();
     for (const g of grades) {
+      const sym = (g.grade || '').trim().toUpperCase();
+      if (!sym) {
+        setErrorMsg('Every grade band must have a non-empty grade symbol.');
+        return;
+      }
+      if (seen.has(sym)) {
+        setErrorMsg(`Duplicate grade identifier '${sym}'. Each band must have a unique symbol.`);
+        return;
+      }
+      seen.add(sym);
+
       if (g.minPercentage < 0 || g.maxPercentage > 100) {
         setErrorMsg(`Grade '${g.grade}' boundaries must be between 0% and 100%.`);
         return;
       }
       if (g.minPercentage > g.maxPercentage) {
         setErrorMsg(`Grade '${g.grade}' minimum (${g.minPercentage}%) cannot exceed maximum (${g.maxPercentage}%).`);
+        return;
+      }
+    }
+
+    // Sort ascending by minPercentage to verify 0-100% continuity
+    const sorted = [...grades].sort((a, b) => a.minPercentage - b.minPercentage);
+    if (sorted[0].minPercentage !== 0) {
+      setErrorMsg(`Grading scheme must cover from 0%. Lowest band '${sorted[0].grade}' starts at ${sorted[0].minPercentage}%.`);
+      return;
+    }
+    if (sorted[sorted.length - 1].maxPercentage !== 100) {
+      setErrorMsg(`Grading scheme must cover up to 100%. Highest band '${sorted[sorted.length - 1].grade}' ends at ${sorted[sorted.length - 1].maxPercentage}%.`);
+      return;
+    }
+
+    for (let i = 0; i < sorted.length - 1; i++) {
+      const cur = sorted[i];
+      const next = sorted[i + 1];
+      if (cur.maxPercentage >= next.minPercentage) {
+        setErrorMsg(`Grade boundary overlap: '${cur.grade}' (ends at ${cur.maxPercentage}%) overlaps with '${next.grade}' (starts at ${next.minPercentage}%).`);
+        return;
+      }
+      if (cur.maxPercentage + 1 < next.minPercentage) {
+        setErrorMsg(`Grade boundary gap: Missing percentage coverage between '${cur.grade}' (${cur.maxPercentage}%) and '${next.grade}' (${next.minPercentage}%).`);
         return;
       }
     }
@@ -336,12 +415,51 @@ export const ExamGradingSchemesPage: React.FC = () => {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                marginBottom: '10px',
+                flexWrap: 'wrap',
+                gap: '10px',
+                marginBottom: '12px',
               }}
             >
-              <h3 style={{ fontSize: '14px', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
-                GRADE BRACKETS & POINT METRICS
-              </h3>
+              <div>
+                <h3 style={{ fontSize: '14px', fontWeight: 700, margin: '0 0 6px 0', color: 'var(--text-primary)' }}>
+                  GRADE BRACKETS & POINT METRICS
+                </h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Quick Presets:</span>
+                  <button
+                    type="button"
+                    onClick={() => handleApplyPreset('letter')}
+                    style={{
+                      padding: '4px 10px',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      borderRadius: '4px',
+                      border: '1px solid rgba(59, 130, 246, 0.4)',
+                      background: 'rgba(59, 130, 246, 0.12)',
+                      color: 'var(--primary-600, #3b82f6)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Restore Letter Scale (A+, A, B+, B, C, D, E)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleApplyPreset('cbse')}
+                    style={{
+                      padding: '4px 10px',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      borderRadius: '4px',
+                      border: '1px solid var(--border-primary)',
+                      background: 'var(--bg-surface)',
+                      color: 'var(--text-secondary)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Restore CBSE 9-Point Scale (A1–E)
+                  </button>
+                </div>
+              </div>
               <Button variant="secondary" size="sm" onClick={handleAddRow}>
                 <Plus size={14} style={{ marginRight: '4px' }} />
                 Add Grade Band

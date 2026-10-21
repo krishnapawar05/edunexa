@@ -14,8 +14,9 @@ import {
   ShieldCheck,
   Check,
 } from 'lucide-react';
-import { Breadcrumbs } from '../../components/Breadcrumbs.js';
 import { coreApi, operationsApi } from '../../services/api.js';
+import { downloadFeeReceiptPdf, downloadFeeInvoicePdf } from '../../services/pdfGenerator.js';
+import { Breadcrumbs } from '../../components/Breadcrumbs.js';
 
 interface Ward {
   id: string;
@@ -354,33 +355,56 @@ export const ParentFeesPage: React.FC = () => {
                           </td>
                           <td>{badge}</td>
                           <td>
-                            {balance > 0 ? (
-                              <button
-                                className="ed-btn ed-btn-sm ed-btn-primary"
-                                onClick={() => handleOpenPayment(inv)}
-                              >
-                                Pay Now
-                              </button>
-                            ) : (
+                            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                              {balance > 0 ? (
+                                <button
+                                  className="ed-btn ed-btn-sm ed-btn-primary"
+                                  onClick={() => handleOpenPayment(inv)}
+                                >
+                                  Pay Now
+                                </button>
+                              ) : (
+                                <button
+                                  className="ed-btn ed-btn-sm ed-btn-secondary"
+                                  onClick={() => {
+                                    if (inv.payments && inv.payments.length > 0) {
+                                      handleOpenReceipt({
+                                        ...inv.payments[0],
+                                        invoiceNumber: inv.invoiceNumber,
+                                        feeStructureHead: inv.feeStructureHead,
+                                        studentName: inv.studentName || selectedChild?.name,
+                                        studentProfileId: inv.studentProfileId || selectedChild?.admissionNumber,
+                                        className: inv.className || selectedChild?.grade,
+                                      });
+                                    }
+                                  }}
+                                  disabled={!inv.payments || inv.payments.length === 0}
+                                >
+                                  <Receipt size={13} /> Receipt
+                                </button>
+                              )}
                               <button
                                 className="ed-btn ed-btn-sm ed-btn-secondary"
+                                title="Download Official Invoice PDF"
                                 onClick={() => {
-                                  if (inv.payments && inv.payments.length > 0) {
-                                    handleOpenReceipt({
-                                      ...inv.payments[0],
-                                      invoiceNumber: inv.invoiceNumber,
-                                      feeStructureHead: inv.feeStructureHead,
-                                      studentName: inv.studentName,
-                                      studentProfileId: inv.studentProfileId,
-                                      className: inv.className,
-                                    });
-                                  }
+                                  downloadFeeInvoicePdf({
+                                    schoolName: 'Apex Academy of Sciences & Arts',
+                                    invoiceNumber: inv.invoiceNumber,
+                                    dueDate: inv.dueDate,
+                                    studentName: inv.studentName || selectedChild?.name || 'Aarav Sharma',
+                                    admissionNumber: inv.studentProfileId || selectedChild?.admissionNumber || 'ADM-2026-0042',
+                                    className: inv.className || selectedChild?.grade || 'Grade 10-A',
+                                    feeHead: inv.feeStructureHead || 'Secondary Tuition & Academic Development',
+                                    amountDue: inv.amountDue,
+                                    amountPaid: inv.amountPaid,
+                                    balanceDue: balance,
+                                    status: inv.status,
+                                  });
                                 }}
-                                disabled={!inv.payments || inv.payments.length === 0}
                               >
-                                <Receipt size={13} /> Receipt
+                                <Download size={13} />
                               </button>
-                            )}
+                            </div>
                           </td>
                         </tr>
                       );
@@ -448,12 +472,37 @@ export const ParentFeesPage: React.FC = () => {
                           {p.transactionRef || 'DIRECT'}
                         </td>
                         <td>
-                          <button
-                            className="ed-btn ed-btn-sm ed-btn-secondary"
-                            onClick={() => handleOpenReceipt(p)}
-                          >
-                            <Download size={13} /> View
-                          </button>
+                          <div style={{ display: 'flex', gap: '4px' }}>
+                            <button
+                              className="ed-btn ed-btn-sm ed-btn-secondary"
+                              title="View receipt details"
+                              onClick={() => handleOpenReceipt(p)}
+                            >
+                              View
+                            </button>
+                            <button
+                              className="ed-btn ed-btn-sm ed-btn-primary"
+                              title="Download official PDF receipt"
+                              onClick={() => {
+                                downloadFeeReceiptPdf({
+                                  schoolName: 'Apex Academy of Sciences & Arts',
+                                  receiptNumber: p.receiptNumber,
+                                  invoiceNumber: p.invoiceNumber,
+                                  date: p.date || new Date().toISOString().split('T')[0],
+                                  studentName: p.studentName || selectedChild?.name || 'Aarav Sharma',
+                                  admissionNumber: p.studentProfileId || selectedChild?.admissionNumber || 'ADM-2026-0042',
+                                  className: p.className || selectedChild?.grade || 'Grade 10-A',
+                                  feeHead: p.feeStructureHead || 'Secondary Tuition & Academic Development',
+                                  amountPaid: Number(p.amountPaid),
+                                  paymentMethod: p.paymentMethod || 'UPI',
+                                  transactionRef: p.transactionRef || 'DIRECT',
+                                  balanceRemaining: 0,
+                                });
+                              }}
+                            >
+                              <Download size={13} /> PDF
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -592,6 +641,27 @@ export const ParentFeesPage: React.FC = () => {
                 </p>
               </div>
               <div style={{ display: 'flex', gap: '6px' }}>
+                <button
+                  className="ed-btn ed-btn-sm ed-btn-primary"
+                  onClick={() => {
+                    downloadFeeReceiptPdf({
+                      schoolName: 'Apex Academy of Sciences & Arts',
+                      receiptNumber: activeReceipt.receiptNumber,
+                      invoiceNumber: activeReceipt.invoiceNumber,
+                      date: activeReceipt.date || new Date().toISOString().split('T')[0],
+                      studentName: activeReceipt.studentName || selectedChild?.name || 'Aarav Sharma',
+                      admissionNumber: activeReceipt.studentProfileId || selectedChild?.admissionNumber || 'ADM-2026-0042',
+                      className: activeReceipt.className || selectedChild?.grade || 'Grade 10-A',
+                      feeHead: activeReceipt.feeStructureHead || 'Secondary Tuition & Academic Development',
+                      amountPaid: Number(activeReceipt.amountPaid),
+                      paymentMethod: activeReceipt.paymentMethod || 'UPI',
+                      transactionRef: activeReceipt.transactionRef || 'DIRECT',
+                      balanceRemaining: 0,
+                    });
+                  }}
+                >
+                  <Download size={13} /> Download PDF
+                </button>
                 <button className="ed-btn ed-btn-sm ed-btn-secondary" onClick={() => window.print()}>
                   <Printer size={13} /> Print
                 </button>

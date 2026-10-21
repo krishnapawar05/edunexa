@@ -20,6 +20,7 @@ import { Button } from '../../components/ui/Button.js';
 import { Modal } from '../../components/ui/Modal.js';
 import { useSchoolBranding } from '../../context/SchoolBrandingContext.js';
 import { coreApi } from '../../services/api.js';
+import { downloadIdCardPdf } from '../../services/pdfGenerator.js';
 
 interface CardHolder {
   id: string; // studentProfileId or staffProfileId
@@ -461,6 +462,25 @@ export const VirtualIdCardsPage: React.FC = () => {
                               <Eye size={13} />
                               <span>Card</span>
                             </button>
+                            <button
+                              onClick={() => {
+                                if (!h.idCard) return;
+                                downloadIdCardPdf({
+                                  schoolName: branding.schoolName || 'Apex Academy of Sciences & Arts',
+                                  fullName: h.name,
+                                  identifierNumber: h.identifier,
+                                  roleCategory: h.holderType,
+                                  classOrDept: h.subDetail,
+                                  academicSession: '2026–2027',
+                                  status: h.idCard.status,
+                                  verificationToken: h.idCard.verificationToken,
+                                });
+                              }}
+                              className="ed-btn ed-btn-sm ed-btn-secondary"
+                              title="Download ISO CR80 ID Card (PDF)"
+                            >
+                              <Download size={13} />
+                            </button>
                             {h.idCard.status === 'ACTIVE' && (
                               <button
                                 onClick={() => setRevokeCardTarget(h)}
@@ -648,9 +668,28 @@ export const VirtualIdCardsPage: React.FC = () => {
               </a>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', width: '100%' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', width: '100%' }}>
               <Button variant="secondary" onClick={() => setPreviewCard(null)}>
                 Close Preview
+              </Button>
+              <Button
+                variant="primary"
+                icon={<Download size={14} />}
+                onClick={() => {
+                  if (!previewCard?.idCard) return;
+                  downloadIdCardPdf({
+                    schoolName: branding.schoolName || 'Apex Academy of Sciences & Arts',
+                    fullName: previewCard.name,
+                    identifierNumber: previewCard.identifier,
+                    roleCategory: previewCard.holderType,
+                    classOrDept: previewCard.subDetail,
+                    academicSession: '2026–2027',
+                    status: previewCard.idCard.status,
+                    verificationToken: previewCard.idCard.verificationToken,
+                  });
+                }}
+              >
+                Download ID Card (PDF)
               </Button>
             </div>
           </div>

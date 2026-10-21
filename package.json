@@ -9,9 +9,10 @@
     "client"
   ],
   "scripts": {
-    "dev": "npm run dev --workspace=client",
+    "dev": "concurrently -k -p \"[{name}]\" -n \"SERVER,CLIENT\" -c \"cyan,magenta\" \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:client": "npm run dev --workspace=client",
     "dev:server": "npm run dev --workspace=server",
-    "dev:all": "concurrently \"npm run dev:server\" \"npm run dev\"",
+    "dev:all": "npm run dev",
     "build": "npm run build --workspace=shared && npm run db:generate && npm run build --workspace=server && npm run build --workspace=client",
     "start": "node server/dist/server.js",
     "start:migrate": "npm run db:deploy && node server/dist/server.js",

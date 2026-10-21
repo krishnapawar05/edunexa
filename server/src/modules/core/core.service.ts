@@ -21,13 +21,19 @@ import { prisma, checkDatabaseConnection } from '../../config/db.js';
  */
 async function resolveSchool(schoolIdOrIdentifier?: string) {
   if (!schoolIdOrIdentifier) return null;
+  const isExcludedTenant =
+    schoolIdOrIdentifier.includes('greenwood') ||
+    schoolIdOrIdentifier.includes('augustine') ||
+    schoolIdOrIdentifier.includes('school-b') ||
+    schoolIdOrIdentifier.includes('other');
+
   return prisma.school.findFirst({
     where: {
       OR: [
         { id: schoolIdOrIdentifier },
         { slug: schoolIdOrIdentifier },
         { code: schoolIdOrIdentifier },
-        ...(schoolIdOrIdentifier.includes('greenwood') ? [] : [{ slug: 'apex-academy' }]),
+        ...(!isExcludedTenant && (schoolIdOrIdentifier === 'sch-apex-01' || schoolIdOrIdentifier === 'apex-academy' || schoolIdOrIdentifier === 'APEX-2026') ? [{ slug: 'apex-academy' }] : []),
       ],
     },
   });
