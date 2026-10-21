@@ -2346,7 +2346,7 @@ export class AcademicService {
         timestamp: log.createdAt.toISOString(),
         actorName: log.user ? `${log.user.firstName} ${log.user.lastName}` : 'Marcus Holloway',
         actorEmail: log.user?.email || 'exam.coordinator@apexacademy.edu',
-        actorRole: log.user?.role || 'EXAM_COORDINATOR',
+        actorRole: (log.user as any)?.role || 'EXAM_COORDINATOR',
         action: log.action,
         entityType: log.entityType,
         entityId: log.entityId,

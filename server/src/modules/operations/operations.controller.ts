@@ -9,9 +9,11 @@ import {
   CreateNoticeSchema,
   CreateSchoolEventSchema,
   CreateFeeStructureSchema,
+  CreateFeeInvoiceSchema,
   RecordFeePaymentSchema,
   ApplyFeeConcessionSchema,
   RecordFeeRefundSchema,
+  RecordReconciliationSchema,
   ApiSuccessResponse,
   PlatformRole,
 } from '@edunexa/shared';
@@ -311,6 +313,73 @@ export class OperationsController {
     }
   }
 
+  async listFeeStructures(req: Request, res: Response, next: NextFunction) {
+    try {
+      const schoolId = req.user!.schoolId!;
+      const className = req.query.className as string | undefined;
+      const feeHead = req.query.feeHead as string | undefined;
+
+      const result = await operationsService.listFeeStructures(schoolId, { className, feeHead });
+      const response: ApiSuccessResponse<typeof result> = {
+        success: true,
+        data: result,
+      };
+      res.status(200).json(response);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateFeeStructure(req: Request, res: Response, next: NextFunction) {
+    try {
+      const schoolId = req.user!.schoolId!;
+      const id = req.params.id;
+      const { feeHead, amount, frequency } = req.body;
+
+      const result = await operationsService.updateFeeStructure(schoolId, id, { feeHead, amount, frequency });
+      const response: ApiSuccessResponse<typeof result> = {
+        success: true,
+        data: result,
+      };
+      res.status(200).json(response);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async deleteFeeStructure(req: Request, res: Response, next: NextFunction) {
+    try {
+      const schoolId = req.user!.schoolId!;
+      const id = req.params.id;
+
+      const result = await operationsService.deleteFeeStructure(schoolId, id);
+      const response: ApiSuccessResponse<typeof result> = {
+        success: true,
+        data: result,
+      };
+      res.status(200).json(response);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async createFeeInvoice(req: Request, res: Response, next: NextFunction) {
+    try {
+      const parsed = CreateFeeInvoiceSchema.parse(req.body);
+      const schoolId = req.user!.schoolId!;
+      const authorizedBy = req.user!.userId;
+
+      const result = await operationsService.createFeeInvoice(schoolId, authorizedBy, parsed);
+      const response: ApiSuccessResponse<typeof result> = {
+        success: true,
+        data: result,
+      };
+      res.status(201).json(response);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async listFeeInvoices(req: Request, res: Response, next: NextFunction) {
     try {
       const schoolId = req.user!.schoolId!;
@@ -474,6 +543,37 @@ export class OperationsController {
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', 'attachment; filename="fee_ledger_report.csv"');
       res.status(200).send(csv);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getReconciliationReport(req: Request, res: Response, next: NextFunction) {
+    try {
+      const schoolId = req.user!.schoolId!;
+      const result = await operationsService.getReconciliationReport(schoolId);
+      const response: ApiSuccessResponse<typeof result> = {
+        success: true,
+        data: result,
+      };
+      res.status(200).json(response);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async recordReconciliation(req: Request, res: Response, next: NextFunction) {
+    try {
+      const parsed = RecordReconciliationSchema.parse(req.body);
+      const schoolId = req.user!.schoolId!;
+      const userId = req.user!.userId;
+
+      const result = await operationsService.recordReconciliation(schoolId, userId, parsed);
+      const response: ApiSuccessResponse<typeof result> = {
+        success: true,
+        data: result,
+      };
+      res.status(200).json(response);
     } catch (error) {
       next(error);
     }

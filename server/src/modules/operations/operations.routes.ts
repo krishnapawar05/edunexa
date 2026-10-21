@@ -88,6 +88,30 @@ router.post(
   operationsController.createFeeStructure
 );
 
+router.get(
+  '/fees/structures',
+  requireRole(PlatformRole.ACCOUNTS, PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.SUPER_ADMIN),
+  operationsController.listFeeStructures
+);
+
+router.patch(
+  '/fees/structures/:id',
+  requireRole(PlatformRole.ACCOUNTS, PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.SUPER_ADMIN),
+  operationsController.updateFeeStructure
+);
+
+router.delete(
+  '/fees/structures/:id',
+  requireRole(PlatformRole.ACCOUNTS, PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.SUPER_ADMIN),
+  operationsController.deleteFeeStructure
+);
+
+router.post(
+  '/fees/invoices',
+  requireRole(PlatformRole.ACCOUNTS, PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.SUPER_ADMIN),
+  operationsController.createFeeInvoice
+);
+
 router.get('/fees/invoices', operationsController.listFeeInvoices);
 
 router.post(
@@ -118,6 +142,18 @@ router.get(
   '/fees/export-csv',
   requireRole(PlatformRole.ACCOUNTS, PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.SUPER_ADMIN),
   operationsController.exportFinancialLedgerCSV
+);
+
+router.get(
+  '/fees/reconciliation',
+  requireRole(PlatformRole.ACCOUNTS, PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.SUPER_ADMIN),
+  operationsController.getReconciliationReport
+);
+
+router.post(
+  '/fees/reconcile',
+  requireRole(PlatformRole.ACCOUNTS, PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.SUPER_ADMIN),
+  operationsController.recordReconciliation
 );
 
 export default router;

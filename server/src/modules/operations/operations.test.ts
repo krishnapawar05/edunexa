@@ -486,4 +486,144 @@ describe('STAGE 6: School Operations and Reporting Test Suite', () => {
     expect(res.body.data.invoicesCount).toBe(0);
     expect(res.body.data.totalInvoiced).toBe(0);
   });
+
+  // ==========================================================================
+  // 8. ACCOUNTS STAFF WORKFLOWS: FEE STRUCTURES, INVOICING & RECONCILIATION
+  // ==========================================================================
+
+  it('8a. Accounts Officer can list fee structures from PostgreSQL', async () => {
+    const res = await request(app)
+      .get('/api/v1/operations/fees/structures')
+      .set('Authorization', `Bearer ${accountsToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(Array.isArray(res.body.data)).toBe(true);
+    expect(res.body.data.length).toBeGreaterThanOrEqual(1);
+    expect(res.body.data[0]).toHaveProperty('feeHead');
+    expect(res.body.data[0]).toHaveProperty('amount');
+  });
+
+  it('8b. Accounts Officer can create and update a fee structure in PostgreSQL', async () => {
+    const createRes = await request(app)
+      .post('/api/v1/operations/fees/structures')
+      .set('Authorization', `Bearer ${accountsToken}`)
+      .send({
+        className: 'Grade 10',
+        feeHead: 'Robotics & AI Innovation Lab',
+        amount: 15000,
+        frequency: 'TERM',
+      });
+
+    expect(createRes.status).toBe(201);
+    expect(createRes.body.success).toBe(true);
+    expect(createRes.body.data.feeHead).toBe('Robotics & AI Innovation Lab');
+    const createdId = createRes.body.data.id;
+
+    // Update the structure
+    const updateRes = await request(app)
+      .patch(`/api/v1/operations/fees/structures/${createdId}`)
+      .set('Authorization', `Bearer ${accountsToken}`)
+      .send({
+        amount: 16500,
+        frequency: 'ANNUAL',
+      });
+
+    expect(updateRes.status).toBe(200);
+    expect(updateRes.body.data.amount).toBe(16500);
+    expect(updateRes.body.data.frequency).toBe('ANNUAL');
+
+    // Clean up
+    await request(app)
+      .delete(`/api/v1/operations/fees/structures/${createdId}`)
+      .set('Authorization', `Bearer ${accountsToken}`);
+  });
+
+  it('8c. Accounts Officer can generate an official fee invoice in PostgreSQL', async () => {
+    const res = await request(app)
+      .post('/api/v1/operations/fees/invoices')
+      .set('Authorization', `Bearer ${accountsToken}`)
+      .send({
+        studentProfileId: 'stu-aarav-01',
+        feeHead: 'Special Mentorship Fee',
+        amountDue: 12000,
+        dueDate: '2026-11-30',
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.invoiceNumber).toMatch(/^INV-2026-\d{4}$/);
+    expect(res.body.data.amountDue).toBe(12000);
+    expect(res.body.data.amountPaid).toBe(0);
+    expect(res.body.data.status).toBe('UNPAID');
+
+    // Clean up created test invoice
+    await prisma.feeInvoice.delete({ where: { id: res.body.data.id } });
+  });
+
+  it('8d. Accounts Officer can retrieve bank reconciliation report from PostgreSQL', async () => {
+    const res = await request(app)
+      .get('/api/v1/operations/fees/reconciliation')
+      .set('Authorization', `Bearer ${accountsToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data).toHaveProperty('summary');
+    expect(res.body.data.summary).toHaveProperty('totalVolume');
+    expect(res.body.data.summary).toHaveProperty('totalReconciled');
+    expect(Array.isArray(res.body.data.transactions)).toBe(true);
+  });
+
+  it('8e. Accounts Officer can record audited reconciliation decision in PostgreSQL', async () => {
+    // Get an existing payment
+    const payment = await prisma.feePayment.findFirst();
+    if (payment) {
+      const res = await request(app)
+        .post('/api/v1/operations/fees/reconcile')
+        .set('Authorization', `Bearer ${accountsToken}`)
+        .send({
+          paymentId: payment.id,
+          action: 'RECONCILE',
+          statementRef: 'STMT-TEST-CLEAR-01',
+          reason: 'Verified against HDFC institutional current account statement',
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.status).toBe('RECONCILED');
+
+      // Verify AuditLog record in DB
+      const audit = await prisma.auditLog.findFirst({
+        where: {
+          entityType: 'FeePayment',
+          entityId: payment.id,
+          action: 'PAYMENT_RECONCILED',
+        },
+      });
+      expect(audit).not.toBeNull();
+    }
+  });
+
+  it('8f. Unauthorized role (Student) attempting to access bank reconciliation returns 403 FORBIDDEN_ROLE', async () => {
+    const res = await request(app)
+      .get('/api/v1/operations/fees/reconciliation')
+      .set('Authorization', `Bearer ${studentAaravToken}`);
+
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('FORBIDDEN_ROLE');
+  });
+
+  it('8g. Unauthorized role (Teacher) attempting to create fee invoice returns 403 FORBIDDEN_ROLE', async () => {
+    const res = await request(app)
+      .post('/api/v1/operations/fees/invoices')
+      .set('Authorization', `Bearer ${teacherToken}`)
+      .send({
+        studentProfileId: 'stu-aarav-01',
+        amountDue: 5000,
+        dueDate: '2026-11-30',
+      });
+
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('FORBIDDEN_ROLE');
+  });
 });

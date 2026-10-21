@@ -78,7 +78,10 @@ import { HrOverviewPage } from './modules/hr/HrOverviewPage.js';
 import { HrStaffRecordsPage } from './modules/hr/HrStaffRecordsPage.js';
 import { HrLeaveRequestsPage } from './modules/hr/HrLeaveRequestsPage.js';
 import { HrStaffTrainingPage } from './modules/hr/HrStaffTrainingPage.js';
-import { AccountsDashboard } from './modules/accounts/AccountsDashboard.js';
+import { AccountsOverviewPage } from './modules/accounts/AccountsOverviewPage.js';
+import { AccountsInvoicesPage } from './modules/accounts/AccountsInvoicesPage.js';
+import { AccountsFeeStructuresPage } from './modules/accounts/AccountsFeeStructuresPage.js';
+import { AccountsReconciliationPage } from './modules/accounts/AccountsReconciliationPage.js';
 
 export const App: React.FC = () => {
   return (
@@ -252,10 +255,12 @@ export const App: React.FC = () => {
             </ProtectedRoute>
           }
         >
-          <Route path="/accounts" element={<AccountsDashboard />} />
-          <Route path="/accounts/invoices" element={<AccountsDashboard />} />
-          <Route path="/accounts/structures" element={<AccountsDashboard />} />
-          <Route path="/accounts/reconciliation" element={<AccountsDashboard />} />
+          <Route path="/accounts" element={<AccountsOverviewPage />} />
+          <Route path="/accounts/overview" element={<AccountsOverviewPage />} />
+          <Route path="/accounts/invoices" element={<AccountsInvoicesPage />} />
+          <Route path="/accounts/structures" element={<AccountsFeeStructuresPage />} />
+          <Route path="/accounts/fees" element={<AccountsFeeStructuresPage />} />
+          <Route path="/accounts/reconciliation" element={<AccountsReconciliationPage />} />
         </Route>
 
         {/* ================================================================ */}

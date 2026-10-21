@@ -616,6 +616,26 @@ export const RecordFeeRefundSchema = z.object({
 
 export type RecordFeeRefundDTO = z.infer<typeof RecordFeeRefundSchema>;
 
+export const CreateFeeInvoiceSchema = z.object({
+  studentProfileId: z.string().min(1, 'Student identifier is required'),
+  feeStructureId: z.string().optional(),
+  feeHead: z.string().optional(),
+  className: z.string().optional(),
+  amountDue: z.number().positive('Invoice amount must be positive'),
+  dueDate: z.string().min(1, 'Due date is required'),
+});
+
+export type CreateFeeInvoiceDTO = z.infer<typeof CreateFeeInvoiceSchema>;
+
+export const RecordReconciliationSchema = z.object({
+  paymentId: z.string().min(1, 'Payment ID required'),
+  action: z.enum(['RECONCILE', 'FLAG_DISCREPANCY']),
+  statementRef: z.string().optional(),
+  reason: z.string().optional(),
+});
+
+export type RecordReconciliationDTO = z.infer<typeof RecordReconciliationSchema>;
+
 // Financial Summary Report Contract
 export interface FinancialSummaryReport {
   schoolId: string;
@@ -636,6 +656,18 @@ export interface FinancialSummaryReport {
     method: string;
     date: string;
     isSimulated: boolean;
+  }>;
+  breakdownByClass?: Array<{
+    className: string;
+    invoiced: number;
+    collected: number;
+    outstanding: number;
+  }>;
+  breakdownByFeeHead?: Array<{
+    feeHead: string;
+    invoiced: number;
+    collected: number;
+    outstanding: number;
   }>;
 }
 

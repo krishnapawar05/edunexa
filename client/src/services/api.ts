@@ -752,6 +752,81 @@ export const operationsApi = {
     }),
 
   exportFeeCsv: () => apiRequest<string>('/api/v1/operations/fees/export-csv'),
+
+  listFeeStructures: (params: { className?: string; feeHead?: string } = {}) => {
+    const query = new URLSearchParams();
+    if (params.className) query.set('className', params.className);
+    if (params.feeHead) query.set('feeHead', params.feeHead);
+    return apiRequest<any[]>(`/api/v1/operations/fees/structures?${query.toString()}`);
+  },
+
+  createFeeStructure: (data: { className: string; feeHead: string; amount: number; frequency: string }) =>
+    apiRequest<any>('/api/v1/operations/fees/structures', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateFeeStructure: (id: string, data: { feeHead?: string; amount?: number; frequency?: string }) =>
+    apiRequest<any>(`/api/v1/operations/fees/structures/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  deleteFeeStructure: (id: string) =>
+    apiRequest<any>(`/api/v1/operations/fees/structures/${id}`, {
+      method: 'DELETE',
+    }),
+
+  createFeeInvoice: (data: {
+    studentProfileId: string;
+    feeStructureId?: string;
+    feeHead?: string;
+    className?: string;
+    amountDue: number;
+    dueDate: string;
+  }) =>
+    apiRequest<any>('/api/v1/operations/fees/invoices', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  getReconciliationReport: () =>
+    apiRequest<{
+      summary: {
+        totalVolume: number;
+        totalReconciled: number;
+        totalPending: number;
+        discrepanciesCount: number;
+        reconciliationRate: number;
+      };
+      transactions: Array<{
+        id: string;
+        receiptNumber: string;
+        invoiceNumber: string;
+        studentName: string;
+        admissionNo: string;
+        className: string;
+        amountPaid: number;
+        paymentMethod: string;
+        transactionRef: string;
+        paidAt: string;
+        isSimulated: boolean;
+        status: 'RECONCILED' | 'PENDING' | 'DISCREPANCY';
+        verifiedAt?: string | null;
+        notes?: string;
+      }>;
+    }>('/api/v1/operations/fees/reconciliation'),
+
+  recordReconciliation: (data: {
+    paymentId: string;
+    action: 'RECONCILE' | 'FLAG_DISCREPANCY';
+    statementRef?: string;
+    reason?: string;
+  }) =>
+    apiRequest<any>('/api/v1/operations/fees/reconcile', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 };
 
 // ============================================================================

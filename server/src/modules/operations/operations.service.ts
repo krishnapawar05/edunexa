@@ -9,9 +9,11 @@ import {
   CreateNoticeDTO,
   CreateSchoolEventDTO,
   CreateFeeStructureDTO,
+  CreateFeeInvoiceDTO,
   RecordFeePaymentDTO,
   ApplyFeeConcessionDTO,
   RecordFeeRefundDTO,
+  RecordReconciliationDTO,
   FinancialSummaryReport,
   PlatformRole,
   FeePaymentStatusType,
@@ -772,6 +774,102 @@ export class OperationsService {
     };
   }
 
+  async listFeeStructures(schoolIdOrIdentifier: string, params?: { className?: string; feeHead?: string }) {
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    const targetSchoolId = school ? school.id : schoolIdOrIdentifier;
+
+    const structures = await prisma.feeStructure.findMany({
+      where: {
+        schoolId: targetSchoolId,
+        ...(params?.className ? { class: { name: { contains: params.className, mode: 'insensitive' } } } : {}),
+        ...(params?.feeHead ? { feeHead: { contains: params.feeHead, mode: 'insensitive' } } : {}),
+      },
+      include: {
+        class: true,
+        invoices: {
+          select: { id: true, amountDue: true, amountPaid: true, status: true },
+        },
+      },
+      orderBy: { feeHead: 'asc' },
+    });
+
+    return structures.map((fs) => ({
+      id: fs.id,
+      schoolId: fs.schoolId,
+      classId: fs.classId,
+      className: fs.class.name,
+      feeHead: fs.feeHead,
+      amount: fs.amount,
+      frequency: fs.frequency,
+      invoicesCount: fs.invoices.length,
+      totalInvoiced: fs.invoices.reduce((sum, inv) => sum + inv.amountDue, 0),
+      totalCollected: fs.invoices.reduce((sum, inv) => sum + inv.amountPaid, 0),
+      totalOutstanding: fs.invoices.reduce((sum, inv) => sum + Math.max(0, inv.amountDue - inv.amountPaid), 0),
+    }));
+  }
+
+  async updateFeeStructure(
+    schoolIdOrIdentifier: string,
+    id: string,
+    data: { feeHead?: string; amount?: number; frequency?: string }
+  ) {
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    const targetSchoolId = school ? school.id : schoolIdOrIdentifier;
+
+    const existing = await prisma.feeStructure.findFirst({
+      where: { id, schoolId: targetSchoolId },
+    });
+    if (!existing) {
+      throw new AppError('Fee structure not found or does not belong to your institution.', 404, 'RECORD_NOT_FOUND');
+    }
+
+    if (data.amount !== undefined && data.amount <= 0) {
+      throw new AppError('Fee structure amount must be greater than zero.', 400, 'INVALID_AMOUNT');
+    }
+
+    const updated = await prisma.feeStructure.update({
+      where: { id },
+      data: {
+        ...(data.feeHead ? { feeHead: data.feeHead } : {}),
+        ...(data.amount !== undefined ? { amount: data.amount } : {}),
+        ...(data.frequency ? { frequency: data.frequency } : {}),
+      },
+      include: { class: true },
+    });
+
+    return {
+      id: updated.id,
+      className: updated.class.name,
+      feeHead: updated.feeHead,
+      amount: updated.amount,
+      frequency: updated.frequency,
+    };
+  }
+
+  async deleteFeeStructure(schoolIdOrIdentifier: string, id: string) {
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    const targetSchoolId = school ? school.id : schoolIdOrIdentifier;
+
+    const existing = await prisma.feeStructure.findFirst({
+      where: { id, schoolId: targetSchoolId },
+      include: { invoices: { select: { id: true } } },
+    });
+    if (!existing) {
+      throw new AppError('Fee structure not found.', 404, 'RECORD_NOT_FOUND');
+    }
+
+    if (existing.invoices.length > 0) {
+      throw new AppError(
+        `Cannot delete fee structure with ${existing.invoices.length} attached historical invoice(s). Archival required to preserve accounting integrity.`,
+        400,
+        'HAS_HISTORICAL_INVOICES'
+      );
+    }
+
+    await prisma.feeStructure.delete({ where: { id } });
+    return { success: true, deletedId: id };
+  }
+
   async listFeeInvoices(schoolIdOrIdentifier: string, studentProfileId?: string | string[]) {
     const school = await resolveSchool(schoolIdOrIdentifier);
     const targetSchoolId = school ? school.id : schoolIdOrIdentifier;
@@ -824,6 +922,95 @@ export class OperationsService {
       auditTrail: (i.auditTrail as any) || [],
       createdAt: (i as any).createdAt ? (i as any).createdAt.toISOString() : i.dueDate.toISOString(),
     }));
+  }
+
+  async createFeeInvoice(schoolIdOrIdentifier: string, authorizedByUserId: string, data: CreateFeeInvoiceDTO) {
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    const targetSchoolId = school ? school.id : schoolIdOrIdentifier;
+
+    if (data.amountDue <= 0) {
+      throw new AppError('Fee invoice amount must be greater than zero.', 400, 'INVALID_AMOUNT');
+    }
+
+    const student = await resolveStudentProfile(targetSchoolId, data.studentProfileId);
+    if (!student) {
+      throw new AppError(`Student profile '${data.studentProfileId}' not found in institution.`, 404, 'STUDENT_NOT_FOUND');
+    }
+
+    let feeStructureId = data.feeStructureId;
+    if (!feeStructureId) {
+      const cls = student.enrollments?.[0]?.class || (await prisma.class.findFirst({
+        where: { schoolId: targetSchoolId },
+      }));
+      if (!cls) {
+        throw new AppError('No class record found to associate with fee invoice.', 400, 'CLASS_NOT_FOUND');
+      }
+
+      let fs = await prisma.feeStructure.findFirst({
+        where: { schoolId: targetSchoolId, classId: cls.id, feeHead: data.feeHead || 'General Tuition Fee' },
+      });
+      if (!fs) {
+        fs = await prisma.feeStructure.create({
+          data: {
+            schoolId: targetSchoolId,
+            classId: cls.id,
+            feeHead: data.feeHead || 'General Tuition Fee',
+            amount: data.amountDue,
+            frequency: 'TERM',
+          },
+        });
+      }
+      feeStructureId = fs.id;
+    }
+
+    const count = await prisma.feeInvoice.count({
+      where: { feeStructure: { schoolId: targetSchoolId } },
+    });
+    const invoiceNumber = `INV-2026-${String(count + 101).padStart(4, '0')}`;
+
+    const newInvoice = await prisma.feeInvoice.create({
+      data: {
+        feeStructureId,
+        studentProfileId: student.id,
+        invoiceNumber,
+        amountDue: data.amountDue,
+        amountPaid: 0,
+        discountApplied: 0,
+        dueDate: new Date(data.dueDate),
+        status: 'UNPAID',
+        auditTrail: [
+          {
+            action: 'INVOICE_GENERATED',
+            authorizedByUserId,
+            amount: data.amountDue,
+            timestamp: new Date().toISOString(),
+          },
+        ],
+      },
+      include: {
+        feeStructure: { include: { class: true } },
+        student: { include: { membership: { include: { user: true } } } },
+      },
+    });
+
+    const studentUser = newInvoice.student.membership.user;
+    return {
+      id: newInvoice.id,
+      invoiceNumber: newInvoice.invoiceNumber,
+      studentProfileId: newInvoice.student.admissionNumber || newInvoice.studentProfileId,
+      actualStudentProfileId: newInvoice.studentProfileId,
+      studentName: `${studentUser.firstName} ${studentUser.lastName}`.trim(),
+      className: newInvoice.feeStructure.class.name,
+      feeStructureHead: newInvoice.feeStructure.feeHead,
+      amountDue: newInvoice.amountDue,
+      amountPaid: 0,
+      balanceDue: newInvoice.amountDue,
+      discountApplied: 0,
+      dueDate: newInvoice.dueDate.toISOString().split('T')[0],
+      status: newInvoice.status,
+      payments: [],
+      auditTrail: newInvoice.auditTrail,
+    };
   }
 
   /**
@@ -1061,6 +1248,7 @@ export class OperationsService {
       where: { feeStructure: { schoolId: school.id } },
       include: {
         student: { include: { membership: { include: { user: true } } } },
+        feeStructure: { include: { class: true } },
         payments: true,
       },
     });
@@ -1077,6 +1265,28 @@ export class OperationsService {
     ).length;
 
     const rate = totalInvoiced > 0 ? Number(((totalCollected / totalInvoiced) * 100).toFixed(1)) : 0;
+
+    // Class-wise & Fee-Head Breakdowns
+    const classMap = new Map<string, { className: string; invoiced: number; collected: number; outstanding: number }>();
+    const feeHeadMap = new Map<string, { feeHead: string; invoiced: number; collected: number; outstanding: number }>();
+
+    for (const inv of schoolInvoices) {
+      const clsName = inv.feeStructure?.class?.name || 'Grade 10';
+      const headName = inv.feeStructure?.feeHead || 'Tuition Fee';
+      const outstanding = Math.max(0, inv.amountDue - inv.amountPaid - inv.discountApplied);
+
+      const c = classMap.get(clsName) || { className: clsName, invoiced: 0, collected: 0, outstanding: 0 };
+      c.invoiced += inv.amountDue;
+      c.collected += inv.amountPaid;
+      c.outstanding += outstanding;
+      classMap.set(clsName, c);
+
+      const h = feeHeadMap.get(headName) || { feeHead: headName, invoiced: 0, collected: 0, outstanding: 0 };
+      h.invoiced += inv.amountDue;
+      h.collected += inv.amountPaid;
+      h.outstanding += outstanding;
+      feeHeadMap.set(headName, h);
+    }
 
     const payments = await prisma.feePayment.findMany({
       where: { invoice: { feeStructure: { schoolId: school.id } } },
@@ -1114,6 +1324,8 @@ export class OperationsService {
       partialInvoicesCount: partialCount,
       overdueInvoicesCount: overdueCount,
       recentTransactions: recentTx,
+      breakdownByClass: Array.from(classMap.values()),
+      breakdownByFeeHead: Array.from(feeHeadMap.values()),
     };
   }
 
@@ -1152,6 +1364,161 @@ export class OperationsService {
     }
 
     return csv;
+  }
+
+  /**
+   * Bank Settlement & Gateway Reconciliation Reporting from PostgreSQL
+   */
+  async getReconciliationReport(schoolIdOrIdentifier: string) {
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    const targetSchoolId = school ? school.id : schoolIdOrIdentifier;
+
+    const payments = await prisma.feePayment.findMany({
+      where: { invoice: { feeStructure: { schoolId: targetSchoolId } } },
+      include: {
+        invoice: {
+          include: {
+            feeStructure: { include: { class: true } },
+            student: { include: { membership: { include: { user: true } } } },
+          },
+        },
+      },
+      orderBy: { paidAt: 'desc' },
+    });
+
+    // Retrieve reconciliation audit logs
+    const auditLogs = await prisma.auditLog.findMany({
+      where: {
+        schoolId: targetSchoolId,
+        entityType: 'FeePayment',
+        action: { in: ['PAYMENT_RECONCILED', 'PAYMENT_FLAGGED'] },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const auditMap = new Map<string, any>();
+    for (const log of auditLogs) {
+      if (log.entityId && !auditMap.has(log.entityId)) {
+        auditMap.set(log.entityId, log);
+      }
+    }
+
+    const items = payments.map((p) => {
+      const u = p.invoice.student.membership.user;
+      const latestAudit = auditMap.get(p.id);
+
+      let status: 'RECONCILED' | 'PENDING' | 'DISCREPANCY' = 'PENDING';
+      let verifiedAt: string | null = null;
+      let notes = p.notes || '';
+
+      if (latestAudit) {
+        if (latestAudit.action === 'PAYMENT_RECONCILED') {
+          status = 'RECONCILED';
+          verifiedAt = latestAudit.createdAt.toISOString();
+        } else if (latestAudit.action === 'PAYMENT_FLAGGED') {
+          status = 'DISCREPANCY';
+          notes = latestAudit.details?.reason || notes;
+        }
+      } else if (p.paymentMethod === 'UPI' || p.transactionRef?.startsWith('UPI-') || p.notes?.includes('[RECONCILED]')) {
+        status = 'RECONCILED';
+        verifiedAt = p.paidAt.toISOString();
+      }
+
+      return {
+        id: p.id,
+        receiptNumber: p.receiptNumber,
+        invoiceNumber: p.invoice.invoiceNumber,
+        studentName: `${u.firstName} ${u.lastName}`.trim(),
+        admissionNo: p.invoice.student.admissionNumber,
+        className: p.invoice.feeStructure.class.name,
+        amountPaid: p.amountPaid,
+        paymentMethod: p.paymentMethod,
+        transactionRef: p.transactionRef || 'N/A',
+        paidAt: p.paidAt.toISOString(),
+        isSimulated: p.isSimulated,
+        status,
+        verifiedAt,
+        notes,
+      };
+    });
+
+    const totalVolume = items.reduce((sum, item) => sum + item.amountPaid, 0);
+    const totalReconciled = items.filter((i) => i.status === 'RECONCILED').reduce((sum, i) => sum + i.amountPaid, 0);
+    const totalPending = items.filter((i) => i.status === 'PENDING').reduce((sum, i) => sum + i.amountPaid, 0);
+    const discrepanciesCount = items.filter((i) => i.status === 'DISCREPANCY').length;
+
+    return {
+      summary: {
+        totalVolume,
+        totalReconciled,
+        totalPending,
+        discrepanciesCount,
+        reconciliationRate: totalVolume > 0 ? Number(((totalReconciled / totalVolume) * 100).toFixed(1)) : 100,
+      },
+      transactions: items,
+    };
+  }
+
+  /**
+   * Record Audited Reconciliation Decision in PostgreSQL
+   */
+  async recordReconciliation(schoolIdOrIdentifier: string, userId: string, data: RecordReconciliationDTO) {
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    const targetSchoolId = school ? school.id : schoolIdOrIdentifier;
+
+    const payment = await prisma.feePayment.findFirst({
+      where: {
+        id: data.paymentId,
+        invoice: { feeStructure: { schoolId: targetSchoolId } },
+      },
+    });
+
+    if (!payment) {
+      throw new AppError('Payment transaction record not found.', 404, 'RECORD_NOT_FOUND');
+    }
+
+    const auditAction = data.action === 'RECONCILE' ? 'PAYMENT_RECONCILED' : 'PAYMENT_FLAGGED';
+
+    const validUser = await prisma.user.findUnique({ where: { id: userId } });
+    const auditUserId = validUser ? validUser.id : null;
+
+    const audit = await prisma.auditLog.create({
+      data: {
+        schoolId: targetSchoolId,
+        userId: auditUserId,
+        action: auditAction,
+        entityType: 'FeePayment',
+        entityId: payment.id,
+        details: {
+          receiptNumber: payment.receiptNumber,
+          transactionRef: payment.transactionRef,
+          amount: payment.amountPaid,
+          statementRef: data.statementRef,
+          reason:
+            data.reason ||
+            (data.action === 'RECONCILE'
+              ? 'Bank settlement verified against institutional statement'
+              : 'Discrepancy flagged for audit review'),
+          timestamp: new Date().toISOString(),
+        },
+      },
+    });
+
+    if (data.statementRef || data.reason) {
+      await prisma.feePayment.update({
+        where: { id: payment.id },
+        data: {
+          notes: `${data.action === 'RECONCILE' ? '[RECONCILED]' : '[DISCREPANCY]'}: ${data.statementRef || data.reason || ''}`.trim(),
+        },
+      });
+    }
+
+    return {
+      paymentId: payment.id,
+      receiptNumber: payment.receiptNumber,
+      status: data.action === 'RECONCILE' ? 'RECONCILED' : 'DISCREPANCY',
+      auditedAt: audit.createdAt.toISOString(),
+    };
   }
 }
 
