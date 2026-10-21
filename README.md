@@ -114,25 +114,25 @@ The technology stack is verified directly from `package.json`, lockfiles, and ac
 The following diagram illustrates the verified end-to-end request lifecycle and component boundaries:
 
 ```mermaid
-graph TD
-    subgraph Client ["Client Browser (React 19 + Vite)"]
-        UI[Role Dashboard & Pages]
-        AuthCtx[Auth & Session Storage]
+flowchart TD
+    subgraph ClientBrowser [Client Browser - React 19 and Vite]
+        UI[Role Dashboard and Pages]
+        AuthCtx[Auth and Session Storage]
         PdfGen[jsPDF Document Engine]
         ApiClient[Typed Fetch API Client]
     end
 
-    subgraph Gateway ["Express API Gateway (:5000)"]
-        HelmetCors[Helmet & Dynamic CORS]
+    subgraph ApiGateway [Express API Gateway - Port 5000]
+        HelmetCors[Helmet and Dynamic CORS]
         RateLimiter[Auth Rate Limiter]
         ReqLogger[Request Logger Middleware]
         JwtAuth[JWT Auth Middleware]
         RbacGuard[requireRole Guard]
         TenantGuard[requireTenantScope Guard]
-        IsoGuard[Student/Parent Isolation Guard]
+        IsoGuard[Student and Parent Isolation Guard]
     end
 
-    subgraph Controllers ["Modular Route Controllers"]
+    subgraph Controllers [Modular Route Controllers]
         AuthCtrl[Auth Controller]
         SuperCtrl[SuperAdmin Controller]
         CoreCtrl[Core School Controller]
@@ -141,15 +141,15 @@ graph TD
         AiCtrl[AI Controller]
     end
 
-    subgraph DataAccess ["Data Access & External Services"]
+    subgraph DataAccess [Data Access and External Services]
         Prisma[Prisma ORM Client]
         Postgres[(PostgreSQL Database)]
         Gemini[Google Gemini API v1beta]
     end
 
-    UI -->|User Interactions| ApiClient
-    UI -->|Download Action| PdfGen
-    ApiClient -->|HTTP Bearer Requests| HelmetCors
+    UI --> ApiClient
+    UI --> PdfGen
+    ApiClient --> HelmetCors
     HelmetCors --> RateLimiter
     RateLimiter --> ReqLogger
     ReqLogger --> JwtAuth
@@ -302,30 +302,30 @@ Requests flowing through Express in [server/src/app.ts](file:///c:/Users/Krishna
 sequenceDiagram
     autonumber
     actor Admin as School Administrator
-    participant Client as Web Client (React 19)
-    participant Auth as Auth & Tenant Middleware
-    participant CoreRoutes as Core Router (/api/v1/core/students)
+    participant Client as Web Client
+    participant Auth as Auth and Tenant Middleware
+    participant CoreRoutes as Core Router
     participant CoreService as Core Service
     participant Prisma as Prisma Client
     participant DB as PostgreSQL Database
 
-    Admin->>Client: Fills Student Form & Clicks "Register Student"
-    Client->>Auth: POST /api/v1/core/students (Bearer JWT)
-    Auth->>Auth: verifyAccessToken(token) -> req.user
-    Auth->>Auth: requireRole('SCHOOL_ADMIN', 'PRINCIPAL') -> OK
-    Auth->>Auth: requireTenantScope() -> req.schoolId matches tenant
+    Admin->>Client: Fills Student Form and Clicks Register Student
+    Client->>Auth: POST /api/v1/core/students with Bearer JWT
+    Auth->>Auth: verifyAccessToken token to req user
+    Auth->>Auth: requireRole SCHOOL_ADMIN PRINCIPAL
+    Auth->>Auth: requireTenantScope check schoolId
     Auth->>CoreRoutes: Forward sanitized request
-    CoreRoutes->>CoreService: createStudent(schoolId, studentData)
-    CoreService->>Prisma: prisma.$transaction()
-    Prisma->>DB: INSERT INTO "User" (email, passwordHash, firstName, lastName)
-    Prisma->>DB: INSERT INTO "UserMembership" (userId, schoolId, role=STUDENT)
-    Prisma->>DB: INSERT INTO "StudentProfile" (admissionNumber, bloodGroup, emergencyPhone)
-    Prisma->>DB: INSERT INTO "StudentEnrollment" (classId, sectionId, academicSessionId)
-    Prisma->>DB: INSERT INTO "VirtualIdCard" (cardNumber, verificationToken, status=ACTIVE)
+    CoreRoutes->>CoreService: createStudent schoolId studentData
+    CoreService->>Prisma: prisma transaction
+    Prisma->>DB: INSERT INTO User
+    Prisma->>DB: INSERT INTO UserMembership
+    Prisma->>DB: INSERT INTO StudentProfile
+    Prisma->>DB: INSERT INTO StudentEnrollment
+    Prisma->>DB: INSERT INTO VirtualIdCard
     DB-->>Prisma: Transaction Committed Successfully
     Prisma-->>CoreService: Hydrated Student Record
     CoreService-->>CoreRoutes: Return Student Dossier
-    CoreRoutes-->>Client: HTTP 201 { success: true, data: { ... } }
+    CoreRoutes-->>Client: HTTP 201 Created
     Client-->>Admin: Displays success toast and updates Student Directory
 ```
 
@@ -342,7 +342,7 @@ erDiagram
     School ||--o{ UserMembership : "has members"
     School ||--o{ AcademicSession : "operates"
     School ||--o{ Department : "employs"
-    School ||--o{ Class : "organizes"
+    School ||--o{ SchoolClass : "organizes"
     School ||--o{ FeeStructure : "defines"
     School ||--o{ Notice : "publishes"
     School ||--o{ SchoolEvent : "schedules"
@@ -353,17 +353,17 @@ erDiagram
     User ||--o{ AuditLog : "triggers"
     User ||--o{ Notification : "receives"
 
-    UserMembership ||--o| StudentProfile : "profile (student)"
-    UserMembership ||--o| StaffProfile : "profile (staff)"
-    UserMembership ||--o{ ParentStudentLink : "linked wards (parent)"
+    UserMembership ||--o| StudentProfile : "profile student"
+    UserMembership ||--o| StaffProfile : "profile staff"
+    UserMembership ||--o{ ParentStudentLink : "linked wards"
 
-    Class ||--o{ Section : "partitions into"
-    Class ||--o{ Subject : "curriculum"
-    Class ||--o{ StudentEnrollment : "enrolls"
+    SchoolClass ||--o{ Section : "partitions into"
+    SchoolClass ||--o{ Subject : "curriculum"
+    SchoolClass ||--o{ StudentEnrollment : "enrolls"
 
     Section ||--o{ StudentEnrollment : "cohort"
     Section ||--o{ TimetableSlot : "scheduled periods"
-    Section ||--o{ AttendanceRecord : "daily roll-call"
+    Section ||--o{ AttendanceRecord : "daily roll call"
     Section ||--o{ Quiz : "administers"
     Section ||--o{ Assignment : "assigns"
 
