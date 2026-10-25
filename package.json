@@ -21,7 +21,7 @@
     "typecheck": "npm run typecheck --workspace=shared && npm run typecheck --workspace=server && npm run typecheck --workspace=client",
     "db:generate": "npm run prisma:generate --workspace=server",
     "db:migrate": "npm run prisma:migrate --workspace=server",
-    "db:deploy": "npm run prisma:deploy --workspace=server",
+    "db:deploy": "node scripts/deploy-db.js",
     "db:seed": "npm run prisma:seed --workspace=server",
     "db:studio": "npm run prisma:studio --workspace=server"
   },
