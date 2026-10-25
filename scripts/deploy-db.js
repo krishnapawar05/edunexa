@@ -30,3 +30,12 @@ try {
     }
   }
 }
+
+// Seed demo users and initial institutional records if needed
+console.log('[Database Deploy] Seeding initial institutional records and demo accounts...');
+try {
+  run('npm run db:seed');
+  console.log('[Database Deploy] Database seeding completed successfully.');
+} catch (seedError) {
+  console.warn('[Database Deploy] Seed warning (proceeding):', seedError.message);
+}
