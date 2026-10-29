@@ -6,7 +6,7 @@ export const ExaminationInfoPage: React.FC = () => {
   const { branding } = useSchoolBranding();
 
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', padding: 'var(--space-8) var(--space-6)' }}>
+    <div className="ed-public-container" style={{ padding: 'var(--space-8) 0' }}>
       {/* Title */}
       <div style={{ marginBottom: 'var(--space-8)', textAlign: 'center' }}>
         <span className="ed-badge ed-badge-info" style={{ marginBottom: '8px' }}>EVALUATION POLICY</span>
@@ -16,7 +16,7 @@ export const ExaminationInfoPage: React.FC = () => {
         </p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.8fr', gap: 'var(--space-8)' }}>
+      <div className="ed-responsive-split">
         {/* Left Column: Schedule Overview */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
           <div className="ed-card ed-card-body">

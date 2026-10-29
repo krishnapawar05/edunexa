@@ -11,6 +11,15 @@ router.post('/login', authRateLimiter, validateRequest({ body: LoginRequestSchem
   authController.login(req, res, next);
 });
 
+// Account Activation Endpoints (Public)
+router.get('/invitations/verify/:token', authRateLimiter, (req, res, next) => {
+  authController.verifyInvitation(req, res, next);
+});
+
+router.post('/invitations/activate', authRateLimiter, (req, res, next) => {
+  authController.activateAccount(req, res, next);
+});
+
 // Authenticated Session Endpoints
 router.get('/me', authenticateUser, (req, res, next) => {
   authController.getCurrentUser(req, res, next);

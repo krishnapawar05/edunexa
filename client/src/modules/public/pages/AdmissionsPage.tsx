@@ -52,7 +52,7 @@ export const AdmissionsPage: React.FC = () => {
   };
 
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', padding: 'var(--space-8) var(--space-6)' }}>
+    <div className="ed-public-container" style={{ padding: 'var(--space-8) 0' }}>
       {/* Title */}
       <div style={{ marginBottom: 'var(--space-8)', textAlign: 'center' }}>
         <span className="ed-badge ed-badge-success" style={{ marginBottom: '8px' }}>NOW ENROLLING</span>
@@ -62,7 +62,7 @@ export const AdmissionsPage: React.FC = () => {
         </p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.8fr', gap: 'var(--space-8)' }}>
+      <div className="ed-responsive-split">
         {/* Left Column: Guidelines & Criteria */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
           <div className="ed-card ed-card-body">
@@ -159,7 +159,7 @@ export const AdmissionsPage: React.FC = () => {
             </div>
           ) : (
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
+              <div className="ed-modal-grid-2">
                 <div className="ed-input-group" style={{ marginBottom: 0 }}>
                   <label className="ed-label">Applicant Full Name *</label>
                   <input
@@ -186,7 +186,7 @@ export const AdmissionsPage: React.FC = () => {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
+              <div className="ed-modal-grid-2">
                 <div className="ed-input-group" style={{ marginBottom: 0 }}>
                   <label className="ed-label">Parent / Guardian Name *</label>
                   <input

@@ -6,7 +6,7 @@ export const PrincipalMessagePage: React.FC = () => {
   const { branding } = useSchoolBranding();
 
   return (
-    <div style={{ maxWidth: '1000px', margin: '0 auto', padding: 'var(--space-8) var(--space-6)' }}>
+    <div className="ed-public-container" style={{ padding: 'var(--space-8) 0' }}>
       {/* Header */}
       <div style={{ marginBottom: 'var(--space-8)', textAlign: 'center' }}>
         <span className="ed-badge ed-badge-info" style={{ marginBottom: '8px' }}>LEADERSHIP DESK</span>

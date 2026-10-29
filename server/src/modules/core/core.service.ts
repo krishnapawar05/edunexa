@@ -15,6 +15,7 @@ import {
   PlatformRole,
 } from '@prisma/client';
 import { prisma, checkDatabaseConnection } from '../../config/db.js';
+import { accountProvisioningService } from './provisioning.service.js';
 
 /**
  * Resolves a school ID, slug, or test fixture identifier to a real PostgreSQL School record.
@@ -385,7 +386,11 @@ export class CoreSchoolService {
   /**
    * Create Student & Enroll with Unique Admission Number Enforcement in PostgreSQL
    */
-  async createStudent(schoolIdOrIdentifier: string, data: CreateStudentDTO) {
+  async createStudent(
+    schoolIdOrIdentifier: string,
+    data: CreateStudentDTO,
+    actingUser?: { userId?: string; role: any }
+  ) {
     const school = await resolveSchool(schoolIdOrIdentifier);
     if (!school) {
       throw new AppError('Tenant school not found.', 404, 'SCHOOL_NOT_FOUND');
@@ -399,9 +404,12 @@ export class CoreSchoolService {
       ? data.admissionNumber.trim()
       : `ADM-2026-${rand}`;
 
-    const studentEmail = (data.email && data.email.trim().length > 0)
-      ? data.email.trim()
+    const hasIndividualEmail = Boolean(data.email && data.email.trim().length > 0);
+    const studentEmail = hasIndividualEmail
+      ? data.email!.trim()
       : `${cleanFirst}.${cleanLast}.${rand}@student.apex.edu`;
+
+    const isAssistedActivation = Boolean((data as any).isAssistedActivation || !hasIndividualEmail);
 
     const emergencyPhone = (data.emergencyPhone && data.emergencyPhone.trim().length > 0)
       ? data.emergencyPhone.trim()
@@ -445,42 +453,23 @@ export class CoreSchoolService {
 
     // 2. Execute transactional creation
     return prisma.$transaction(async (tx) => {
-      // Find or create User
-      let user = await tx.user.findUnique({ where: { email: studentEmail } });
-      if (!user) {
-        user = await tx.user.create({
-          data: {
-            email: studentEmail,
-            firstName: data.firstName,
-            lastName: data.lastName,
-            phone: emergencyPhone,
-            passwordHash: '$2a$10$wT3wK.sXFjDgnnLd8mY3xebvOQ6B18qTq8u20eSgb/rZeqm5zD78m', // DemoPass2026!
-          },
-        });
-      }
-
-      // Find or create Membership
-      let membership = await tx.userMembership.findUnique({
-        where: {
-          userId_schoolId_role: {
-            userId: user.id,
-            schoolId: school.id,
-            role: PlatformRole.STUDENT,
-          },
-        },
+      // Provision Student User Account & Tenant Membership
+      const studentAccount = await accountProvisioningService.provisionAccount(tx, {
+        schoolId: school.id,
+        email: studentEmail,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        phone: emergencyPhone,
+        role: PlatformRole.STUDENT,
+        actingUserRole: actingUser?.role || PlatformRole.SCHOOL_ADMIN,
+        actingUserId: actingUser?.userId,
+        sendInvitation: (data as any).sendInvitation !== false,
+        isAssistedActivation,
+        schoolName: school.name,
       });
 
-      if (!membership) {
-        membership = await tx.userMembership.create({
-          data: {
-            userId: user.id,
-            schoolId: school.id,
-            role: PlatformRole.STUDENT,
-            isPrimary: true,
-            isActive: true,
-          },
-        });
-      }
+      const user = studentAccount.user;
+      const membership = studentAccount.membership;
 
       // Find or create StudentProfile
       let studentProfile = await tx.studentProfile.findUnique({
@@ -569,41 +558,24 @@ export class CoreSchoolService {
       // Handle Guardian if provided
       const guardians: Array<{ name: string; relationship: string; email: string; phone: string }> = [];
       if (guardianEmail) {
-        let guardianUser = await tx.user.findUnique({ where: { email: guardianEmail } });
-        if (!guardianUser) {
-          const names = (data.guardianName || 'Guardian').split(' ');
-          guardianUser = await tx.user.create({
-            data: {
-              email: guardianEmail,
-              firstName: names[0] || 'Guardian',
-              lastName: names.slice(1).join(' ') || 'Parent',
-              phone: guardianPhone,
-              passwordHash: '$2a$10$wT3wK.sXFjDgnnLd8mY3xebvOQ6B18qTq8u20eSgb/rZeqm5zD78m',
-            },
-          });
-        }
-
-        const parentMembership = await tx.userMembership.upsert({
-          where: {
-            userId_schoolId_role: {
-              userId: guardianUser.id,
-              schoolId: school.id,
-              role: PlatformRole.PARENT,
-            },
-          },
-          update: {},
-          create: {
-            userId: guardianUser.id,
-            schoolId: school.id,
-            role: PlatformRole.PARENT,
-            isPrimary: true,
-            isActive: true,
-          },
+        const names = (data.guardianName || 'Guardian').split(' ');
+        const guardianAccount = await accountProvisioningService.provisionAccount(tx, {
+          schoolId: school.id,
+          email: guardianEmail,
+          firstName: names[0] || 'Guardian',
+          lastName: names.slice(1).join(' ') || 'Parent',
+          phone: guardianPhone,
+          role: PlatformRole.PARENT,
+          actingUserRole: actingUser?.role || PlatformRole.SCHOOL_ADMIN,
+          actingUserId: actingUser?.userId,
+          sendInvitation: Boolean((data as any).sendInvitation !== false && guardianEmail.includes('@')),
+          isAssistedActivation: false,
+          schoolName: school.name,
         });
 
         await tx.parentStudentLink.create({
           data: {
-            parentMembershipId: parentMembership.id,
+            parentMembershipId: guardianAccount.membership.id,
             studentProfileId: studentProfile.id,
             relationship: guardianRelationship,
             isPrimaryContact: true,
@@ -630,6 +602,7 @@ export class CoreSchoolService {
             admissionNumber,
             className: data.className,
             sectionName: data.sectionName,
+            isAssistedActivation,
           },
         },
       });
@@ -650,6 +623,10 @@ export class CoreSchoolService {
         sectionName: data.sectionName,
         rollNumber: data.rollNumber || 1,
         status: StudentStatus.ACTIVE,
+        accountStatus: user.isActive ? 'ACTIVE' : 'PENDING_ACTIVATION',
+        invitation: studentAccount.invitation,
+        rawActivationToken: studentAccount.rawActivationToken,
+        assistedActivationCode: studentAccount.assistedActivationCode,
         guardians,
         createdAt: studentProfile.createdAt.toISOString(),
       };
@@ -1308,6 +1285,8 @@ export class CoreSchoolService {
         guardianRelationship: app.guardianRelationship || 'Parent',
         guardianEmail: app.guardianEmail,
         guardianPhone: app.guardianPhone,
+        sendInvitation: true,
+        isAssistedActivation: false,
       });
     }
 

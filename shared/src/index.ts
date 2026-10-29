@@ -162,6 +162,8 @@ export const CreateStudentSchema = z.object({
   guardianRelationship: z.string().optional().or(z.literal('')),
   guardianEmail: z.string().email('Valid guardian email is required').optional().or(z.literal('')),
   guardianPhone: z.string().optional().or(z.literal('')),
+  sendInvitation: z.boolean().optional().default(true),
+  isAssistedActivation: z.boolean().optional().default(false),
 });
 
 export type CreateStudentDTO = z.infer<typeof CreateStudentSchema>;
@@ -170,15 +172,48 @@ export const CreateStaffSchema = z.object({
   firstName: z.string().min(2, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
   email: z.string().email('Valid institutional email is required'),
+  role: z.enum(['TEACHER', 'PRINCIPAL', 'EXAM_COORDINATOR', 'HR_STAFF', 'ACCOUNTS', 'SCHOOL_ADMIN']).default('TEACHER'),
   employeeId: z.string().regex(/^EMP-\d{4}-\d{3,6}$/, 'Format must be EMP-YYYY-XXXX'),
   departmentName: z.string().min(2, 'Department is required'),
   designation: z.string().min(2, 'Designation is required'),
   joiningDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD'),
   employmentStatus: z.enum(['ACTIVE', 'ON_LEAVE', 'PROBATION', 'RESIGNED', 'TERMINATED']).default('ACTIVE'),
   phone: z.string().min(7, 'Contact phone is required'),
+  sendInvitation: z.boolean().default(true),
 });
 
 export type CreateStaffDTO = z.infer<typeof CreateStaffSchema>;
+
+export const InvitationStatusEnum = z.enum(['PENDING', 'ACCEPTED', 'EXPIRED', 'REVOKED', 'FAILED']);
+export type InvitationStatusType = z.infer<typeof InvitationStatusEnum>;
+
+export const ActivateAccountSchema = z.object({
+  token: z.string().min(6, 'Valid activation token or code is required'),
+  password: z.string().min(8, 'Password must be at least 8 characters long')
+    .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
+    .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
+    .regex(/[0-9]/, 'Password must contain at least one number')
+    .regex(/[^A-Za-z0-9]/, 'Password must contain at least one special character'),
+});
+export type ActivateAccountDTO = z.infer<typeof ActivateAccountSchema>;
+
+export const ResendInvitationSchema = z.object({
+  invitationId: z.string().min(1).optional(),
+  userId: z.string().min(1).optional(),
+});
+export type ResendInvitationDTO = z.infer<typeof ResendInvitationSchema>;
+
+export const RevokeInvitationSchema = z.object({
+  invitationId: z.string().min(1),
+  reason: z.string().optional(),
+});
+export type RevokeInvitationDTO = z.infer<typeof RevokeInvitationSchema>;
+
+export const UpdateAccountStatusSchema = z.object({
+  isActive: z.boolean(),
+  reason: z.string().optional(),
+});
+export type UpdateAccountStatusDTO = z.infer<typeof UpdateAccountStatusSchema>;
 
 export const TeacherAssignmentSchema = z.object({
   staffProfileId: z.string().uuid().or(z.string().min(3)),

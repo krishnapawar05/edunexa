@@ -33,7 +33,7 @@ export const NewsPage: React.FC = () => {
   ];
 
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', padding: 'var(--space-8) var(--space-6)' }}>
+    <div className="ed-public-container" style={{ padding: 'var(--space-8) 0' }}>
       {/* Title */}
       <div style={{ marginBottom: 'var(--space-8)', textAlign: 'center' }}>
         <span className="ed-badge ed-badge-info" style={{ marginBottom: '8px' }}>PRESS & NOTICES</span>

@@ -107,6 +107,14 @@ enum ApplicationStatus {
   WAITLISTED
 }
 
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
+  FAILED
+}
+
 // -------------------------------------------------------------
 // CORE TENANCY & AUTHENTICATION
 // -------------------------------------------------------------
@@ -144,6 +152,7 @@ model School {
   auditLogs         AuditLog[]
   admissionApplications AdmissionApplication[]
   notifications     Notification[]
+  invitations       AccountInvitation[]
 
   @@index([slug])
   @@index([status])
@@ -167,6 +176,7 @@ model User {
   memberships        UserMembership[]
   auditLogs          AuditLog[]
   notifications      Notification[]
+  invitations        AccountInvitation[]
 
   @@index([email])
 }
@@ -192,6 +202,35 @@ model UserMembership {
   @@unique([userId, schoolId, role])
   @@index([schoolId, role])
   @@index([userId])
+}
+
+model AccountInvitation {
+  id              String           @id @default(uuid())
+  schoolId        String
+  userId          String
+  role            PlatformRole
+  email           String?
+  tokenHash       String           @unique
+  status          InvitationStatus @default(PENDING)
+  expiresAt       DateTime
+  acceptedAt      DateTime?
+  sentAt          DateTime?
+  lastAttemptAt   DateTime?
+  deliveryStatus  String?
+  deliveryError   String?
+  invitedByUserId String?
+  isAssisted      Boolean          @default(false)
+  assistedCode    String?
+
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  school          School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, status])
+  @@index([userId])
+  @@index([tokenHash])
 }
 
 model Subscription {
