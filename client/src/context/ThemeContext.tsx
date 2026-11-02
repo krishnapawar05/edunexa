@@ -22,7 +22,7 @@ function getSystemTheme(): ResolvedTheme {
 }
 
 function getInitialTheme(): ThemeMode {
-  if (typeof window === 'undefined') return 'system';
+  if (typeof window === 'undefined') return 'light';
   try {
     const saved = localStorage.getItem(THEME_STORAGE_KEY);
     if (saved === 'light' || saved === 'dark' || saved === 'system') {
@@ -31,7 +31,7 @@ function getInitialTheme(): ThemeMode {
   } catch {
     // Local storage access error or private browsing
   }
-  return 'system';
+  return 'light';
 }
 
 export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
