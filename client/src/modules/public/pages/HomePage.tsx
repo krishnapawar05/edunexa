@@ -227,8 +227,8 @@ export const HomePage: React.FC = () => {
             {/* Authentic School Story Narrative */}
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                <Compass size={24} style={{ color: 'var(--academic-forest-700)' }} />
-                <h3 style={{ fontSize: '1.28rem', color: 'var(--academic-forest-900)', margin: 0, fontFamily: 'var(--font-crest)' }}>
+                <Compass size={24} style={{ color: 'var(--color-primary)' }} />
+                <h3 style={{ fontSize: '1.28rem', color: 'var(--text-primary)', margin: 0, fontFamily: 'var(--font-crest)' }}>
                   A Tradition of Care, Rigor & Moral Purpose
                 </h3>
               </div>
@@ -245,7 +245,7 @@ export const HomePage: React.FC = () => {
                 <Link to="/about" className="ed-btn-academic-forest" style={{ padding: '9px 20px', fontSize: '0.88rem' }}>
                   Read Complete Heritage →
                 </Link>
-                <Link to="/academics" style={{ color: 'var(--academic-forest-700)', fontWeight: 700, fontSize: '0.88rem', textDecoration: 'none' }}>
+                <Link to="/academics" style={{ color: 'var(--color-primary)', fontWeight: 700, fontSize: '0.88rem', textDecoration: 'none' }}>
                   Explore Curriculum Standards →
                 </Link>
               </div>
@@ -287,8 +287,8 @@ export const HomePage: React.FC = () => {
 
                   <div className="ed-facility-photo-body">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                      <FacIcon size={18} style={{ color: 'var(--academic-forest-700)' }} />
-                      <h4 style={{ fontSize: '1.08rem', color: 'var(--academic-forest-900)', margin: 0 }}>
+                      <FacIcon size={18} style={{ color: 'var(--color-primary)' }} />
+                      <h4 style={{ fontSize: '1.08rem', color: 'var(--text-primary)', margin: 0 }}>
                         {fac.title}
                       </h4>
                     </div>
@@ -324,7 +324,7 @@ export const HomePage: React.FC = () => {
                   <Check size={16} />
                 </div>
                 <div>
-                  <h4 style={{ fontSize: '1rem', color: 'var(--academic-forest-900)', marginBottom: '4px' }}>
+                  <h4 style={{ fontSize: '1rem', color: 'var(--text-primary)', marginBottom: '4px' }}>
                     {pillar.title}
                   </h4>
                   <p style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: 1.55 }}>
@@ -350,7 +350,7 @@ export const HomePage: React.FC = () => {
                 padding: 'var(--space-6)',
                 textAlign: 'center',
                 backgroundColor: 'var(--bg-surface)',
-                border: '2px solid var(--academic-forest-600)',
+                border: '1px solid var(--border-default)',
               }}
             >
               <div
@@ -358,24 +358,24 @@ export const HomePage: React.FC = () => {
                   width: '104px',
                   height: '104px',
                   borderRadius: '50%',
-                  backgroundColor: 'var(--academic-forest-50)',
-                  color: 'var(--academic-forest-800)',
+                  backgroundColor: 'var(--bg-subtle)',
+                  color: 'var(--color-primary)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   margin: '0 auto var(--space-3)',
                   fontWeight: 800,
                   fontSize: '2.2rem',
-                  border: '3px solid var(--academic-gold-500)',
+                  border: '2px solid var(--color-accent)',
                   fontFamily: 'var(--font-crest)',
                 }}
               >
                 AT
               </div>
-              <h3 style={{ fontSize: '1.22rem', color: 'var(--academic-forest-900)', marginBottom: '4px' }}>
+              <h3 style={{ fontSize: '1.22rem', color: 'var(--text-primary)', marginBottom: '4px' }}>
                 Dr. Alistair Thorne
               </h3>
-              <div style={{ fontSize: '0.82rem', color: 'var(--academic-forest-700)', fontWeight: 700 }}>
+              <div style={{ fontSize: '0.84rem', color: 'var(--color-primary)', fontWeight: 700 }}>
                 Principal & Head of Faculty
               </div>
               <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px', lineHeight: 1.4 }}>
@@ -390,10 +390,10 @@ export const HomePage: React.FC = () => {
 
             {/* Welcome Message Column */}
             <div>
-              <div style={{ color: 'var(--academic-forest-700)', fontWeight: 700, fontSize: '0.82rem', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>
+              <div style={{ color: 'var(--color-primary)', fontWeight: 700, fontSize: '0.82rem', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>
                 From the Principal's Desk
               </div>
-              <h2 style={{ fontFamily: 'var(--font-crest)', fontSize: 'clamp(1.4rem, 2.8vw, 1.95rem)', color: 'var(--academic-forest-900)', lineHeight: 1.25, marginBottom: 'var(--space-4)' }}>
+              <h2 style={{ fontFamily: 'var(--font-crest)', fontSize: 'clamp(1.4rem, 2.8vw, 1.95rem)', color: 'var(--text-primary)', lineHeight: 1.25, marginBottom: 'var(--space-4)' }}>
                 "Education must awaken moral clarity as purposefully as intellectual skill."
               </h2>
               <p style={{ fontSize: '0.94rem', color: 'var(--text-secondary)', lineHeight: 1.7, marginBottom: 'var(--space-4)' }}>
@@ -405,15 +405,15 @@ export const HomePage: React.FC = () => {
 
               <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                 <div style={{ padding: '10px 16px', backgroundColor: 'var(--bg-surface)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-default)' }}>
-                  <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--academic-forest-800)' }}>100%</div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--color-primary)' }}>100%</div>
                   <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>CBSE Board Pass Rate</div>
                 </div>
                 <div style={{ padding: '10px 16px', backgroundColor: 'var(--bg-surface)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-default)' }}>
-                  <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--academic-forest-800)' }}>1:14</div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--color-primary)' }}>1:14</div>
                   <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Teacher-Student Ratio</div>
                 </div>
                 <div style={{ padding: '10px 16px', backgroundColor: 'var(--bg-surface)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-default)' }}>
-                  <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--academic-forest-800)' }}>64+</div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--color-primary)' }}>64+</div>
                   <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Experienced Educators</div>
                 </div>
               </div>
@@ -439,48 +439,48 @@ export const HomePage: React.FC = () => {
           <div className="ed-responsive-3col">
             {/* Primary Wing */}
             <div className="ed-facility-photo-card" style={{ padding: '1.5rem' }}>
-              <span className="ed-facility-badge" style={{ backgroundColor: 'var(--academic-forest-50)', color: 'var(--academic-forest-800)', borderColor: 'var(--academic-forest-100)', alignSelf: 'flex-start' }}>
+              <span className="ed-facility-badge" style={{ backgroundColor: 'var(--bg-subtle)', color: 'var(--color-primary)', borderColor: 'var(--border-default)', alignSelf: 'flex-start' }}>
                 GRADES 1–5
               </span>
-              <h4 style={{ fontSize: '1.15rem', color: 'var(--academic-forest-900)', marginTop: '12px', marginBottom: '8px' }}>
+              <h4 style={{ fontSize: '1.15rem', color: 'var(--text-primary)', marginTop: '12px', marginBottom: '8px' }}>
                 Primary Wing: Foundations
               </h4>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '16px' }}>
                 Interactive phonics, foundational mathematics, environmental observation, bilingual literacy, and cooperative social play.
               </p>
-              <Link to="/academics" style={{ fontSize: '0.84rem', color: 'var(--academic-forest-700)', fontWeight: 700, textDecoration: 'none', marginTop: 'auto' }}>
+              <Link to="/academics" style={{ fontSize: '0.84rem', color: 'var(--color-primary)', fontWeight: 700, textDecoration: 'none', marginTop: 'auto' }}>
                 View Primary Syllabus →
               </Link>
             </div>
 
             {/* Middle Wing */}
             <div className="ed-facility-photo-card" style={{ padding: '1.5rem' }}>
-              <span className="ed-facility-badge" style={{ backgroundColor: 'var(--academic-gold-50)', color: 'var(--academic-gold-900)', borderColor: 'var(--academic-gold-100)', alignSelf: 'flex-start' }}>
+              <span className="ed-facility-badge" style={{ backgroundColor: 'rgba(196, 164, 107, 0.15)', color: 'var(--color-accent)', borderColor: 'var(--color-accent)', alignSelf: 'flex-start' }}>
                 GRADES 6–8
               </span>
-              <h4 style={{ fontSize: '1.15rem', color: 'var(--academic-forest-900)', marginTop: '12px', marginBottom: '8px' }}>
+              <h4 style={{ fontSize: '1.15rem', color: 'var(--text-primary)', marginTop: '12px', marginBottom: '8px' }}>
                 Middle Wing: Discovery
               </h4>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '16px' }}>
                 Laboratory-driven introduction to physics, chemistry, biology, geometry, historical inquiry, and introductory computational logic.
               </p>
-              <Link to="/academics" style={{ fontSize: '0.84rem', color: 'var(--academic-forest-700)', fontWeight: 700, textDecoration: 'none', marginTop: 'auto' }}>
+              <Link to="/academics" style={{ fontSize: '0.84rem', color: 'var(--color-primary)', fontWeight: 700, textDecoration: 'none', marginTop: 'auto' }}>
                 View Middle Wing Syllabus →
               </Link>
             </div>
 
             {/* Senior Secondary Wing */}
             <div className="ed-facility-photo-card" style={{ padding: '1.5rem' }}>
-              <span className="ed-facility-badge" style={{ backgroundColor: 'var(--academic-forest-50)', color: 'var(--academic-forest-800)', borderColor: 'var(--academic-forest-100)', alignSelf: 'flex-start' }}>
+              <span className="ed-facility-badge" style={{ backgroundColor: 'var(--bg-subtle)', color: 'var(--color-primary)', borderColor: 'var(--border-default)', alignSelf: 'flex-start' }}>
                 GRADES 9–12
               </span>
-              <h4 style={{ fontSize: '1.15rem', color: 'var(--academic-forest-900)', marginTop: '12px', marginBottom: '8px' }}>
+              <h4 style={{ fontSize: '1.15rem', color: 'var(--text-primary)', marginTop: '12px', marginBottom: '8px' }}>
                 Senior Wing: Pre-University
               </h4>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '16px' }}>
                 Specialized academic tracks in Pure Science (Physics, Chem, Math, Bio) and Commerce with career counseling and exam mentoring.
               </p>
-              <Link to="/academics" style={{ fontSize: '0.84rem', color: 'var(--academic-forest-700)', fontWeight: 700, textDecoration: 'none', marginTop: 'auto' }}>
+              <Link to="/academics" style={{ fontSize: '0.84rem', color: 'var(--color-primary)', fontWeight: 700, textDecoration: 'none', marginTop: 'auto' }}>
                 View Senior Secondary Tracks →
               </Link>
             </div>

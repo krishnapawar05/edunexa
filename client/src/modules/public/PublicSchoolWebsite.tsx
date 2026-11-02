@@ -219,7 +219,7 @@ export const PublicSchoolWebsite: React.FC<PublicSchoolWebsiteProps> = ({ onGoTo
       {/* Hero Section */}
       <section
         style={{
-          backgroundColor: 'var(--academic-forest-900)',
+          backgroundColor: '#173327',
           color: '#ffffff',
           padding: 'var(--space-12) var(--space-8)',
           position: 'relative',

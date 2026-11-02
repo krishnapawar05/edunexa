@@ -267,7 +267,7 @@ export const StudentDossierPage: React.FC = () => {
                   width: '320px',
                   height: '190px',
                   borderRadius: '12px',
-                  background: 'linear-gradient(135deg, var(--academic-forest-900) 0%, var(--academic-forest-800) 100%)',
+                  background: 'linear-gradient(135deg, #173327 0%, #1d3d2f 100%)',
                   border: '1px solid var(--academic-gold-500)',
                   color: '#ffffff',
                   padding: '16px',

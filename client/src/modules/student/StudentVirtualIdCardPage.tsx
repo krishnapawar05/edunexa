@@ -155,7 +155,7 @@ export const StudentVirtualIdCardPage: React.FC = () => {
                 maxWidth: '420px',
                 aspectRatio: '1.586 / 1', // ISO/IEC 7810 ID-1 standard ratio
                 borderRadius: '16px',
-                background: 'linear-gradient(145deg, var(--academic-forest-900), var(--academic-forest-800))',
+                background: 'linear-gradient(145deg, #173327, #1d3d2f)',
                 color: '#ffffff',
                 padding: '20px 24px',
                 boxShadow: '0 12px 30px rgba(10, 38, 24, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.1)',

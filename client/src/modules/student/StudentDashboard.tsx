@@ -281,7 +281,7 @@ export const StudentDashboard: React.FC = () => {
             <div
               style={{
                 borderRadius: 'var(--radius-md)',
-                background: 'linear-gradient(135deg, var(--academic-forest-900) 0%, var(--academic-forest-800) 100%)',
+                background: 'linear-gradient(135deg, #173327 0%, #1d3d2f 100%)',
                 color: '#ffffff',
                 padding: 'var(--space-4)',
                 boxShadow: 'var(--shadow-md)',

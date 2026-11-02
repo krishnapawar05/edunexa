@@ -269,20 +269,21 @@ html.dark {
   --teal-border: rgba(127, 168, 140, 0.35);
   --teal-text: var(--color-primary);
 
-  /* Traditional Academic Dark Tokens */
-  --academic-forest-900: #101512;
-  --academic-forest-800: #171d19;
-  --academic-forest-700: #202822;
-  --academic-forest-600: #28332b;
+  /* Traditional Academic Dark Tokens - Inverted for High-Contrast Readability */
+  --academic-forest-900: var(--color-text-primary);
+  --academic-forest-800: #dce7e1;
+  --academic-forest-700: var(--color-primary);
+  --academic-forest-600: var(--color-primary-hover);
   --academic-forest-500: var(--color-primary);
-  --academic-forest-100: rgba(127, 168, 140, 0.25);
-  --academic-forest-50:  rgba(127, 168, 140, 0.12);
+  --academic-forest-100: rgba(127, 168, 140, 0.20);
+  --academic-forest-50:  rgba(127, 168, 140, 0.10);
 
-  --academic-gold-900: #3b2b10;
-  --academic-gold-700: #c4a46b;
-  --academic-gold-600: #d4b883;
+  --academic-gold-900: var(--color-accent);
+  --academic-gold-800: #ebdcc0;
+  --academic-gold-700: var(--color-accent);
+  --academic-gold-600: #c4a46b;
   --academic-gold-500: var(--color-accent);
-  --academic-gold-100: rgba(211, 183, 127, 0.22);
+  --academic-gold-100: rgba(211, 183, 127, 0.20);
   --academic-gold-50:  rgba(211, 183, 127, 0.10);
 
   --academic-ivory: var(--color-background);

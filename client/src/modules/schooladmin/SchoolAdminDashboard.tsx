@@ -1118,7 +1118,7 @@ export const SchoolAdminDashboard: React.FC<SchoolAdminDashboardProps> = ({ init
                 width: '340px',
                 height: '210px',
                 borderRadius: '12px',
-                background: 'linear-gradient(135deg, var(--academic-forest-900) 0%, var(--academic-forest-800) 100%)',
+                background: 'linear-gradient(135deg, #173327 0%, #1d3d2f 100%)',
                 color: '#ffffff',
                 padding: '16px',
                 boxShadow: 'var(--shadow-lg)',

@@ -10,39 +10,39 @@ export const PrincipalMessagePage: React.FC = () => {
       {/* Header */}
       <div style={{ marginBottom: 'var(--space-8)', textAlign: 'center' }}>
         <span className="ed-badge ed-badge-info" style={{ marginBottom: '8px' }}>LEADERSHIP DESK</span>
-        <h1>Principal's Message</h1>
+        <h1 style={{ color: 'var(--text-primary)' }}>Principal's Message</h1>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.96rem' }}>
           Dr. Alistair Thorne, Ph.D. • Apex Academy of Sciences & Arts
         </p>
       </div>
 
-      <div className="ed-card ed-card-body" style={{ padding: 'var(--space-8)', backgroundColor: 'var(--bg-surface)' }}>
+      <div className="ed-card ed-card-body" style={{ padding: 'var(--space-8)', backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border-default)' }}>
         <div style={{ display: 'flex', gap: 'var(--space-6)', alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: 'var(--space-6)' }}>
           <div
             style={{
               width: '120px',
               height: '140px',
-              backgroundColor: 'var(--primary-100)',
+              backgroundColor: 'var(--bg-subtle)',
               borderRadius: 'var(--radius-sm)',
-              border: '2px solid var(--primary-300)',
+              border: '2px solid var(--border-default)',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              color: 'var(--primary-800)',
+              color: 'var(--color-primary)',
               flexShrink: 0,
             }}
           >
-            <Award size={44} style={{ color: 'var(--primary-600)', marginBottom: '4px' }} />
-            <span style={{ fontSize: '0.72rem', fontWeight: 700 }}>PRINCIPAL</span>
+            <Award size={44} style={{ color: 'var(--color-primary)', marginBottom: '4px' }} />
+            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-primary)' }}>PRINCIPAL</span>
           </div>
 
           <div style={{ flex: 1 }}>
-            <h3 style={{ fontSize: '1.25rem', marginBottom: '4px' }}>Welcome to Our Scholarly Community</h3>
+            <h3 style={{ fontSize: '1.25rem', color: 'var(--text-primary)', marginBottom: '4px' }}>Welcome to Our Scholarly Community</h3>
             <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)' }}>
               Head of Institution & Professor of Physical Sciences • Apex Academy
             </p>
-            <div style={{ fontStyle: 'italic', color: 'var(--primary-700)', fontSize: '0.94rem', marginTop: '12px', borderLeft: '3px solid var(--primary-600)', paddingLeft: '12px' }}>
+            <div style={{ fontStyle: 'italic', color: 'var(--color-primary)', fontSize: '0.94rem', marginTop: '12px', borderLeft: '3px solid var(--color-accent)', paddingLeft: '12px' }}>
               "We do not merely teach science and mathematics; we cultivate the habits of inquiry, observation, skepticism, and moral responsibility."
             </div>
           </div>
@@ -68,7 +68,7 @@ export const PrincipalMessagePage: React.FC = () => {
             I invite every student entering our gates to bring their curiosity, their questions, and their audacity to learn.
           </p>
           <div style={{ marginTop: 'var(--space-4)', borderTop: '1px solid var(--border-default)', paddingTop: 'var(--space-4)' }}>
-            <strong>Dr. Alistair Thorne, Ph.D.</strong><br />
+            <strong style={{ color: 'var(--text-primary)' }}>Dr. Alistair Thorne, Ph.D.</strong><br />
             <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
               Principal, Apex Academy of Sciences & Arts<br />
               Former Senior Research Fellow, Indian Institute of Science

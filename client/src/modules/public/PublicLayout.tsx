@@ -255,7 +255,7 @@ export const PublicLayout: React.FC = () => {
                   alignItems: 'center',
                   gap: '4px',
                   border: 'none',
-                  background: isSecondaryActive ? 'var(--academic-forest-100)' : 'transparent',
+                  background: isSecondaryActive ? 'var(--bg-subtle)' : 'transparent',
                   cursor: 'pointer',
                   fontFamily: 'inherit',
                 }}
@@ -302,13 +302,13 @@ export const PublicLayout: React.FC = () => {
                             padding: '9px 12px',
                             fontSize: '0.84rem',
                             fontWeight: isSubActive ? 700 : 500,
-                            color: isSubActive ? 'var(--academic-forest-800)' : 'var(--text-primary)',
-                            backgroundColor: isSubActive ? 'var(--academic-forest-100)' : 'transparent',
+                            color: isSubActive ? 'var(--color-primary)' : 'var(--text-primary)',
+                            backgroundColor: isSubActive ? 'var(--bg-subtle)' : 'transparent',
                             borderRadius: 'var(--radius-xs)',
                             textDecoration: 'none',
                           }}
                         >
-                          <SubIcon size={14} style={{ color: 'var(--academic-forest-600)' }} />
+                          <SubIcon size={14} style={{ color: isSubActive ? 'var(--color-primary)' : 'var(--text-muted)' }} />
                           {subLink.label}
                         </Link>
                       );
@@ -417,7 +417,7 @@ export const PublicLayout: React.FC = () => {
                 onClick={() => setMobileMenuOpen(false)}
               >
                 <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <Icon size={16} style={{ color: isActive ? 'var(--academic-forest-700)' : 'var(--text-muted)' }} />
+                  <Icon size={16} style={{ color: isActive ? 'var(--color-primary)' : 'var(--text-muted)' }} />
                   {link.label}
                 </span>
                 <ChevronRight size={14} style={{ color: 'var(--text-muted)', opacity: 0.6 }} />
@@ -432,7 +432,7 @@ export const PublicLayout: React.FC = () => {
             onClick={() => setMobileMenuOpen(false)}
           >
             <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <LogIn size={16} style={{ color: 'var(--academic-forest-600)' }} />
+              <LogIn size={16} style={{ color: 'var(--color-primary)' }} />
               ERP Portal Login
             </span>
             <ChevronRight size={14} style={{ color: 'var(--text-muted)', opacity: 0.6 }} />
@@ -455,15 +455,15 @@ export const PublicLayout: React.FC = () => {
         <div className="ed-drawer-footer">
           <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <MapPin size={13} style={{ color: 'var(--academic-forest-600)', flexShrink: 0 }} />
+              <MapPin size={13} style={{ color: 'var(--color-primary)', flexShrink: 0 }} />
               <span>{branding.address}</span>
             </span>
             <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Phone size={13} style={{ color: 'var(--academic-forest-600)', flexShrink: 0 }} />
+              <Phone size={13} style={{ color: 'var(--color-primary)', flexShrink: 0 }} />
               <span>{branding.contactPhone}</span>
             </span>
             <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Mail size={13} style={{ color: 'var(--academic-forest-600)', flexShrink: 0 }} />
+              <Mail size={13} style={{ color: 'var(--color-primary)', flexShrink: 0 }} />
               <span>admissions@apexacademy.edu</span>
             </span>
           </div>
@@ -500,12 +500,12 @@ export const PublicLayout: React.FC = () => {
               backgroundColor: 'var(--bg-surface)',
               maxHeight: '92vh',
               overflowY: 'auto',
-              border: '2px solid var(--academic-forest-600)',
+              border: '1px solid var(--border-default)',
             }}
           >
-            <div className="ed-card-header" style={{ backgroundColor: 'var(--academic-forest-50)' }}>
+            <div className="ed-card-header" style={{ backgroundColor: 'var(--bg-subtle)' }}>
               <div>
-                <h3 style={{ fontSize: '1.1rem', color: 'var(--academic-forest-900)' }}>Online Admission Application 2026–2027</h3>
+                <h3 style={{ fontSize: '1.1rem', color: 'var(--text-primary)' }}>Online Admission Application 2026–2027</h3>
                 <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
                   Institutional Enrollment Desk • Direct System Verification
                 </p>
@@ -528,10 +528,10 @@ export const PublicLayout: React.FC = () => {
                   style={{
                     padding: '8px 12px',
                     marginBottom: '12px',
-                    backgroundColor: '#fef2f2',
-                    border: '1px solid #fecaca',
+                    backgroundColor: 'var(--danger-bg)',
+                    border: '1px solid var(--danger-border)',
                     borderRadius: 'var(--radius-sm)',
-                    color: '#dc2626',
+                    color: 'var(--danger-text)',
                     fontSize: '0.80rem',
                   }}
                 >
@@ -541,10 +541,10 @@ export const PublicLayout: React.FC = () => {
 
               {admissionSubmitted ? (
                 <div style={{ textAlign: 'center', padding: 'var(--space-6) 0' }}>
-                  <CheckCircle size={48} style={{ color: 'var(--academic-forest-600)', margin: '0 auto var(--space-3)' }} />
-                  <h3 style={{ color: 'var(--academic-forest-900)' }}>Application Submitted Successfully!</h3>
-                  <p style={{ marginTop: '8px', fontSize: '0.88rem' }}>
-                    Reference Tracking Number: <strong style={{ color: 'var(--academic-forest-700)' }}>{submittedAppNo}</strong>
+                  <CheckCircle size={48} style={{ color: 'var(--success-solid)', margin: '0 auto var(--space-3)' }} />
+                  <h3 style={{ color: 'var(--text-primary)' }}>Application Submitted Successfully!</h3>
+                  <p style={{ marginTop: '8px', fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
+                    Reference Tracking Number: <strong style={{ color: 'var(--color-primary)' }}>{submittedAppNo}</strong>
                   </p>
                   <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '6px', lineHeight: 1.5 }}>
                     An automated acknowledgment has been dispatched to {formData.email || 'your email'}. Our admissions committee will review credentials within 3 business days.

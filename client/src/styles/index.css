@@ -653,15 +653,21 @@ nav,
 
 /* Top Notification / Utility Bar */
 .ed-public-topbar {
-  background-color: var(--academic-forest-900);
-  color: #d1fae5;
+  background-color: #173327;
+  color: #dce7e1;
   padding: 7px 1rem;
   font-size: 0.76rem;
-  border-bottom: 2px solid var(--academic-gold-600);
+  border-bottom: 2px solid var(--color-accent);
   display: flex;
   justify-content: space-between;
   align-items: center;
   transition: background-color 0.2s ease;
+}
+
+[data-theme="dark"] .ed-public-topbar,
+html.dark .ed-public-topbar {
+  background-color: #121714;
+  border-bottom: 2px solid var(--color-accent);
 }
 
 @media (max-width: 768px) {
@@ -737,15 +743,10 @@ nav,
   font-weight: 800;
   letter-spacing: -0.01em;
   line-height: 1.15;
-  color: var(--academic-forest-800);
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-[data-theme="dark"] .ed-public-brand-title,
-html.dark .ed-public-brand-title {
-  color: var(--color-text-primary);
 }
 
 .ed-public-brand-subtitle {
@@ -790,27 +791,14 @@ html.dark .ed-public-brand-title {
 }
 
 .ed-nav-link:hover {
-  color: var(--academic-forest-700);
-  background-color: var(--academic-forest-50);
+  color: var(--color-primary);
+  background-color: var(--bg-subtle);
 }
 
 .ed-nav-link.active {
-  color: var(--academic-forest-800);
+  color: var(--color-primary);
   font-weight: 700;
-  background-color: var(--academic-forest-100);
-  border-bottom: 2px solid var(--academic-forest-700);
-}
-
-[data-theme="dark"] .ed-nav-link:hover,
-html.dark .ed-nav-link:hover {
-  color: var(--color-primary);
-  background-color: var(--academic-forest-50);
-}
-
-[data-theme="dark"] .ed-nav-link.active,
-html.dark .ed-nav-link.active {
-  color: var(--color-primary);
-  background-color: var(--academic-forest-100);
+  background-color: var(--bg-subtle);
   border-bottom: 2px solid var(--color-accent);
 }
 
@@ -904,11 +892,16 @@ html.dark .ed-nav-link.active {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background-color: var(--academic-forest-900);
+  background-color: #173327;
   color: #ffffff;
   position: sticky;
   top: 0;
   z-index: 10;
+}
+
+[data-theme="dark"] .ed-drawer-header,
+html.dark .ed-drawer-header {
+  background-color: #121714;
 }
 
 .ed-drawer-body {
@@ -933,13 +926,13 @@ html.dark .ed-nav-link.active {
 }
 
 .ed-drawer-link:hover {
-  background-color: var(--academic-forest-50);
-  color: var(--academic-forest-700);
+  background-color: var(--bg-subtle);
+  color: var(--color-primary);
 }
 
 .ed-drawer-link.active {
-  background-color: var(--academic-forest-100);
-  color: var(--academic-forest-800);
+  background-color: var(--bg-subtle);
+  color: var(--color-primary);
   font-weight: 700;
 }
 
@@ -989,12 +982,12 @@ html.dark .ed-nav-link.active {
   align-items: center;
   gap: 6px;
   padding: 5px 12px;
-  background-color: var(--academic-forest-50);
-  border: 1px solid var(--academic-forest-100);
+  background-color: var(--bg-subtle);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-pill);
   font-size: 0.78rem;
   font-weight: 700;
-  color: var(--academic-forest-700);
+  color: var(--color-primary);
   margin-bottom: 1.25rem;
   letter-spacing: 0.02em;
   text-transform: uppercase;
@@ -1002,17 +995,12 @@ html.dark .ed-nav-link.active {
 
 .ed-hero-title-academic {
   font-family: var(--font-crest), var(--font-display);
-  color: var(--academic-forest-900) !important;
+  color: var(--text-primary);
   font-size: clamp(1.85rem, 4vw, 2.85rem);
   font-weight: 800;
   line-height: 1.18;
   letter-spacing: -0.02em;
   margin-bottom: 1rem;
-}
-
-[data-theme="dark"] .ed-hero-title-academic,
-html.dark .ed-hero-title-academic {
-  color: var(--color-text-primary) !important;
 }
 
 .ed-hero-subtitle-academic {
@@ -1227,7 +1215,15 @@ html.dark .ed-hero-title-academic {
 .ed-facility-photo-card:hover {
   transform: translateY(-4px);
   box-shadow: 0 10px 24px rgba(10, 38, 24, 0.10);
-  border-color: var(--academic-forest-600);
+  border-color: var(--color-primary);
+}
+
+.ed-facility-photo-card h4 {
+  color: var(--text-primary);
+}
+
+.ed-facility-photo-card p {
+  color: var(--text-secondary);
 }
 
 .ed-facility-photo-thumb {
@@ -1235,7 +1231,7 @@ html.dark .ed-hero-title-academic {
   width: 100%;
   height: 180px;
   overflow: hidden;
-  background-color: var(--academic-sand);
+  background-color: var(--bg-subtle);
 }
 
 .ed-facility-photo-thumb img {
@@ -1254,9 +1250,9 @@ html.dark .ed-hero-title-academic {
   position: absolute;
   top: 10px;
   right: 10px;
-  background-color: rgba(10, 38, 24, 0.85);
-  color: var(--academic-gold-500);
-  border: 1px solid var(--academic-gold-600);
+  background-color: rgba(10, 38, 24, 0.88);
+  color: var(--color-accent);
+  border: 1px solid var(--color-accent);
   font-size: 0.68rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -1361,7 +1357,7 @@ html.dark .ed-hero-title-academic {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--academic-forest-600);
+  color: var(--color-primary);
   margin-bottom: 6px;
 }
 
@@ -1369,25 +1365,20 @@ html.dark .ed-hero-title-academic {
   font-family: var(--font-crest), var(--font-display);
   font-size: clamp(1.5rem, 3.2vw, 2.2rem);
   font-weight: 800;
-  color: var(--academic-forest-900);
+  color: var(--text-primary);
   line-height: 1.25;
-}
-
-[data-theme="dark"] .ed-section-title,
-html.dark .ed-section-title {
-  color: var(--color-text-primary);
 }
 
 .ed-section-rule {
   width: 60px;
   height: 3px;
-  background: linear-gradient(90deg, var(--academic-forest-600), var(--academic-gold-500));
+  background: linear-gradient(90deg, var(--color-secondary), var(--color-accent));
   margin: 12px auto 0;
   border-radius: var(--radius-pill);
 }
 
 .ed-section-subtitle {
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-size: 0.94rem;
   max-width: 680px;
   margin: 12px auto 0;
@@ -1420,7 +1411,7 @@ html.dark .ed-section-title {
 .ed-facility-card:hover {
   transform: translateY(-3px);
   box-shadow: 0 8px 20px rgba(10, 38, 24, 0.08);
-  border-color: var(--academic-forest-500);
+  border-color: var(--color-primary);
 }
 
 .ed-facility-card-top {
@@ -1437,17 +1428,17 @@ html.dark .ed-section-title {
   letter-spacing: 0.04em;
   padding: 2px 8px;
   border-radius: var(--radius-pill);
-  background-color: var(--academic-gold-50);
-  color: var(--academic-gold-900);
-  border: 1px solid var(--academic-gold-100);
+  background-color: var(--bg-subtle);
+  color: var(--color-accent);
+  border: 1px solid var(--border-default);
 }
 
 .ed-facility-icon-wrap {
   width: 46px;
   height: 46px;
   border-radius: var(--radius-sm);
-  background-color: var(--academic-forest-50);
-  color: var(--academic-forest-700);
+  background-color: var(--bg-subtle);
+  color: var(--color-primary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1467,15 +1458,23 @@ html.dark .ed-section-title {
 }
 
 .ed-why-choose-item:hover {
-  border-color: var(--academic-forest-600);
-  background-color: var(--academic-forest-50);
+  border-color: var(--color-primary);
+  background-color: var(--bg-subtle);
+}
+
+.ed-why-choose-item h4 {
+  color: var(--text-primary);
+}
+
+.ed-why-choose-item p {
+  color: var(--text-secondary);
 }
 
 .ed-why-choose-check {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background-color: var(--academic-forest-600);
+  background-color: var(--color-secondary);
   color: #ffffff;
   display: flex;
   align-items: center;
@@ -1486,11 +1485,11 @@ html.dark .ed-section-title {
 
 /* Admissions Callout Banner (St. Joseph's Style) */
 .ed-admissions-banner {
-  background: linear-gradient(135deg, var(--academic-forest-900) 0%, var(--academic-forest-800) 100%);
+  background: linear-gradient(135deg, #173327 0%, #1d3d2f 100%);
   color: #ffffff;
   border-radius: var(--radius-lg);
   padding: clamp(2rem, 4vw, 3.5rem);
-  border: 2px solid var(--academic-gold-500);
+  border: 2px solid var(--color-accent);
   box-shadow: 0 10px 30px rgba(10, 38, 24, 0.2);
   display: flex;
   justify-content: space-between;
@@ -1500,13 +1499,13 @@ html.dark .ed-section-title {
 }
 
 .ed-btn-academic-gold {
-  background: linear-gradient(180deg, var(--academic-gold-500) 0%, var(--academic-gold-600) 100%);
+  background: linear-gradient(180deg, var(--color-accent) 0%, #ab894c 100%);
   color: #1c1917 !important;
   font-weight: 700;
   padding: 12px 28px;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--academic-gold-700);
-  box-shadow: 0 2px 6px rgba(202, 138, 4, 0.35);
+  border: 1px solid #8c6e37;
+  box-shadow: 0 2px 6px rgba(196, 164, 107, 0.35);
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -1516,18 +1515,18 @@ html.dark .ed-section-title {
 }
 
 .ed-btn-academic-gold:hover {
-  background: linear-gradient(180deg, var(--academic-gold-600) 0%, var(--academic-gold-700) 100%);
+  background: linear-gradient(180deg, #ab894c 0%, #8c6e37 100%);
   color: #ffffff !important;
   transform: translateY(-1px);
 }
 
 .ed-btn-academic-forest {
-  background-color: var(--academic-forest-700);
+  background-color: var(--color-primary);
   color: #ffffff !important;
   font-weight: 700;
   padding: 12px 24px;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--academic-forest-800);
+  border: 1px solid var(--color-primary-hover);
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -1537,16 +1536,23 @@ html.dark .ed-section-title {
 }
 
 .ed-btn-academic-forest:hover {
-  background-color: var(--academic-forest-800);
+  background-color: var(--color-primary-hover);
+  color: #ffffff !important;
   transform: translateY(-1px);
 }
 
 /* Institutional Footer (Forest Green Theme) */
 .ed-academic-footer {
-  background-color: var(--academic-forest-900);
+  background-color: #173327;
   color: #d1fae5;
-  border-top: 3px solid var(--academic-gold-600);
+  border-top: 3px solid var(--color-accent);
   padding: clamp(2.5rem, 5vw, 4rem) 0 1.5rem;
+}
+
+[data-theme="dark"] .ed-academic-footer,
+html.dark .ed-academic-footer {
+  background-color: #121714;
+  border-top: 3px solid var(--color-accent);
 }
 
 .ed-academic-footer-link {
