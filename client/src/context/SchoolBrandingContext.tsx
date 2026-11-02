@@ -24,7 +24,7 @@ export const DEFAULT_BRANDING: SchoolBranding = {
   contactEmail: 'admissions@apexacademy.edu',
   contactPhone: '+91 (11) 2840-9100',
   address: 'Sector 14, Institutional Area, New Delhi, India 110025',
-  primaryAccent: '#0F766E', // Institutional Teal
+  primaryAccent: '#244C3A', // Institutional Forest Green
   monogram: 'A',
 };
 
@@ -38,16 +38,39 @@ interface SchoolBrandingContextType {
 
 const SchoolBrandingContext = createContext<SchoolBrandingContextType | undefined>(undefined);
 
+const BRANDING_STORAGE_KEY = 'edunexa_school_branding';
+
 export const SchoolBrandingProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [branding, setBranding] = useState<SchoolBranding>(DEFAULT_BRANDING);
+  const [branding, setBranding] = useState<SchoolBranding>(() => {
+    try {
+      const saved = localStorage.getItem(BRANDING_STORAGE_KEY);
+      if (saved) return { ...DEFAULT_BRANDING, ...JSON.parse(saved) };
+    } catch {
+      // fallback
+    }
+    return DEFAULT_BRANDING;
+  });
   const [isCustomizing, setIsCustomizing] = useState(false);
 
   const updateBranding = (updates: Partial<SchoolBranding>) => {
-    setBranding((prev) => ({ ...prev, ...updates }));
+    setBranding((prev) => {
+      const next = { ...prev, ...updates };
+      try {
+        localStorage.setItem(BRANDING_STORAGE_KEY, JSON.stringify(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
   };
 
   const resetBranding = () => {
     setBranding(DEFAULT_BRANDING);
+    try {
+      localStorage.removeItem(BRANDING_STORAGE_KEY);
+    } catch {
+      // ignore
+    }
   };
 
   return (

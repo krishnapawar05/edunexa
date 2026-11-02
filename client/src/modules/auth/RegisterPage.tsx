@@ -36,7 +36,7 @@ export const RegisterPage: React.FC = () => {
         padding: 'var(--space-6)',
       }}
     >
-      <div className="ed-card" style={{ width: '100%', maxWidth: '560px', backgroundColor: '#ffffff', padding: 'var(--space-6)' }}>
+      <div className="ed-card" style={{ width: '100%', maxWidth: '560px', backgroundColor: 'var(--bg-surface)', padding: 'var(--space-6)' }}>
         <div style={{ textAlign: 'center', marginBottom: 'var(--space-5)' }}>
           <div
             style={{

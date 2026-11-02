@@ -5,7 +5,15 @@ NODE_ENV = "production"
 nixPkgs = ["nodejs_20", "openssl"]
 
 [phases.install]
-cmds = ["npm install --include=dev"]
+cmds = [
+  "mkdir -p /usr/local/bin",
+  "ln -sf $(which node) /usr/local/bin/node 2>/dev/null || true",
+  "ln -sf $(which npm) /usr/local/bin/npm 2>/dev/null || true",
+  "ln -sf $(which npx) /usr/local/bin/npx 2>/dev/null || true",
+  "echo 'export PATH=\"/root/.nix-profile/bin:/nix/var/nix/profiles/default/bin:$PATH\"' >> /root/.bashrc 2>/dev/null || true",
+  "echo 'export PATH=\"/root/.nix-profile/bin:/nix/var/nix/profiles/default/bin:$PATH\"' >> /etc/profile 2>/dev/null || true",
+  "npm install --include=dev"
+]
 
 [phases.build]
 cmds = ["npm run build"]

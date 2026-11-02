@@ -182,7 +182,7 @@ export const HrLeaveRequestsPage: React.FC = () => {
             position: 'fixed',
             bottom: '24px',
             right: '24px',
-            backgroundColor: 'var(--ink-900, #0f172a)',
+            backgroundColor: 'var(--ink-900)',
             color: '#ffffff',
             padding: '12px 18px',
             borderRadius: 'var(--radius-md)',

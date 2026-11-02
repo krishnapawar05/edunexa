@@ -79,7 +79,7 @@ export const ContactPage: React.FC = () => {
         </div>
 
         {/* Right Column: Interactive Inquiry Form */}
-        <div className="ed-card ed-card-body" style={{ backgroundColor: '#ffffff' }}>
+        <div className="ed-card ed-card-body" style={{ backgroundColor: 'var(--bg-surface)' }}>
           <h3 style={{ fontSize: '1.2rem', marginBottom: '4px' }}>Send an Institutional Inquiry</h3>
           <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: 'var(--space-4)' }}>
             Your dispatch will be routed to the appropriate academic or administrative bureau.

@@ -16,7 +16,7 @@ export const PrincipalMessagePage: React.FC = () => {
         </p>
       </div>
 
-      <div className="ed-card ed-card-body" style={{ padding: 'var(--space-8)', backgroundColor: '#ffffff' }}>
+      <div className="ed-card ed-card-body" style={{ padding: 'var(--space-8)', backgroundColor: 'var(--bg-surface)' }}>
         <div style={{ display: 'flex', gap: 'var(--space-6)', alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: 'var(--space-6)' }}>
           <div
             style={{

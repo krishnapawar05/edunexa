@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Outlet, Navigate, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar.js';
 import { Header } from './Header.js';
-import { SchoolIdentityModal } from './SchoolIdentityModal.js';
 import { fetchServerHealth, getStoredUser } from '../services/api.js';
 import { HealthCheckData } from '@edunexa/shared';
 
@@ -33,9 +32,6 @@ export const ErpLayout: React.FC = () => {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: 'var(--bg-app)' }}>
-      {/* Dynamic School Identity Configuration Modal */}
-      <SchoolIdentityModal />
-
       {/* Persistent Left Sidebar with React Router NavLinks */}
       <Sidebar
         currentRole={authenticatedRole}

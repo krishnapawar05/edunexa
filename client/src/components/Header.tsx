@@ -2,31 +2,25 @@ import React, { useState } from 'react';
 import {
   Search,
   Bell,
-  CheckCircle2,
-  AlertTriangle,
-  RefreshCw,
-  Sliders,
   Menu,
 } from 'lucide-react';
 import { HealthCheckData } from '@edunexa/shared';
-import { useSchoolBranding } from '../context/SchoolBrandingContext.js';
 import { operationsApi, getStoredUser } from '../services/api.js';
 import { ThemeSwitcher } from './ThemeSwitcher.js';
 
 interface HeaderProps {
   currentRole: string;
-  serverHealth: HealthCheckData | null;
-  onRefreshHealth: () => void;
+  serverHealth?: HealthCheckData | null;
+  onRefreshHealth?: () => void;
   onToggleMobileMenu?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   currentRole,
-  serverHealth,
-  onRefreshHealth,
+  serverHealth: _serverHealth,
+  onRefreshHealth: _onRefreshHealth,
   onToggleMobileMenu,
 }) => {
-  const { branding, setIsCustomizing } = useSchoolBranding();
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState<number>(0);
@@ -118,59 +112,8 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* Right Controls: Brand Customizer, Health Badge, Alerts, Verified Profile, Sign Out */}
+      {/* Right Controls: Notifications, Global Theme Switcher */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-        {/* School Identity Customizer Button (for Admin / School-level users) */}
-        {activeRole !== 'STUDENT' && activeRole !== 'PARENT' && (
-          <button
-            onClick={() => setIsCustomizing(true)}
-            className="ed-btn ed-btn-secondary"
-            title="Configure School Name, Theme & Identity (PRD Stage 1 Requirement)"
-            style={{
-              padding: '4px 10px',
-              fontSize: '0.78rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              borderColor: 'var(--border-default)',
-            }}
-          >
-            <Sliders size={13} style={{ color: 'var(--primary-700)' }} />
-            <span>Branding: <strong>{branding.shortName}</strong></span>
-          </button>
-        )}
-
-        {/* Backend Status Live Badge */}
-        <div
-          onClick={onRefreshHealth}
-          title={
-            serverHealth
-              ? `Backend Connected (${serverHealth.service}) - Uptime: ${serverHealth.uptimeSeconds}s`
-              : 'Backend connecting or offline (Click to re-check)'
-          }
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            padding: '4px 10px',
-            backgroundColor: serverHealth ? 'var(--success-bg)' : 'var(--warning-bg)',
-            border: `1px solid ${serverHealth ? 'var(--success-border)' : 'var(--warning-border)'}`,
-            borderRadius: 'var(--radius-pill)',
-            fontSize: '0.75rem',
-            fontWeight: 600,
-            color: serverHealth ? 'var(--success-text)' : 'var(--warning-text)',
-            cursor: 'pointer',
-          }}
-        >
-          {serverHealth ? (
-            <CheckCircle2 size={13} style={{ color: 'var(--success-solid)' }} />
-          ) : (
-            <AlertTriangle size={13} style={{ color: 'var(--warning-solid)' }} />
-          )}
-          <span>{serverHealth ? `Core API: Online` : 'Core API: Connecting...'}</span>
-          <RefreshCw size={11} style={{ opacity: 0.7 }} />
-        </div>
-
         {/* Notifications Icon */}
         <div style={{ position: 'relative' }}>
           <button

@@ -24,6 +24,10 @@ if (!resolvedDbUrl) {
 
 process.env.DATABASE_URL = resolvedDbUrl;
 
+// Ensure Nix and global binaries are always reachable in PATH
+const nixPaths = '/root/.nix-profile/bin:/nix/var/nix/profiles/default/bin';
+process.env.PATH = process.env.PATH ? `${nixPaths}:${process.env.PATH}` : nixPaths;
+
 function run(cmd) {
   return execSync(cmd, { stdio: 'inherit', env: process.env });
 }

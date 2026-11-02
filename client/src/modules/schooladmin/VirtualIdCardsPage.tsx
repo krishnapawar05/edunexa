@@ -527,7 +527,7 @@ export const VirtualIdCardsPage: React.FC = () => {
                 width: '380px',
                 height: '240px',
                 borderRadius: '16px',
-                backgroundColor: 'var(--ink-900)',
+                backgroundColor: 'var(--bg-dark-sidebar)',
                 color: '#ffffff',
                 padding: '20px',
                 display: 'flex',
@@ -536,7 +536,7 @@ export const VirtualIdCardsPage: React.FC = () => {
                 position: 'relative',
                 overflow: 'hidden',
                 boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.3)',
-                border: '1px solid rgba(255, 255, 255, 0.15)',
+                border: '1px solid var(--academic-gold-500)',
               }}
             >
               {/* Top Accent bar */}
@@ -609,7 +609,7 @@ export const VirtualIdCardsPage: React.FC = () => {
                   <div style={{ fontSize: '1.05rem', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {previewCard.name}
                   </div>
-                  <div style={{ fontSize: '0.74rem', color: '#38bdf8', fontWeight: 600, marginTop: '2px' }}>
+                  <div style={{ fontSize: '0.74rem', color: 'var(--academic-gold-500)', fontWeight: 600, marginTop: '2px' }}>
                     {previewCard.holderType} • {previewCard.subDetail}
                   </div>
                   <div style={{ fontSize: '0.74rem', color: '#94a3b8', marginTop: '6px' }}>
@@ -636,7 +636,7 @@ export const VirtualIdCardsPage: React.FC = () => {
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <QrCode size={22} style={{ color: '#38bdf8' }} />
+                  <QrCode size={22} style={{ color: 'var(--academic-gold-500)' }} />
                   <span style={{ fontSize: '0.62rem', color: '#94a3b8' }}>Cryptographic QR</span>
                 </div>
               </div>

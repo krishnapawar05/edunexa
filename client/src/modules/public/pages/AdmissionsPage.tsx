@@ -113,14 +113,14 @@ export const AdmissionsPage: React.FC = () => {
         </div>
 
         {/* Right Column: Interactive Application Form */}
-        <div className="ed-card ed-card-body" style={{ backgroundColor: '#ffffff' }}>
+        <div className="ed-card ed-card-body" style={{ backgroundColor: 'var(--bg-surface)' }}>
           <h3 style={{ fontSize: '1.2rem', marginBottom: '4px' }}>Online Admission Application</h3>
           <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: 'var(--space-4)' }}>
             Applications are persisted directly to the school administrative ledger in PostgreSQL.
           </p>
 
           {errorMessage && (
-            <div style={{ padding: '10px 14px', marginBottom: '16px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--radius-sm)', color: '#dc2626', fontSize: '0.84rem' }}>
+            <div style={{ padding: '10px 14px', marginBottom: '16px', backgroundColor: 'var(--danger-bg)', border: '1px solid var(--danger-border)', borderRadius: 'var(--radius-sm)', color: 'var(--danger-text)', fontSize: '0.84rem' }}>
               {errorMessage}
             </div>
           )}

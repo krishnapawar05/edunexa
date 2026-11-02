@@ -155,11 +155,11 @@ export const StudentVirtualIdCardPage: React.FC = () => {
                 maxWidth: '420px',
                 aspectRatio: '1.586 / 1', // ISO/IEC 7810 ID-1 standard ratio
                 borderRadius: '16px',
-                background: 'linear-gradient(145deg, #090d16, #1e293b)',
+                background: 'linear-gradient(145deg, var(--academic-forest-900), var(--academic-forest-800))',
                 color: '#ffffff',
                 padding: '20px 24px',
-                boxShadow: '0 12px 30px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-                border: '1px solid #334155',
+                boxShadow: '0 12px 30px rgba(10, 38, 24, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                border: '1px solid var(--academic-gold-500)',
                 position: 'relative',
                 display: 'flex',
                 flexDirection: 'column',
@@ -190,13 +190,14 @@ export const StudentVirtualIdCardPage: React.FC = () => {
                           width: '32px',
                           height: '32px',
                           borderRadius: '6px',
-                          backgroundColor: 'var(--primary-600)',
+                          backgroundColor: 'var(--brand-forest-700)',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           fontWeight: 900,
                           fontSize: '1rem',
                           color: '#ffffff',
+                          border: '1px solid var(--academic-gold-500)',
                         }}
                       >
                         A
@@ -225,18 +226,18 @@ export const StudentVirtualIdCardPage: React.FC = () => {
                       style={{
                         width: '82px',
                         height: '98px',
-                        backgroundColor: '#0f172a',
-                        border: '2px solid #475569',
+                        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
                         borderRadius: '6px',
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        color: '#64748b',
+                        color: 'var(--text-inverse-muted)',
                         flexShrink: 0,
                       }}
                     >
-                      <Award size={32} style={{ color: '#60a5fa', marginBottom: '4px' }} />
+                      <Award size={32} style={{ color: 'var(--academic-gold-500)', marginBottom: '4px' }} />
                       <span style={{ fontSize: '0.64rem', fontWeight: 700 }}>STUDENT</span>
                     </div>
 
@@ -245,7 +246,7 @@ export const StudentVirtualIdCardPage: React.FC = () => {
                       <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.02em', lineHeight: 1.2 }}>
                         {studentFullName}
                       </div>
-                      <div style={{ color: '#93c5fd', fontFamily: 'var(--font-mono)', fontSize: '0.78rem', marginTop: '2px', fontWeight: 600 }}>
+                      <div style={{ color: 'var(--academic-gold-500)', fontFamily: 'var(--font-mono)', fontSize: '0.78rem', marginTop: '2px', fontWeight: 600 }}>
                         {admissionNumber}
                       </div>
                       <div style={{ marginTop: '8px', color: '#cbd5e1', fontSize: '0.78rem', display: 'flex', flexDirection: 'column', gap: '2px' }}>
@@ -293,10 +294,10 @@ export const StudentVirtualIdCardPage: React.FC = () => {
                     <div
                       style={{
                         height: '32px',
-                        backgroundColor: '#020617',
+                        backgroundColor: '#121714',
                         margin: '-4px -24px 8px -24px',
-                        borderTop: '1px solid #1e293b',
-                        borderBottom: '1px solid #1e293b',
+                        borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+                        borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
                       }}
                     />
                     <div style={{ fontSize: '0.74rem', color: '#cbd5e1', lineHeight: 1.4 }}>

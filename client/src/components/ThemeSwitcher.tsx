@@ -28,14 +28,14 @@ export const ThemeSwitcher: React.FC<ThemeSwitcherProps> = ({ compact = false })
     {
       mode: 'light',
       label: 'Light Mode',
-      icon: <Sun size={15} style={{ color: '#f59e0b' }} />,
-      desc: 'Crisp academic daylight styling',
+      icon: <Sun size={15} style={{ color: '#d97706' }} />,
+      desc: 'Warm ivory & forest daylight styling',
     },
     {
       mode: 'dark',
       label: 'Dark Mode',
-      icon: <Moon size={15} style={{ color: '#818cf8' }} />,
-      desc: 'Refined midnight blue contrast',
+      icon: <Moon size={15} style={{ color: 'var(--color-accent)' }} />,
+      desc: 'Refined charcoal-green institutional theme',
     },
     {
       mode: 'system',
@@ -46,12 +46,12 @@ export const ThemeSwitcher: React.FC<ThemeSwitcherProps> = ({ compact = false })
   ];
 
   const currentIcon = () => {
-    if (theme === 'light') return <Sun size={16} style={{ color: '#f59e0b' }} />;
-    if (theme === 'dark') return <Moon size={16} style={{ color: '#818cf8' }} />;
+    if (theme === 'light') return <Sun size={16} style={{ color: '#d97706' }} />;
+    if (theme === 'dark') return <Moon size={16} style={{ color: 'var(--color-accent)' }} />;
     return resolvedTheme === 'dark' ? (
-      <Moon size={16} style={{ color: '#818cf8' }} />
+      <Moon size={16} style={{ color: 'var(--color-accent)' }} />
     ) : (
-      <Sun size={16} style={{ color: '#f59e0b' }} />
+      <Sun size={16} style={{ color: '#d97706' }} />
     );
   };
 

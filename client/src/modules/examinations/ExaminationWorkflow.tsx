@@ -549,7 +549,7 @@ export const ExaminationWorkflow: React.FC = () => {
             style={{
               width: '100%',
               maxWidth: '680px',
-              backgroundColor: '#ffffff',
+              backgroundColor: 'var(--bg-surface-elevated)',
               maxHeight: '90vh',
               overflowY: 'auto',
               boxShadow: 'var(--shadow-xl)',
@@ -678,7 +678,7 @@ export const ExaminationWorkflow: React.FC = () => {
           style={{
             position: 'fixed',
             inset: 0,
-            backgroundColor: 'rgba(15, 23, 42, 0.7)',
+            backgroundColor: 'rgba(16, 23, 18, 0.72)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -686,7 +686,7 @@ export const ExaminationWorkflow: React.FC = () => {
             padding: 'var(--space-4)',
           }}
         >
-          <div className="ed-card" style={{ width: '100%', maxWidth: '460px', backgroundColor: '#ffffff' }}>
+          <div className="ed-card" style={{ width: '100%', maxWidth: '460px', backgroundColor: 'var(--bg-surface-elevated)' }}>
             <div className="ed-card-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <AlertTriangle size={18} style={{ color: 'var(--warning-solid)' }} />

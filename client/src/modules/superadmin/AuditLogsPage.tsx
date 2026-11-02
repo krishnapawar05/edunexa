@@ -285,8 +285,9 @@ export const AuditLogsPage: React.FC = () => {
                 </div>
                 <pre
                   style={{
-                    backgroundColor: '#1e293b',
-                    color: '#f8fafc',
+                    backgroundColor: 'var(--bg-subtle)',
+                    color: 'var(--text-primary)',
+                    border: '1px solid var(--border-default)',
                     padding: '12px',
                     borderRadius: 'var(--radius-sm)',
                     fontSize: '0.76rem',

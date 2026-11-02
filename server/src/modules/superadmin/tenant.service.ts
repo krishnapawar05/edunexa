@@ -508,6 +508,9 @@ export class TenantService {
             state: dto.state,
             postalCode: dto.postalCode,
             websiteUrl: dto.websiteUrl,
+            ...(dto.motto !== undefined ? { motto: dto.motto } : {}),
+            ...(dto.code !== undefined ? { code: dto.code } : {}),
+            ...(dto.brandingConfig !== undefined ? { brandingConfig: dto.brandingConfig } : {}),
           },
           include: { subscriptions: true },
         });

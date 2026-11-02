@@ -281,19 +281,19 @@ export const StudentDashboard: React.FC = () => {
             <div
               style={{
                 borderRadius: 'var(--radius-md)',
-                backgroundColor: '#0f172a',
+                background: 'linear-gradient(135deg, var(--academic-forest-900) 0%, var(--academic-forest-800) 100%)',
                 color: '#ffffff',
                 padding: 'var(--space-4)',
                 boxShadow: 'var(--shadow-md)',
                 position: 'relative',
                 overflow: 'hidden',
-                border: '1px solid #334155',
+                border: '1px solid var(--academic-gold-500)',
               }}
             >
               {/* Card Header */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.12)', paddingBottom: '8px', marginBottom: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <div style={{ width: '24px', height: '24px', backgroundColor: 'var(--primary-600)', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.8rem' }}>
+                  <div style={{ width: '24px', height: '24px', backgroundColor: 'var(--brand-forest-700)', borderRadius: '3px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.8rem', border: '1px solid var(--academic-gold-500)' }}>
                     A
                   </div>
                   <span style={{ fontSize: '0.85rem', fontWeight: 700, letterSpacing: '-0.01em' }}>
@@ -309,18 +309,18 @@ export const StudentDashboard: React.FC = () => {
                   style={{
                     width: '74px',
                     height: '88px',
-                    backgroundColor: '#1e293b',
-                    border: '2px solid #475569',
+                    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                    border: '1px solid rgba(255, 255, 255, 0.18)',
                     borderRadius: 'var(--radius-xs)',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
                     fontSize: '0.75rem',
-                    color: '#94a3b8',
+                    color: 'var(--text-inverse-muted)',
                   }}
                 >
-                  <Award size={28} style={{ color: '#60a5fa', marginBottom: '4px' }} />
+                  <Award size={28} style={{ color: 'var(--academic-gold-500)', marginBottom: '4px' }} />
                   <span>PHOTO</span>
                 </div>
 
@@ -328,7 +328,7 @@ export const StudentDashboard: React.FC = () => {
                   <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#f8fafc' }}>
                     {studentFullName}
                   </div>
-                  <div style={{ color: '#93c5fd', fontFamily: 'var(--font-mono)', fontSize: '0.75rem', marginTop: '2px' }}>
+                  <div style={{ color: 'var(--academic-gold-500)', fontFamily: 'var(--font-mono)', fontSize: '0.75rem', marginTop: '2px' }}>
                     {admissionNumber}
                   </div>
                   <div style={{ marginTop: '6px', color: '#cbd5e1', fontSize: '0.76rem' }}>

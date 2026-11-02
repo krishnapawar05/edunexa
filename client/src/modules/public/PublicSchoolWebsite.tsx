@@ -15,7 +15,6 @@ import {
   FileText,
   X,
   LogIn,
-  Sliders,
 } from 'lucide-react';
 import { useSchoolBranding } from '../../context/SchoolBrandingContext.js';
 import { coreApi } from '../../services/api.js';
@@ -26,7 +25,7 @@ interface PublicSchoolWebsiteProps {
 }
 
 export const PublicSchoolWebsite: React.FC<PublicSchoolWebsiteProps> = ({ onGoToLogin, onGoToVerify }) => {
-  const { branding, setIsCustomizing } = useSchoolBranding();
+  const { branding } = useSchoolBranding();
   const [activeSection, setActiveSection] = useState<'home' | 'about' | 'academics' | 'admissions' | 'faculty' | 'contact'>('home');
   const [showAdmissionModal, setShowAdmissionModal] = useState(false);
   const [admissionSubmitted, setAdmissionSubmitted] = useState(false);
@@ -78,7 +77,7 @@ export const PublicSchoolWebsite: React.FC<PublicSchoolWebsiteProps> = ({ onGoTo
   };
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#ffffff', color: 'var(--text-primary)' }}>
+    <div style={{ minHeight: '100vh', backgroundColor: 'var(--bg-app)', color: 'var(--text-primary)' }}>
       {/* Top Notification Bar */}
       <div
         style={{
@@ -101,24 +100,6 @@ export const PublicSchoolWebsite: React.FC<PublicSchoolWebsiteProps> = ({ onGoTo
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
-          <button
-            onClick={() => setIsCustomizing(true)}
-            style={{
-              background: 'rgba(255, 255, 255, 0.1)',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-              color: '#38bdf8',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              cursor: 'pointer',
-              fontWeight: 600,
-              padding: '2px 8px',
-              borderRadius: 'var(--radius-xs)',
-              fontSize: '0.74rem',
-            }}
-          >
-            <Sliders size={11} /> Customize School Identity
-          </button>
           {onGoToVerify && (
             <button
               onClick={onGoToVerify}
@@ -166,7 +147,7 @@ export const PublicSchoolWebsite: React.FC<PublicSchoolWebsiteProps> = ({ onGoTo
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          backgroundColor: '#ffffff',
+          backgroundColor: 'var(--bg-surface)',
           position: 'sticky',
           top: 0,
           zIndex: 30,
@@ -238,7 +219,7 @@ export const PublicSchoolWebsite: React.FC<PublicSchoolWebsiteProps> = ({ onGoTo
       {/* Hero Section */}
       <section
         style={{
-          backgroundColor: '#0f172a',
+          backgroundColor: 'var(--academic-forest-900)',
           color: '#ffffff',
           padding: 'var(--space-12) var(--space-8)',
           position: 'relative',
@@ -395,7 +376,7 @@ export const PublicSchoolWebsite: React.FC<PublicSchoolWebsiteProps> = ({ onGoTo
             style={{
               width: '100%',
               maxWidth: '560px',
-              backgroundColor: '#ffffff',
+              backgroundColor: 'var(--bg-surface)',
               boxShadow: 'var(--shadow-lg)',
             }}
           >

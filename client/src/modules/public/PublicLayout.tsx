@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import {
-  GraduationCap,
-  Calendar,
   Phone,
   Mail,
   MapPin,
@@ -15,25 +13,23 @@ import {
   FileText,
   X,
   LogIn,
-  Sliders,
-  Sparkles,
   Menu,
   ChevronDown,
   ChevronRight,
-  ShieldCheck,
   Building,
   Briefcase,
   Image,
   Newspaper,
   Compass,
+  GraduationCap,
+  Sparkles,
 } from 'lucide-react';
 import { useSchoolBranding } from '../../context/SchoolBrandingContext.js';
-import { SchoolIdentityModal } from '../../components/SchoolIdentityModal.js';
 import { ThemeSwitcher } from '../../components/ThemeSwitcher.js';
 import { coreApi } from '../../services/api.js';
 
 export const PublicLayout: React.FC = () => {
-  const { branding, setIsCustomizing } = useSchoolBranding();
+  const { branding } = useSchoolBranding();
   const location = useLocation();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -50,7 +46,7 @@ export const PublicLayout: React.FC = () => {
     parentName: '',
     email: '',
     phone: '',
-    city: 'Bangalore',
+    city: 'New Delhi',
     prevSchool: '',
   });
 
@@ -116,12 +112,12 @@ export const PublicLayout: React.FC = () => {
     }
   };
 
-  // Primary navigation links for desktop navbar
+  // Primary navigation links based on classic CBSE institutional hierarchy (St. Joseph's style)
   const primaryNavLinks = [
     { to: '/', label: 'Home' },
-    { to: '/about', label: 'About School' },
-    { to: '/academics', label: 'Curriculum' },
-    { to: '/admissions', label: 'Admissions' },
+    { to: '/about', label: 'About Us' },
+    { to: '/academics', label: 'Academics' },
+    { to: '/admissions', label: 'Admission' },
     { to: '/faculty', label: 'Faculty' },
     { to: '/examination-info', label: 'Examinations' },
     { to: '/contact', label: 'Contact' },
@@ -129,84 +125,62 @@ export const PublicLayout: React.FC = () => {
 
   // Secondary links for "More" dropdown
   const secondaryNavLinks = [
-    { to: '/principal-message', label: "Principal's Message", icon: Award },
-    { to: '/departments', label: 'Departments & Labs', icon: Building },
-    { to: '/events', label: 'Campus Events', icon: Calendar },
-    { to: '/news', label: 'Announcements & News', icon: Newspaper },
-    { to: '/gallery', label: 'Campus Photo Gallery', icon: Image },
+    { to: '/principal-message', label: "Principal's Desk", icon: Award },
+    { to: '/departments', label: 'Laboratories & Depts', icon: Building },
+    { to: '/events', label: 'School Events', icon: Sparkles },
+    { to: '/news', label: 'Notices & Circulars', icon: Newspaper },
+    { to: '/gallery', label: 'Photo Gallery', icon: Image },
     { to: '/careers', label: 'Career Opportunities', icon: Briefcase },
   ];
 
   // All 13 navigation links for mobile drawer
   const allNavLinks = [
     { to: '/', label: 'Home', icon: Compass },
-    { to: '/about', label: 'About School', icon: Building },
-    { to: '/principal-message', label: "Principal's Message", icon: Award },
-    { to: '/academics', label: 'Curriculum Standards', icon: BookOpen },
-    { to: '/departments', label: 'Departments & Labs', icon: Building },
-    { to: '/admissions', label: 'Admissions & Eligibility', icon: GraduationCap },
+    { to: '/about', label: 'About School & Story', icon: Building },
+    { to: '/principal-message', label: "Principal's Desk", icon: Award },
+    { to: '/academics', label: 'Academics & Curriculum', icon: BookOpen },
+    { to: '/departments', label: 'Laboratories & Depts', icon: Building },
+    { to: '/admissions', label: 'Admission & Guidelines', icon: GraduationCap },
     { to: '/faculty', label: 'Faculty Directory', icon: Users },
-    { to: '/events', label: 'Campus Events', icon: Calendar },
-    { to: '/news', label: 'News & Notices', icon: Newspaper },
-    { to: '/gallery', label: 'Campus Gallery', icon: Image },
-    { to: '/examination-info', label: 'Examination Framework', icon: FileText },
-    { to: '/careers', label: 'Career Opportunities', icon: Briefcase },
-    { to: '/contact', label: 'Contact & Inquiries', icon: Phone },
+    { to: '/events', label: 'School Events & Sports', icon: Sparkles },
+    { to: '/news', label: 'Notices & Circulars', icon: Newspaper },
+    { to: '/gallery', label: 'Campus Photo Gallery', icon: Image },
+    { to: '/examination-info', label: 'Examination Standards', icon: FileText },
+    { to: '/careers', label: 'Careers & Recruitment', icon: Briefcase },
+    { to: '/contact', label: 'Contact & Campus Map', icon: Phone },
   ];
 
   const isSecondaryActive = secondaryNavLinks.some((link) => location.pathname === link.to);
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--bg-app)', color: 'var(--text-primary)' }}>
-      {/* Dynamic School Identity Modal */}
-      <SchoolIdentityModal />
-
-      {/* Top Notification / Utility Bar (Desktop only, hides on <= 768px) */}
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--academic-warm-white)', color: 'var(--text-primary)' }}>
+      {/* Top Contact Strip (Deep Forest Green with Gold Accent Border) */}
       <header className="ed-public-topbar">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-            <MapPin size={12} style={{ color: 'var(--primary-400)' }} /> {branding.address}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-5)', flexWrap: 'wrap' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+            <MapPin size={12} style={{ color: 'var(--academic-gold-500)' }} /> {branding.address}
           </span>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-            <Phone size={12} style={{ color: 'var(--primary-400)' }} /> {branding.contactPhone}
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+            <Phone size={12} style={{ color: 'var(--academic-gold-500)' }} /> {branding.contactPhone}
           </span>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-            <Mail size={12} style={{ color: 'var(--primary-400)' }} /> admissions@apexacademy.edu
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+            <Mail size={12} style={{ color: 'var(--academic-gold-500)' }} /> admissions@apexacademy.edu
           </span>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-          <button
-            onClick={() => setIsCustomizing(true)}
-            style={{
-              background: 'rgba(255, 255, 255, 0.08)',
-              border: '1px solid rgba(255, 255, 255, 0.18)',
-              color: '#38bdf8',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '4px',
-              cursor: 'pointer',
-              fontWeight: 600,
-              padding: '2px 8px',
-              borderRadius: 'var(--radius-xs)',
-              fontSize: '0.74rem',
-            }}
-          >
-            <Sliders size={11} /> Customize Identity
-          </button>
-
           <Link
             to="/verify-id"
             style={{
-              background: 'rgba(16, 185, 129, 0.12)',
-              border: '1px solid rgba(16, 185, 129, 0.3)',
-              color: '#34d399',
+              background: 'rgba(196, 164, 107, 0.15)',
+              border: '1px solid var(--academic-gold-500)',
+              color: 'var(--academic-gold-100)',
               display: 'inline-flex',
               alignItems: 'center',
               gap: '4px',
               textDecoration: 'none',
               fontWeight: 600,
-              padding: '2px 8px',
+              padding: '2px 9px',
               borderRadius: 'var(--radius-xs)',
               fontSize: '0.74rem',
             }}
@@ -220,14 +194,14 @@ export const PublicLayout: React.FC = () => {
               color: '#ffffff',
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '4px',
+              gap: '5px',
               textDecoration: 'none',
               fontWeight: 600,
               fontSize: '0.76rem',
               marginLeft: '4px',
             }}
           >
-            <LogIn size={12} /> ERP Portal Login
+            <LogIn size={12} style={{ color: 'var(--academic-gold-500)' }} /> Portal Login
           </Link>
 
           <div style={{ marginLeft: '4px' }}>
@@ -236,21 +210,21 @@ export const PublicLayout: React.FC = () => {
         </div>
       </header>
 
-      {/* Main Responsive Sticky Navbar */}
+      {/* Main Responsive Sticky Navbar (White / Ivory with Forest Green Branding) */}
       <nav className="ed-public-navbar" aria-label="Main Navigation">
         <div className="ed-public-navbar-inner">
-          {/* School Branding */}
+          {/* Institutional School Branding */}
           <Link to="/" className="ed-public-brand" aria-label={`${branding.schoolName} Home`}>
             <div
               className="ed-public-brand-logo"
-              style={{ backgroundColor: branding.primaryAccent }}
+              style={{ backgroundColor: branding.primaryAccent || '#14532d' }}
             >
               {branding.monogram}
             </div>
             <div className="ed-public-brand-text">
               <span className="ed-public-brand-title">{branding.schoolName}</span>
               <span className="ed-public-brand-subtitle">
-                {branding.affiliation} • Code: {branding.code}
+                {branding.affiliation || 'Affiliated to CBSE, New Delhi'} • Code: {branding.code}
               </span>
             </div>
           </Link>
@@ -281,7 +255,7 @@ export const PublicLayout: React.FC = () => {
                   alignItems: 'center',
                   gap: '4px',
                   border: 'none',
-                  background: isSecondaryActive ? 'var(--primary-50)' : 'transparent',
+                  background: isSecondaryActive ? 'var(--academic-forest-100)' : 'transparent',
                   cursor: 'pointer',
                   fontFamily: 'inherit',
                 }}
@@ -303,13 +277,14 @@ export const PublicLayout: React.FC = () => {
                       position: 'absolute',
                       top: 'calc(100% + 6px)',
                       right: 0,
-                      minWidth: '220px',
-                      borderRadius: 'var(--radius-md)',
+                      minWidth: '230px',
+                      borderRadius: 'var(--radius-sm)',
                       padding: '6px',
                       zIndex: 50,
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '2px',
+                      border: '1px solid var(--border-default)',
                     }}
                   >
                     {secondaryNavLinks.map((subLink) => {
@@ -323,17 +298,17 @@ export const PublicLayout: React.FC = () => {
                           style={{
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '8px',
-                            padding: '8px 12px',
+                            gap: '10px',
+                            padding: '9px 12px',
                             fontSize: '0.84rem',
                             fontWeight: isSubActive ? 700 : 500,
-                            color: isSubActive ? 'var(--primary-700)' : 'var(--text-primary)',
-                            backgroundColor: isSubActive ? 'var(--primary-50)' : 'transparent',
-                            borderRadius: 'var(--radius-sm)',
+                            color: isSubActive ? 'var(--academic-forest-800)' : 'var(--text-primary)',
+                            backgroundColor: isSubActive ? 'var(--academic-forest-100)' : 'transparent',
+                            borderRadius: 'var(--radius-xs)',
                             textDecoration: 'none',
                           }}
                         >
-                          <SubIcon size={14} style={{ color: 'var(--primary-600)' }} />
+                          <SubIcon size={14} style={{ color: 'var(--academic-forest-600)' }} />
                           {subLink.label}
                         </Link>
                       );
@@ -343,18 +318,18 @@ export const PublicLayout: React.FC = () => {
               )}
             </div>
 
-            {/* Admission Action CTA */}
+            {/* Traditional Gold / Forest Admission Action CTA */}
             <button
-              className="ed-btn ed-btn-primary"
+              className="ed-btn-academic-gold"
               onClick={() => setShowAdmissionModal(true)}
               style={{
-                padding: '7px 16px',
+                padding: '8px 18px',
                 fontSize: '0.84rem',
-                fontWeight: 600,
                 marginLeft: '8px',
+                cursor: 'pointer',
               }}
             >
-              Apply for Admission
+              Online Admission
             </button>
           </div>
 
@@ -395,13 +370,13 @@ export const PublicLayout: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div
               className="ed-public-brand-logo"
-              style={{ width: '32px', height: '32px', fontSize: '1rem', backgroundColor: branding.primaryAccent }}
+              style={{ width: '34px', height: '34px', fontSize: '1.1rem', backgroundColor: branding.primaryAccent || '#14532d' }}
             >
               {branding.monogram}
             </div>
             <div>
-              <div style={{ fontWeight: 800, fontSize: '0.94rem', lineHeight: 1.2 }}>{branding.schoolName}</div>
-              <div style={{ fontSize: '0.70rem', color: 'var(--text-muted)' }}>CBSE Code: {branding.code}</div>
+              <div style={{ fontWeight: 800, fontSize: '0.94rem', lineHeight: 1.2, color: '#ffffff' }}>{branding.schoolName}</div>
+              <div style={{ fontSize: '0.70rem', color: '#a7f3d0' }}>CBSE Code: {branding.code}</div>
             </div>
           </div>
           <button
@@ -409,6 +384,7 @@ export const PublicLayout: React.FC = () => {
             className="ed-btn-icon"
             onClick={() => setMobileMenuOpen(false)}
             aria-label="Close Navigation Menu"
+            style={{ color: '#ffffff' }}
           >
             <X size={20} />
           </button>
@@ -419,14 +395,14 @@ export const PublicLayout: React.FC = () => {
           {/* Primary Action Button */}
           <button
             type="button"
-            className="ed-btn ed-btn-primary"
-            style={{ width: '100%', padding: '10px', fontWeight: 700, fontSize: '0.9rem', marginBottom: '8px' }}
+            className="ed-btn-academic-gold"
+            style={{ width: '100%', padding: '11px', fontWeight: 700, fontSize: '0.9rem', marginBottom: '8px', justifyContent: 'center' }}
             onClick={() => {
               setMobileMenuOpen(false);
               setShowAdmissionModal(true);
             }}
           >
-            Apply for Admission 2026–2027
+            Online Admission 2026–2027
           </button>
 
           <div className="ed-drawer-section-title">Institutional Navigation</div>
@@ -441,7 +417,7 @@ export const PublicLayout: React.FC = () => {
                 onClick={() => setMobileMenuOpen(false)}
               >
                 <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <Icon size={16} style={{ color: isActive ? 'var(--primary-700)' : 'var(--text-muted)' }} />
+                  <Icon size={16} style={{ color: isActive ? 'var(--academic-forest-700)' : 'var(--text-muted)' }} />
                   {link.label}
                 </span>
                 <ChevronRight size={14} style={{ color: 'var(--text-muted)', opacity: 0.6 }} />
@@ -449,14 +425,14 @@ export const PublicLayout: React.FC = () => {
             );
           })}
 
-          <div className="ed-drawer-section-title">Access & Portals</div>
+          <div className="ed-drawer-section-title">Institutional Portals</div>
           <Link
             to="/login"
             className="ed-drawer-link"
             onClick={() => setMobileMenuOpen(false)}
           >
             <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <LogIn size={16} style={{ color: 'var(--primary-600)' }} />
+              <LogIn size={16} style={{ color: 'var(--academic-forest-600)' }} />
               ERP Portal Login
             </span>
             <ChevronRight size={14} style={{ color: 'var(--text-muted)', opacity: 0.6 }} />
@@ -473,37 +449,21 @@ export const PublicLayout: React.FC = () => {
             </span>
             <ChevronRight size={14} style={{ color: 'var(--text-muted)', opacity: 0.6 }} />
           </Link>
-
-          <button
-            type="button"
-            className="ed-drawer-link"
-            style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}
-            onClick={() => {
-              setMobileMenuOpen(false);
-              setIsCustomizing(true);
-            }}
-          >
-            <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Sliders size={16} style={{ color: '#0284c7' }} />
-              Customize School Identity
-            </span>
-            <ChevronRight size={14} style={{ color: 'var(--text-muted)', opacity: 0.6 }} />
-          </button>
         </div>
 
         {/* Drawer Footer with Essential Contact Info */}
         <div className="ed-drawer-footer">
           <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <MapPin size={13} style={{ color: 'var(--primary-600)', flexShrink: 0 }} />
+              <MapPin size={13} style={{ color: 'var(--academic-forest-600)', flexShrink: 0 }} />
               <span>{branding.address}</span>
             </span>
             <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Phone size={13} style={{ color: 'var(--primary-600)', flexShrink: 0 }} />
+              <Phone size={13} style={{ color: 'var(--academic-forest-600)', flexShrink: 0 }} />
               <span>{branding.contactPhone}</span>
             </span>
             <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Mail size={13} style={{ color: 'var(--primary-600)', flexShrink: 0 }} />
+              <Mail size={13} style={{ color: 'var(--academic-forest-600)', flexShrink: 0 }} />
               <span>admissions@apexacademy.edu</span>
             </span>
           </div>
@@ -521,7 +481,7 @@ export const PublicLayout: React.FC = () => {
           style={{
             position: 'fixed',
             inset: 0,
-            backgroundColor: 'rgba(15, 23, 42, 0.7)',
+            backgroundColor: 'rgba(10, 38, 24, 0.72)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -540,13 +500,14 @@ export const PublicLayout: React.FC = () => {
               backgroundColor: 'var(--bg-surface)',
               maxHeight: '92vh',
               overflowY: 'auto',
+              border: '2px solid var(--academic-forest-600)',
             }}
           >
-            <div className="ed-card-header">
+            <div className="ed-card-header" style={{ backgroundColor: 'var(--academic-forest-50)' }}>
               <div>
-                <h3 style={{ fontSize: '1.1rem' }}>Online Admission Application 2026–2027</h3>
+                <h3 style={{ fontSize: '1.1rem', color: 'var(--academic-forest-900)' }}>Online Admission Application 2026–2027</h3>
                 <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-                  Apex Academy Institutional Enrollment Desk (Direct PostgreSQL Entry)
+                  Institutional Enrollment Desk • Direct System Verification
                 </p>
               </div>
               <button
@@ -580,16 +541,16 @@ export const PublicLayout: React.FC = () => {
 
               {admissionSubmitted ? (
                 <div style={{ textAlign: 'center', padding: 'var(--space-6) 0' }}>
-                  <CheckCircle size={48} style={{ color: 'var(--success-solid)', margin: '0 auto var(--space-3)' }} />
-                  <h3>Application Submitted Successfully!</h3>
+                  <CheckCircle size={48} style={{ color: 'var(--academic-forest-600)', margin: '0 auto var(--space-3)' }} />
+                  <h3 style={{ color: 'var(--academic-forest-900)' }}>Application Submitted Successfully!</h3>
                   <p style={{ marginTop: '8px', fontSize: '0.88rem' }}>
-                    Reference Number: <strong style={{ color: 'var(--primary-700)' }}>{submittedAppNo}</strong>
+                    Reference Tracking Number: <strong style={{ color: 'var(--academic-forest-700)' }}>{submittedAppNo}</strong>
                   </p>
                   <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '6px', lineHeight: 1.5 }}>
                     An automated acknowledgment has been dispatched to {formData.email || 'your email'}. Our admissions committee will review credentials within 3 business days.
                   </p>
                   <button
-                    className="ed-btn ed-btn-primary"
+                    className="ed-btn-academic-forest"
                     style={{ marginTop: 'var(--space-5)' }}
                     onClick={() => {
                       setShowAdmissionModal(false);
@@ -619,11 +580,20 @@ export const PublicLayout: React.FC = () => {
                         value={formData.applyingGrade}
                         onChange={(e) => setFormData({ ...formData, applyingGrade: e.target.value })}
                       >
+                        <option>Nursery / Kindergarten</option>
+                        <option>Grade 1</option>
+                        <option>Grade 2</option>
+                        <option>Grade 3</option>
+                        <option>Grade 4</option>
+                        <option>Grade 5</option>
+                        <option>Grade 6</option>
+                        <option>Grade 7</option>
                         <option>Grade 8</option>
                         <option>Grade 9</option>
                         <option>Grade 10</option>
                         <option>Grade 11 - Science</option>
                         <option>Grade 11 - Commerce</option>
+                        <option>Grade 12</option>
                       </select>
                     </div>
                   </div>
@@ -664,7 +634,7 @@ export const PublicLayout: React.FC = () => {
                   </div>
 
                   <div className="ed-input-group" style={{ marginTop: '10px' }}>
-                    <label className="ed-label">Previous Institution Attended</label>
+                    <label className="ed-label">Previous School Attended</label>
                     <input
                       className="ed-input"
                       placeholder="e.g. St. Xavier High School"
@@ -684,9 +654,9 @@ export const PublicLayout: React.FC = () => {
                     <button
                       type="submit"
                       disabled={isSubmitting}
-                      className="ed-btn ed-btn-primary"
+                      className="ed-btn-academic-forest"
                     >
-                      {isSubmitting ? 'Submitting to Admissions...' : 'Submit Official Application'}
+                      {isSubmitting ? 'Submitting Application...' : 'Submit Official Application'}
                     </button>
                   </div>
                 </form>
@@ -696,57 +666,76 @@ export const PublicLayout: React.FC = () => {
         </div>
       )}
 
-      {/* Official Institutional Footer (Responsive) */}
-      <footer style={{ backgroundColor: 'var(--bg-dark-sidebar)', color: '#94a3b8', padding: 'clamp(2.5rem, 5vw, 3.5rem) 0', marginTop: 'auto' }}>
+      {/* Official Institutional Footer (St. Joseph's Inspiration - Forest Green) */}
+      <footer className="ed-academic-footer">
         <div className="ed-public-container">
           <div className="ed-footer-columns">
+            {/* School Profile Column */}
             <div>
-              <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#ffffff', marginBottom: '8px' }}>
-                {branding.schoolName}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                <div
+                  className="ed-public-brand-logo"
+                  style={{ width: '38px', height: '38px', fontSize: '1.2rem', backgroundColor: branding.primaryAccent || '#14532d' }}
+                >
+                  {branding.monogram}
+                </div>
+                <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#ffffff', fontFamily: 'var(--font-crest)' }}>
+                  {branding.schoolName}
+                </div>
               </div>
-              <p style={{ color: '#94a3b8', fontSize: '0.84rem', maxWidth: '360px', lineHeight: 1.6, marginBottom: '12px' }}>
-                Affiliated to the Central Board of Secondary Education (CBSE Affiliation Code {branding.code}). Committed to academic rigor, scientific inquiry, and ethical leadership.
+              <p style={{ color: '#cbd5e1', fontSize: '0.84rem', maxWidth: '360px', lineHeight: 1.65, marginBottom: '14px' }}>
+                A premier co-educational institution committed to academic excellence, discipline, scientific inquiry, and moral character. Affiliated to CBSE, New Delhi (Affiliation Code: {branding.code}).
               </p>
-              <div style={{ fontSize: '0.76rem', color: '#64748b' }}>
-                © {new Date().getFullYear()} {branding.schoolName}. All rights reserved.
+              <div style={{ fontSize: '0.76rem', color: '#94a3b8' }}>
+                © {new Date().getFullYear()} {branding.schoolName}. All institutional rights reserved.
               </div>
             </div>
 
+            {/* Quick Links Column */}
             <div>
-              <div style={{ color: '#ffffff', fontWeight: 600, fontSize: '0.92rem', marginBottom: 'var(--space-3)' }}>Academics</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.84rem' }}>
-                <Link to="/academics" style={{ color: '#94a3b8', textDecoration: 'none' }}>Curriculum Standards</Link>
-                <Link to="/departments" style={{ color: '#94a3b8', textDecoration: 'none' }}>Research Labs & Depts</Link>
-                <Link to="/examination-info" style={{ color: '#94a3b8', textDecoration: 'none' }}>Examination Framework</Link>
-                <Link to="/gallery" style={{ color: '#94a3b8', textDecoration: 'none' }}>Campus Showcase</Link>
+              <div style={{ color: 'var(--academic-gold-500)', fontWeight: 700, fontSize: '0.90rem', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 'var(--space-3)' }}>
+                About School
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <Link to="/about" className="ed-academic-footer-link">Our Heritage & Story</Link>
+                <Link to="/principal-message" className="ed-academic-footer-link">Principal's Desk</Link>
+                <Link to="/faculty" className="ed-academic-footer-link">Faculty & Mentors</Link>
+                <Link to="/gallery" className="ed-academic-footer-link">Campus Facilities</Link>
+                <Link to="/careers" className="ed-academic-footer-link">Career Opportunities</Link>
               </div>
             </div>
 
+            {/* Academics & Student Welfare */}
             <div>
-              <div style={{ color: '#ffffff', fontWeight: 600, fontSize: '0.92rem', marginBottom: 'var(--space-3)' }}>Community</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.84rem' }}>
-                <Link to="/principal-message" style={{ color: '#94a3b8', textDecoration: 'none' }}>Principal's Message</Link>
-                <Link to="/faculty" style={{ color: '#94a3b8', textDecoration: 'none' }}>Faculty Roster</Link>
-                <Link to="/events" style={{ color: '#94a3b8', textDecoration: 'none' }}>Events Calendar</Link>
-                <Link to="/news" style={{ color: '#94a3b8', textDecoration: 'none' }}>Announcements</Link>
-                <Link to="/careers" style={{ color: '#94a3b8', textDecoration: 'none' }}>Career Openings</Link>
+              <div style={{ color: 'var(--academic-gold-500)', fontWeight: 700, fontSize: '0.90rem', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 'var(--space-3)' }}>
+                Academics
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <Link to="/academics" className="ed-academic-footer-link">CBSE Curriculum Standards</Link>
+                <Link to="/departments" className="ed-academic-footer-link">Science & Robotics Labs</Link>
+                <Link to="/examination-info" className="ed-academic-footer-link">Examination Framework</Link>
+                <Link to="/events" className="ed-academic-footer-link">Activities & Sports</Link>
+                <Link to="/news" className="ed-academic-footer-link">Circulars & Notices</Link>
               </div>
             </div>
 
+            {/* Contact & Portals */}
             <div>
-              <div style={{ color: '#ffffff', fontWeight: 600, fontSize: '0.92rem', marginBottom: 'var(--space-3)' }}>Institutional Access</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.84rem' }}>
-                <Link to="/login" style={{ color: '#93c5fd', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                  Staff & Faculty ERP →
+              <div style={{ color: 'var(--academic-gold-500)', fontWeight: 700, fontSize: '0.90rem', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 'var(--space-3)' }}>
+                Contact & Portals
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <span style={{ color: '#cbd5e1', fontSize: '0.84rem' }}>
+                  {branding.address}
+                </span>
+                <span style={{ color: '#cbd5e1', fontSize: '0.84rem' }}>
+                  Phone: {branding.contactPhone}
+                </span>
+                <Link to="/login" style={{ color: 'var(--academic-gold-500)', fontWeight: 600, fontSize: '0.84rem', textDecoration: 'none', marginTop: '4px' }}>
+                  Staff & Student ERP Portal →
                 </Link>
-                <Link to="/login" style={{ color: '#93c5fd', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                  Student & Parent Portal →
-                </Link>
-                <Link to="/verify-id" style={{ color: '#34d399', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                  Public ID Card Verifier →
-                </Link>
-                <Link to="/contact" style={{ color: '#94a3b8', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                  Campus Inquiries →
+                <Link to="/verify-id" style={{ color: 'var(--academic-gold-500)', fontWeight: 600, fontSize: '0.84rem', textDecoration: 'none' }}>
+                  Verify Student ID Card →
                 </Link>
               </div>
             </div>

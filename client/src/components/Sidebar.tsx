@@ -195,7 +195,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           style={{
             position: 'fixed',
             inset: 0,
-            backgroundColor: 'rgba(15, 23, 42, 0.65)',
+            backgroundColor: 'rgba(16, 23, 18, 0.72)',
             backdropFilter: 'blur(3px)',
             zIndex: 49,
           }}
@@ -208,7 +208,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         style={{
           width: 'var(--sidebar-width)',
           minWidth: 'var(--sidebar-width)',
-          backgroundColor: 'var(--ink-900)',
+          backgroundColor: 'var(--bg-dark-sidebar)',
           color: 'var(--text-inverse)',
           display: 'flex',
           flexDirection: 'column',
@@ -218,7 +218,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           zIndex: 50,
           borderRight: '1px solid rgba(255, 255, 255, 0.08)',
           userSelect: 'none',
-          transition: 'transform 0.25s ease-in-out',
+          transition: 'transform 0.25s ease-in-out, background-color 0.2s ease',
         }}
       >
         {/* Brand Header */}
@@ -244,6 +244,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 fontWeight: 800,
                 fontSize: '1rem',
                 color: '#ffffff',
+                border: '1px solid var(--brand-gold-500)',
               }}
             >
               {branding.monogram}
@@ -279,16 +280,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
               backgroundColor: 'rgba(255, 255, 255, 0.06)',
               borderRadius: 'var(--radius-xs)',
               fontSize: '0.72rem',
-              color: '#93c5fd',
+              color: 'var(--brand-gold-500)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
+              border: '1px solid rgba(196, 164, 107, 0.2)',
             }}
           >
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '140px' }}>
               {currentRole === 'SUPER_ADMIN' ? 'Platform Authority' : `${branding.shortName} (${branding.code})`}
             </span>
-            <span style={{ fontSize: '0.66rem', color: '#34d399', textTransform: 'uppercase', fontWeight: 700 }}>
+            <span style={{ fontSize: '0.66rem', color: 'var(--success-solid)', textTransform: 'uppercase', fontWeight: 700 }}>
               Active
             </span>
           </div>
@@ -326,7 +328,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     gap: 'var(--space-3)',
                     padding: '8px 10px',
                     borderRadius: 'var(--radius-sm)',
-                    backgroundColor: isActive ? 'rgba(255, 255, 255, 0.12)' : 'transparent',
+                    backgroundColor: isActive ? 'rgba(196, 164, 107, 0.16)' : 'transparent',
+                    borderLeft: isActive ? '3px solid var(--brand-gold-500)' : '3px solid transparent',
                     color: isActive ? '#ffffff' : 'var(--text-inverse-muted)',
                     textDecoration: 'none',
                     fontSize: '0.84rem',
@@ -339,7 +342,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 >
                   {({ isActive }) => (
                     <>
-                      <Icon size={15} style={{ color: isActive ? '#38bdf8' : '#94a3b8' }} />
+                      <Icon size={15} style={{ color: isActive ? 'var(--brand-gold-500)' : '#8a9c91' }} />
                       <span>{item.label}</span>
                     </>
                   )}

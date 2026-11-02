@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Building2, Palette, Check, RotateCcw, Sparkles } from 'lucide-react';
 import { useSchoolBranding, DEFAULT_BRANDING } from '../context/SchoolBrandingContext.js';
+import { superadminApi } from '../services/api.js';
 
 export const SchoolIdentityModal: React.FC = () => {
   const { branding, updateBranding, resetBranding, isCustomizing, setIsCustomizing } = useSchoolBranding();
@@ -10,11 +11,11 @@ export const SchoolIdentityModal: React.FC = () => {
   if (!isCustomizing) return null;
 
   const presetThemes = [
-    { name: 'Institutional Teal', color: '#0F766E' },
-    { name: 'Scholar Navy', color: '#1E3A8A' },
-    { name: 'Forest Emerald', color: '#065F46' },
+    { name: 'Forest Green (Official)', color: '#244C3A' },
+    { name: 'Secondary Green', color: '#365C49' },
+    { name: 'Muted Gold Accent', color: '#C4A46B' },
+    { name: 'Sage Academic', color: '#4A745F' },
     { name: 'Royal Crimson', color: '#881337' },
-    { name: 'Slate Gray', color: '#334155' },
   ];
 
   const presetSchools = [
@@ -24,15 +25,15 @@ export const SchoolIdentityModal: React.FC = () => {
       code: 'APX-01',
       tagline: 'Fostering Academic Excellence, Scientific Rigor & Global Leadership',
       monogram: 'A',
-      primaryAccent: '#0F766E',
+      primaryAccent: '#244C3A',
     },
     {
-      schoolName: 'St. Jude International Academy',
-      shortName: 'St. Jude Academy',
-      code: 'SJA-09',
-      tagline: 'Truth, Honor, Knowledge & Character',
+      schoolName: 'St. Joseph Public School',
+      shortName: 'St. Joseph School',
+      code: 'SJP-01',
+      tagline: 'Character, Discipline, Academic Distinction & Service',
       monogram: 'J',
-      primaryAccent: '#1E3A8A',
+      primaryAccent: '#244C3A',
     },
     {
       schoolName: 'Greenwood World School & Research Centre',
@@ -40,7 +41,7 @@ export const SchoolIdentityModal: React.FC = () => {
       code: 'GWS-22',
       tagline: 'Cultivating Inquisitive Minds & Sustainable Futures',
       monogram: 'G',
-      primaryAccent: '#065F46',
+      primaryAccent: '#365C49',
     },
   ];
 
@@ -48,6 +49,28 @@ export const SchoolIdentityModal: React.FC = () => {
     e.preventDefault();
     updateBranding(form);
     setIsCustomizing(false);
+
+    superadminApi.listSchools().then((schools) => {
+      const match = schools.find((s: any) => s.code === form.code) || schools[0];
+      if (match) {
+        superadminApi.updateSchool(match.id, {
+          name: form.schoolName,
+          email: form.contactEmail,
+          phone: form.contactPhone,
+          address: form.address,
+          motto: form.tagline,
+          code: form.code,
+          brandingConfig: {
+            shortName: form.shortName,
+            monogram: form.monogram,
+            affiliation: form.affiliation,
+            primaryAccent: form.primaryAccent,
+            establishedYear: form.establishedYear,
+            tagline: form.tagline,
+          },
+        }).catch((err) => console.warn('Could not persist school branding to backend:', err));
+      }
+    }).catch(() => {});
   };
 
   const handleApplyPreset = (preset: typeof presetSchools[0]) => {
@@ -67,7 +90,7 @@ export const SchoolIdentityModal: React.FC = () => {
       style={{
         position: 'fixed',
         inset: 0,
-        backgroundColor: 'rgba(15, 23, 42, 0.72)',
+        backgroundColor: 'rgba(16, 23, 18, 0.72)',
         backdropFilter: 'blur(4px)',
         display: 'flex',
         alignItems: 'center',

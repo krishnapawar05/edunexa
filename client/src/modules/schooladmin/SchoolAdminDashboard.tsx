@@ -1118,11 +1118,11 @@ export const SchoolAdminDashboard: React.FC<SchoolAdminDashboardProps> = ({ init
                 width: '340px',
                 height: '210px',
                 borderRadius: '12px',
-                background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)',
+                background: 'linear-gradient(135deg, var(--academic-forest-900) 0%, var(--academic-forest-800) 100%)',
                 color: '#ffffff',
                 padding: '16px',
                 boxShadow: 'var(--shadow-lg)',
-                border: '1px solid rgba(255, 255, 255, 0.15)',
+                border: '1px solid var(--academic-gold-500)',
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'space-between',
@@ -1153,7 +1153,7 @@ export const SchoolAdminDashboard: React.FC<SchoolAdminDashboardProps> = ({ init
                 </div>
                 <div>
                   <div style={{ fontSize: '0.96rem', fontWeight: 700, letterSpacing: '-0.01em' }}>{previewCard.holderName}</div>
-                  <div style={{ fontSize: '0.70rem', color: '#38bdf8', fontFamily: 'var(--font-mono)' }}>{previewCard.identifierNumber || previewCard.identifier}</div>
+                  <div style={{ fontSize: '0.70rem', color: 'var(--academic-gold-500)', fontFamily: 'var(--font-mono)' }}>{previewCard.identifierNumber || previewCard.identifier}</div>
                   <div style={{ fontSize: '0.64rem', color: '#94a3b8', marginTop: '2px' }}>{previewCard.holderType || 'STUDENT'} BADGE</div>
                 </div>
               </div>

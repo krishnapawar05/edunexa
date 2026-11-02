@@ -267,7 +267,8 @@ export const StudentDossierPage: React.FC = () => {
                   width: '320px',
                   height: '190px',
                   borderRadius: '12px',
-                  background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)',
+                  background: 'linear-gradient(135deg, var(--academic-forest-900) 0%, var(--academic-forest-800) 100%)',
+                  border: '1px solid var(--academic-gold-500)',
                   color: '#ffffff',
                   padding: '16px',
                   boxShadow: 'var(--shadow-md)',
@@ -282,7 +283,7 @@ export const StudentDossierPage: React.FC = () => {
                 </div>
                 <div>
                   <div style={{ fontSize: '1rem', fontWeight: 700 }}>{student.firstName} {student.lastName}</div>
-                  <div style={{ fontSize: '0.72rem', color: '#38bdf8' }}>{student.admissionNumber} • {student.className}-{student.sectionName || 'A'}</div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--academic-gold-500)' }}>{student.admissionNumber} • {student.className}-{student.sectionName || 'A'}</div>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '6px' }}>
                   <div style={{ fontSize: '0.62rem', color: '#94a3b8' }}>
