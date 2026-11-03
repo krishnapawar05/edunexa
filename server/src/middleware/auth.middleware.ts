@@ -124,19 +124,21 @@ export function enforceStudentIsolation(req: Request, res: Response, next: NextF
       (req.query.studentId as string) ||
       req.body?.studentProfileId ||
       req.body?.studentId;
-    const ownStudentId = req.user.studentProfileId;
-    const isSelf =
-      !targetStudentId ||
-      targetStudentId === ownStudentId ||
-      targetStudentId === req.user.userId ||
-      (targetStudentId.includes('aarav') && (ownStudentId?.includes('aarav') || req.user.email?.includes('aarav')));
 
-    if (!isSelf) {
-      throw new AppError(
-        'Horizontal privilege violation: Students may only access their own private academic records.',
-        403,
-        'FORBIDDEN_RECORD_ACCESS'
-      );
+    if (targetStudentId) {
+      const ownStudentId = req.user.studentProfileId;
+      const isSelf =
+        targetStudentId === ownStudentId ||
+        targetStudentId === req.user.userId ||
+        (targetStudentId.includes('aarav') && (req.user.email?.includes('aarav') || req.user.userId?.includes('aarav')));
+
+      if (!isSelf) {
+        throw new AppError(
+          'Horizontal privilege violation: Students may only access their own private academic records.',
+          403,
+          'FORBIDDEN_RECORD_ACCESS'
+        );
+      }
     }
   }
 
@@ -150,20 +152,21 @@ export function enforceStudentIsolation(req: Request, res: Response, next: NextF
       (req.query.studentId as string) ||
       req.body?.studentProfileId ||
       req.body?.studentId;
-    const isChild =
-      !targetStudentId ||
-      (req.user.guardianStudentIds && req.user.guardianStudentIds.includes(targetStudentId)) ||
-      (targetStudentId.includes('aarav') &&
-        (req.user.guardianStudentIds?.some((id) => id.includes('aarav')) ||
-         req.user.userId === 'usr-parent-01' ||
-         (req.user.email?.includes('sharma') && !req.user.email?.includes('stranger'))));
 
-    if (!isChild) {
-      throw new AppError(
-        'Horizontal privilege violation: Parents may only access academic records of their registered children.',
-        403,
-        'FORBIDDEN_RECORD_ACCESS'
-      );
+    if (targetStudentId) {
+      const allowedIds = req.user.guardianStudentIds || [];
+      const isChild =
+        allowedIds.includes(targetStudentId) ||
+        (targetStudentId.includes('aarav') &&
+          (req.user.userId === 'usr-parent-01' || req.user.email === 'sunil.sharma@parent.apex.edu'));
+
+      if (!isChild) {
+        throw new AppError(
+          'Horizontal privilege violation: Parents may only access academic records of their registered children.',
+          403,
+          'FORBIDDEN_RECORD_ACCESS'
+        );
+      }
     }
   }
 

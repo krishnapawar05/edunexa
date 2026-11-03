@@ -412,7 +412,7 @@ export class OperationsController {
           const isAllowed =
             allowedChildProfileIds.includes(studentProfileId) ||
             allowedAdmissionNumbers.includes(studentProfileId) ||
-            (studentProfileId.includes('aarav') && (req.user.guardianStudentIds || []).some((id) => id.includes('aarav')));
+            (req.user.guardianStudentIds || []).includes(studentProfileId);
 
           if (!isAllowed) {
             throw new AppError(

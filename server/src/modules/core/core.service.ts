@@ -1465,6 +1465,76 @@ export class CoreSchoolService {
         },
       });
 
+      // Handle Promotion / Class / Section transfer
+      if (data.className) {
+        let cls = await tx.class.findFirst({
+          where: {
+            schoolId: targetSchoolId,
+            name: { equals: data.className, mode: 'insensitive' },
+          },
+        });
+        if (!cls) {
+          cls = await tx.class.create({
+            data: {
+              schoolId: targetSchoolId,
+              name: data.className,
+              code: `CLS-${Math.floor(100 + Math.random() * 900)}`,
+              stage: 'Secondary',
+            },
+          });
+        }
+
+        const targetSecName = data.sectionName || 'A';
+        let sec = await tx.section.findFirst({
+          where: {
+            classId: cls.id,
+            name: { equals: targetSecName, mode: 'insensitive' },
+          },
+        });
+        if (!sec) {
+          sec = await tx.section.create({
+            data: {
+              classId: cls.id,
+              name: targetSecName,
+              capacity: 40,
+            },
+          });
+        }
+
+        let session = await tx.academicSession.findFirst({
+          where: { schoolId: targetSchoolId, isCurrent: true },
+        });
+        if (!session) {
+          session = await tx.academicSession.findFirst({
+            where: { schoolId: targetSchoolId },
+            orderBy: { startDate: 'desc' },
+          });
+        }
+
+        if (session) {
+          await tx.studentEnrollment.upsert({
+            where: {
+              studentProfileId_academicSessionId: {
+                studentProfileId: student.id,
+                academicSessionId: session.id,
+              },
+            },
+            create: {
+              studentProfileId: student.id,
+              academicSessionId: session.id,
+              classId: cls.id,
+              sectionId: sec.id,
+              rollNumber: data.rollNumber || undefined,
+            },
+            update: {
+              classId: cls.id,
+              sectionId: sec.id,
+              ...(data.rollNumber !== undefined && { rollNumber: data.rollNumber }),
+            },
+          });
+        }
+      }
+
       return {
         id: updated.id,
         admissionNumber: updated.admissionNumber,

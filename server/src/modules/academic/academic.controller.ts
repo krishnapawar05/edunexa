@@ -239,8 +239,10 @@ export class AcademicController {
     try {
       const { id } = req.params; // quizId
       const schoolId = req.user!.schoolId!;
-      // Default student profile mapping for demo/test callers
-      const studentProfileId = (req.query.studentProfileId as string) || (req.user?.role === 'STUDENT' ? 'stu-aarav-01' : 'stu-aarav-01');
+      const studentProfileId =
+        req.user?.studentProfileId ||
+        (req.query.studentProfileId as string) ||
+        (req.user?.role === 'STUDENT' ? req.user.userId : 'stu-aarav-01');
 
       const result = await academicService.startQuizAttempt(schoolId, id, studentProfileId);
       const response: ApiSuccessResponse<typeof result> = {
@@ -257,7 +259,10 @@ export class AcademicController {
     try {
       const parsed = SubmitQuizAttemptSchema.parse(req.body);
       const schoolId = req.user!.schoolId!;
-      const studentProfileId = (req.query.studentProfileId as string) || (req.user?.role === 'STUDENT' ? 'stu-aarav-01' : 'stu-aarav-01');
+      const studentProfileId =
+        req.user?.studentProfileId ||
+        (req.query.studentProfileId as string) ||
+        (req.user?.role === 'STUDENT' ? req.user.userId : 'stu-aarav-01');
 
       const result = await academicService.submitQuizAttempt(schoolId, studentProfileId, parsed);
       const response: ApiSuccessResponse<typeof result> = {

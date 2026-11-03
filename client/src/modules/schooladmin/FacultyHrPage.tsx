@@ -16,6 +16,7 @@ import {
   Trash2,
   Edit2,
   Calendar,
+  Download,
 } from 'lucide-react';
 import { Badge } from '../../components/ui/Badge.js';
 import { Button } from '../../components/ui/Button.js';
@@ -213,6 +214,34 @@ export const FacultyHrPage: React.FC = () => {
     }
   };
 
+  const handleExportCsv = () => {
+    if (staffList.length === 0) {
+      showToast('No staff records to export.');
+      return;
+    }
+    const headers = ['Employee ID', 'First Name', 'Last Name', 'Email', 'Phone', 'Department', 'Designation', 'Status', 'Joining Date'];
+    const rows = staffList.map((s) => [
+      s.employeeId,
+      `"${s.firstName}"`,
+      `"${s.lastName}"`,
+      `"${s.email}"`,
+      `"${s.phone || ''}"`,
+      `"${s.departmentName || ''}"`,
+      `"${s.designation || ''}"`,
+      s.employmentStatus,
+      s.joiningDate ? s.joiningDate.slice(0, 10) : '',
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `edunexa-staff-${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast(`Exported ${staffList.length} staff records to CSV.`);
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
       {/* Toast Notification */}
@@ -267,6 +296,15 @@ export const FacultyHrPage: React.FC = () => {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+          <button
+            onClick={handleExportCsv}
+            className="ed-btn ed-btn-secondary"
+            title="Export filtered staff roster as CSV"
+            style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}
+          >
+            <Download size={15} />
+            <span>Export CSV</span>
+          </button>
           <button
             onClick={loadStaff}
             disabled={loading}

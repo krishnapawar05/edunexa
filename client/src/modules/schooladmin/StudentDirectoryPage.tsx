@@ -17,6 +17,7 @@ import {
   Mail,
   Phone,
   ShieldAlert,
+  Download,
 } from 'lucide-react';
 import { Badge } from '../../components/ui/Badge.js';
 import { Button } from '../../components/ui/Button.js';
@@ -216,6 +217,8 @@ export const StudentDirectoryPage: React.FC = () => {
         bloodGroup: editStudent.bloodGroup,
         address: editStudent.address,
         status: editStudent.status,
+        className: editStudent.className,
+        sectionName: editStudent.sectionName,
       });
       showToast(`Student record for ${editStudent.firstName} updated.`);
       setEditStudent(null);
@@ -225,6 +228,35 @@ export const StudentDirectoryPage: React.FC = () => {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleExportCsv = () => {
+    if (students.length === 0) {
+      showToast('No students to export.');
+      return;
+    }
+    const headers = ['Admission Number', 'First Name', 'Last Name', 'Class', 'Section', 'Roll No', 'Gender', 'Blood Group', 'Status', 'Emergency Phone'];
+    const rows = students.map((s) => [
+      s.admissionNumber,
+      `"${s.firstName}"`,
+      `"${s.lastName}"`,
+      `"${s.className}"`,
+      `"${s.sectionName || 'A'}"`,
+      s.rollNumber || '',
+      s.gender,
+      s.bloodGroup || '',
+      s.status,
+      `"${s.emergencyPhone || ''}"`,
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `edunexa-students-${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast(`Exported ${students.length} student records to CSV.`);
   };
 
   // 3. Handle Delete Student
@@ -297,6 +329,15 @@ export const StudentDirectoryPage: React.FC = () => {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+          <button
+            onClick={handleExportCsv}
+            className="ed-btn ed-btn-secondary"
+            title="Export filtered student roster as CSV"
+            style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}
+          >
+            <Download size={15} />
+            <span>Export CSV</span>
+          </button>
           <button
             onClick={loadStudents}
             disabled={loading}
@@ -788,6 +829,47 @@ export const StudentDirectoryPage: React.FC = () => {
                   onChange={(e) => setEditStudent({ ...editStudent, lastName: e.target.value })}
                   className="ed-input"
                 />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '4px' }}>
+                  Class (Promotion / Transfer)
+                </label>
+                <select
+                  value={editStudent.className}
+                  onChange={(e) => setEditStudent({ ...editStudent, className: e.target.value })}
+                  className="ed-input"
+                >
+                  <option value="Grade 1">Grade 1</option>
+                  <option value="Grade 2">Grade 2</option>
+                  <option value="Grade 3">Grade 3</option>
+                  <option value="Grade 4">Grade 4</option>
+                  <option value="Grade 5">Grade 5</option>
+                  <option value="Grade 6">Grade 6</option>
+                  <option value="Grade 7">Grade 7</option>
+                  <option value="Grade 8">Grade 8</option>
+                  <option value="Grade 9">Grade 9</option>
+                  <option value="Grade 10">Grade 10</option>
+                  <option value="Grade 11">Grade 11</option>
+                  <option value="Grade 12">Grade 12</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '4px' }}>
+                  Section
+                </label>
+                <select
+                  value={editStudent.sectionName || 'A'}
+                  onChange={(e) => setEditStudent({ ...editStudent, sectionName: e.target.value })}
+                  className="ed-input"
+                >
+                  <option value="A">Section A</option>
+                  <option value="B">Section B</option>
+                  <option value="C">Section C</option>
+                  <option value="D">Section D</option>
+                </select>
               </div>
             </div>
 
