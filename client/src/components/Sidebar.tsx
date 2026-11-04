@@ -26,6 +26,8 @@ import {
   FileCheck,
   Edit3,
   ShieldCheck,
+  KeyRound,
+  Globe,
   X,
 } from 'lucide-react';
 import { useSchoolBranding } from '../context/SchoolBrandingContext.js';
@@ -79,6 +81,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       case 'SCHOOL_ADMIN':
         return [
           { id: 'overview', path: '/admin', label: 'School Overview', icon: LayoutDashboard },
+          { id: 'website', path: '/admin/website', label: 'Website CMS & Gallery', icon: Globe },
+          { id: 'users', path: '/admin/users', label: 'User & Access Management', icon: KeyRound },
           { id: 'students', path: '/admin/students', label: 'Student Directory & SIS', icon: GraduationCap },
           { id: 'admissions', path: '/admin/admissions', label: 'Admissions Review Queue', icon: FileCheck },
           { id: 'faculty', path: '/admin/faculty', label: 'Faculty & HR', icon: Users },
@@ -90,6 +94,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       case 'PRINCIPAL':
         return [
           { id: 'overview', path: '/admin', label: 'Academic Overview', icon: LayoutDashboard },
+          { id: 'website', path: '/admin/website', label: 'Website CMS & Gallery', icon: Globe },
+          { id: 'users', path: '/admin/users', label: 'User & Access Management', icon: KeyRound },
           { id: 'students', path: '/admin/students', label: 'Student Directory & SIS', icon: GraduationCap },
           { id: 'admissions', path: '/admin/admissions', label: 'Admissions Review Queue', icon: FileCheck },
           { id: 'faculty', path: '/admin/faculty', label: 'Faculty & HR', icon: Users },

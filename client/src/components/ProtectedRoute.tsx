@@ -17,6 +17,11 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles, ch
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
+  // Enforce mandatory password change if mustChangePassword is true
+  if (user.mustChangePassword && location.pathname !== '/change-password') {
+    return <Navigate to="/change-password" state={{ forced: true, from: location }} replace />;
+  }
+
   // If allowedRoles is specified, ensure user's role is permitted
   if (allowedRoles && allowedRoles.length > 0) {
     const isAuthorized = allowedRoles.includes(user.role);

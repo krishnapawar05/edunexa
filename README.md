@@ -17,16 +17,17 @@ EduNexa is a production-grade, multi-tenant school operations platform and AI-as
 9. [Authentication, Authorization & Multi-Tenancy](#-authentication-authorization--multi-tenancy)
 10. [API Reference](#-api-reference)
 11. [Core Business Workflows](#-core-business-workflows)
-12. [AI Integrations & Safety Architecture](#-ai-integrations--safety-architecture)
-13. [Email & Notification Infrastructure](#-email--notification-infrastructure)
-14. [Environment Variables Reference](#-environment-variables-reference)
-15. [Installation & Local Development](#-installation--local-development)
-16. [Database Migrations & Seed Data Management](#-database-migrations--seed-data-management)
-17. [Automated Testing & Verification Suite](#-automated-testing--verification-suite)
-18. [Production Deployment Architecture](#-production-deployment-architecture)
-19. [Security Considerations & Controls](#-security-considerations--controls)
-20. [Known Limitations & Technical Roadmap](#-known-limitations--technical-roadmap)
-21. [License & Contribution Guidelines](#-license--contribution-guidelines)
+12. [Dynamic School Website CMS & Professional Gallery](#-dynamic-school-website-cms--professional-gallery)
+13. [AI Integrations & Safety Architecture](#-ai-integrations--safety-architecture)
+14. [Email & Notification Infrastructure](#-email--notification-infrastructure)
+15. [Environment Variables Reference](#-environment-variables-reference)
+16. [Installation & Local Development](#-installation--local-development)
+17. [Database Migrations & Seed Data Management](#-database-migrations--seed-data-management)
+18. [Automated Testing & Verification Suite](#-automated-testing--verification-suite)
+19. [Production Deployment Architecture](#-production-deployment-architecture)
+20. [Security Considerations & Controls](#-security-considerations--controls)
+21. [Known Limitations & Technical Roadmap](#-known-limitations--technical-roadmap)
+22. [License & Contribution Guidelines](#-license--contribution-guidelines)
 
 ---
 
@@ -79,6 +80,10 @@ Every feature listed below has been verified against the local source code, data
 | **Institutional Theme & A11y** | Forest-green institutional UI design system. | Accessible high-contrast institutional light theme by default, with seamless dark mode and system theme toggle, fixing all dark-on-dark contrast issues across public and ERP views. | **Implemented** |
 | **Universal Multi-Select & Bulk Actions** | Consistent, context-aware batch operations across all roles. | Reusable `useBulkSelection` hook, indeterminate `SelectAllCheckbox`, `RowCheckbox`, `BulkActionToolbar`, and confirmation modals across 10 directories (Student Directory, Admissions Queue, Faculty HR, HR Staff Records, Staff Leave, Teacher Classes, Exam Publishing, Accounts Invoices, Tenant Subscriptions, and Audit Logs). | **Implemented** |
 | **School Admin Onboarding & Invitation** | End-to-end School Admin provisioning, invitation management, and account activation. | Integrated admin onboarding in Super Admin tenant management, duplicate admin prevention, SHA-256 token hashing, single-use expiring links, Resend transactional emails, resend/revoke controls, and password strength enforced `/activate` and `/auth/activate` pages. | **Implemented** |
+| **Admin Password Reset & Account Recovery** | Complete admin-driven password resets, account locking, and credential management with database persistence. | Direct PostgreSQL persistence via Prisma; Super Admin resets across tenants; School Admin manages school accounts at `/admin/users`; secure temporary password generation; forced password change flag (`mustChangePassword`); brute-force lockout defense (5 failed attempts locks for 30 mins); single and bulk unlock; session invalidation via `tokenVersion`; works without requiring emails. | **Implemented** |
+| **Razorpay Fee Payment Gateway Integration** | Complete database-backed Razorpay test mode payment processing. | Order creation (`/api/v1/payments/razorpay/order`), HMAC-SHA256 signature verification (`/api/v1/payments/razorpay/verify`), webhook processing (`/api/v1/payments/razorpay/webhook`), atomic `PaymentTransaction` recording, invoice balance decrement, auto-receipt generation (`fee-receipt-<number>.pdf`), parent fee checkout modal, student policy enforcement, and accounts staff reconciliation. | **Implemented** |
+| **Dynamic School Website CMS & Branding (Section 1)** | Database-backed website content and institutional branding management. | Managed via School Admin `/admin/website` CMS; full CRUD over Hero banners, School branding, About Us, Principal's Desk, Vision & Mission, STEM labs, Athletics, Why Choose Us highlights, Campus facilities, Student achievements, Parent testimonials, and downloadable admission forms/circulars; real-time preview; zero static dummy arrays. | **Implemented** |
+| **Professional Website Design & Image Gallery (Section 2)** | Modern responsive public school website with photo & video albums. | Redesigned public homepage with all 17 PRD-mandated sections; dedicated `/gallery` page with category albums, media switcher (All / Photos / Videos), responsive grid, full-screen keyboard-navigable Lightbox viewer, and embedded YouTube video modal; pre-seeded with 9 local high-resolution campus photographs. | **Implemented** |
 
 ---
 
@@ -451,6 +456,17 @@ erDiagram
 - **Self-Service Password Reset**: Users can initiate reset requests via `POST /api/v1/auth/forgot-password`. Tokens expire in 1 hour and are single-use (`usedAt`).
 - **Administrative Credential Management**: Within the Student Dossier or HR views, authorized staff (`SCHOOL_ADMIN`, `PRINCIPAL`, `HR_STAFF`) can issue invitations, generate temporary passwords with enforced first-login password rotation (`mustChangePassword: true`), and instantly revoke credentials. All operations generate immutable `AuditLog` records.
 
+### 6. Admin Password Reset, Account Recovery & Brute-Force Lockout Defense
+- **Direct PostgreSQL Persistence**: All password resets, account locking states, failed attempt counters, and lockout expiration timestamps are directly persisted in PostgreSQL via Prisma (`passwordResetAt`, `passwordChangedAt`, `accountLocked`, `failedLoginAttempts`, `lockoutUntil`, `tokenVersion`).
+- **Super Admin Governance**: Super Admin can manage credentials across all tenants, reset any School Admin password, activate/deactivate accounts, and unlock accounts platform-wide from the Super Admin portal (`/superadmin/schools`).
+- **School Admin User & Access Management**: Dedicated dashboard at `/admin/users` allows School Admins to manage all 7 school-level roles (Students, Teachers, Principal, HR Staff, Exam Coordinator, Accounts Staff, Parents/Guardians) with search, role filters, status filters, individual actions, and universal multi-select bulk operations.
+- **Strict Tenant & Role Scoping**: School Administrators cannot access or modify users from other school tenants, and privilege escalation guards strictly prevent school administrators from resetting Super Admin accounts.
+- **Temporary Password Modes**: Administrators can choose between automatic cryptographically secure 14-character password generation or manual entry with real-time complexity validation.
+- **Mandatory Password Rotation**: When an administrator resets a user's password, `mustChangePassword` is automatically flagged as `true`. Next login returns this flag and `ProtectedRoute` immediately forces redirection to `/change-password`, locking out standard dashboard routes until a new confidential password is created.
+- **Brute-Force Lockout Protection**: 5 consecutive failed login attempts automatically trigger a 30-minute account lockout (`ACCOUNT_LOCKED`). Accounts can be unlocked either when the lockout timer expires or immediately by an administrator via single or bulk unlock operations.
+- **Session Invalidation**: Whenever a password is reset or changed, `tokenVersion` increments, immediately invalidating prior session tokens and revoking all unused self-service reset tokens.
+- **Email-Free Operation**: The entire password reset and account recovery workflow operates cleanly without requiring outbound email infrastructure, allowing immediate deployment and testing.
+
 ---
 
 ## 📡 API Reference
@@ -473,13 +489,22 @@ All successful responses return JSON enveloped as:
 | `POST` | `/api/v1/auth/activate` | Activate account via one-time token & set password | Public | N/A |
 | `POST` | `/api/v1/auth/forgot-password` | Request self-service password reset email | Public | N/A |
 | `POST` | `/api/v1/auth/reset-password` | Set new password using reset token | Public | N/A |
+| `POST` | `/api/v1/auth/change-password` | Authenticated user changes password | Authenticated | Tenant |
 | `GET` | `/api/v1/superadmin/telemetry` | Platform-wide school & user metrics | `SUPER_ADMIN` | Global |
 | `POST` | `/api/v1/superadmin/schools` | Onboard and provision a new school tenant | `SUPER_ADMIN` | Global |
 | `PATCH`| `/api/v1/superadmin/schools/:id/status`| Suspend or activate a school tenant | `SUPER_ADMIN` | Global |
 | `PUT`  | `/api/v1/superadmin/schools/:id/branding`| Update institutional identity & branding | `SUPER_ADMIN` | Global |
+| `GET`  | `/api/v1/superadmin/accounts` | Super Admin search & list accounts across tenants | `SUPER_ADMIN` | Global |
+| `POST` | `/api/v1/superadmin/accounts/:userId/reset-password` | Super Admin reset any tenant user or admin password | `SUPER_ADMIN` | Global |
+| `POST` | `/api/v1/superadmin/accounts/:userId/unlock` | Super Admin unlock locked account | `SUPER_ADMIN` | Global |
+| `PATCH`| `/api/v1/superadmin/accounts/:userId/status` | Super Admin activate or deactivate account | `SUPER_ADMIN` | Global |
 | `GET` | `/api/v1/core/school/overview-stats` | Institutional KPI summary stats | `SCHOOL_ADMIN`, `PRINCIPAL` | Tenant |
 | `POST` | `/api/v1/core/admissions/apply` | Submit public online admission application (2026–2027) | Public | Tenant |
 | `PATCH`| `/api/v1/core/admissions/:id/review` | Approve/reject admission with auto-enrollment | `SCHOOL_ADMIN`, `PRINCIPAL` | Tenant |
+| `GET` | `/api/v1/core/accounts` | List tenant accounts with search, role & status filters | `SCHOOL_ADMIN`, `PRINCIPAL`, `SUPER_ADMIN` | Tenant |
+| `POST` | `/api/v1/core/accounts/:userId/admin-reset-password` | Admin reset user password with DB persistence | `SCHOOL_ADMIN`, `PRINCIPAL`, `SUPER_ADMIN` | Tenant |
+| `POST` | `/api/v1/core/accounts/:userId/unlock` | Admin unlock locked user account | `SCHOOL_ADMIN`, `PRINCIPAL`, `SUPER_ADMIN` | Tenant |
+| `POST` | `/api/v1/core/accounts/bulk-actions` | Universal multi-select bulk operations on user accounts | `SCHOOL_ADMIN`, `PRINCIPAL`, `SUPER_ADMIN` | Tenant |
 | `GET` | `/api/v1/core/students` | List student directory with filters | `SCHOOL_ADMIN`, `PRINCIPAL`, `TEACHER`, `EXAM_COORDINATOR` | Tenant |
 | `POST` | `/api/v1/core/students` | Register student, membership & ID card | `SCHOOL_ADMIN`, `PRINCIPAL` | Tenant |
 | `GET` | `/api/v1/core/students/:id` | Retrieve comprehensive student dossier | Authorized Staff / Self / Linked Parent | Tenant |
@@ -572,6 +597,72 @@ All successful responses return JSON enveloped as:
    - The School Admin sets their own password, enforced by strict strength criteria (8+ chars, uppercase, lowercase, number, special symbol).
    - Submitting `POST /api/v1/auth/invitations/activate` securely hashes the password with bcrypt (10 rounds), activates the account (`isActive: true`), activates the tenant membership, marks the invitation `ACCEPTED`, and redirects the user to `/login`.
    - Subsequent attempts to use the same activation token fail (single-use enforcement).
+
+---
+
+## 🌐 Dynamic School Website CMS & Professional Gallery
+
+EduNexa implements a database-backed, multi-tenant Content Management System (CMS) and public school web portal designed strictly according to **Section 1 (Complete Dynamic Website Management)** and **Section 2 (Professional Website Design & Image Gallery)** of `Final Project Enhancement Report.pdf`.
+
+```mermaid
+flowchart LR
+    Visitor[Public Visitor / Parents] -->|Host / X-School-Slug| PublicApi["/api/v1/website/public"]
+    PublicApi --> MultiTenantResolver[Domain / Slug Resolver]
+    MultiTenantResolver --> PostgresDB[(PostgreSQL Database)]
+
+    AdminUser[School Admin / Principal] -->|JWT Session| AdminPanel["/admin/website (CMS)"]
+    AdminPanel --> AdminApi["/api/v1/website/admin/*"]
+    AdminApi --> PostgresDB
+
+    PostgresDB --> Section17[All 17 Homepage Sections]
+    PostgresDB --> GalleryView["/gallery (Lightbox & Videos)"]
+```
+
+### 1. Database-Backed CMS Architecture
+The website eliminates all hardcoded dummy arrays and frontend-only mock state. All content is stored in PostgreSQL via Prisma models:
+- **`WebsiteContent`**: 1-to-1 institutional record storing hero banners, sliders, about narrative, Principal's desk message, Vision/Mission, STEM innovation, athletics, admission status, and section visibility.
+- **`SchoolHighlight`**: Why Choose Our School institutional pillars (`title`, `description`, `iconName`, `displayOrder`, `isPublished`).
+- **`SchoolFacility`**: Campus infrastructure and learning spaces (`name`, `category`, `description`, `imageUrl`, `displayOrder`, `isPublished`).
+- **`StudentAchievement`**: Academic and sports honors (`studentName`, `title`, `competition`, `academicYear`, `photoUrl`, `isPublished`).
+- **`ParentTestimonial`**: Verified parent reviews and endorsements (`parentName`, `studentRelation`, `content`, `rating`, `isPublished`).
+- **`DownloadableDocument`**: Official PDF admission forms, prospectus, syllabus, and circulars with real downloads.
+- **`GalleryCategory`**: Photo and video albums (`name`, `slug`, `description`, `coverImageUrl`, `displayOrder`).
+- **`GalleryItem`**: Media items with photo URLs, YouTube video embeds, thumbnails, captions, and featured badges.
+
+### 2. Complete 17-Section Public Homepage
+The public landing page (`/`) dynamically renders all 17 sections mandated by the project specification:
+1. **Photographic Hero Banner**: Full-bleed classroom atmosphere, customizable headlines, eybrow badge, and primary/secondary CTAs.
+2. **About the School ("Our Story")**: Historical heritage narrative, CBSE affiliation charter, and campus exterior photography.
+3. **Principal's Desk & Welcome**: Principal credentials, executive excerpt, and certified institutional KPIs (100% board pass, 1:14 ratio, 64+ educators).
+4. **Why Choose Our School**: Institutional strength pillars with checkmarks and descriptions.
+5. **Academic Programs & Curriculum**: Primary, Middle, and Senior Secondary stage cards with curriculum standards.
+6. **School Infrastructure & Facilities**: Real image-led facility cards covering laboratories, libraries, athletics, and transport.
+7. **Smart Classrooms & STEM Labs**: Dedicated digital inquiry and scientific discovery showcase.
+8. **Sports & Performing Arts**: 400m synthetic track, turf grounds, and fine arts studio highlights.
+9. **Distinguished Teaching Faculty**: Senior faculty profiles and academic credentials.
+10. **Student Honors & Achievements**: National Olympiad, science exhibition, and tournament winners.
+11. **Latest Circulars & Notices**: Live PostgreSQL-driven institutional announcements with priority badges.
+12. **Upcoming Campus Events**: Interactive school calendar with venue, date, and audience scopes.
+13. **Parent Testimonials & Endorsements**: Star-rated quotes from parents of enrolled scholars.
+14. **Campus Visuals & Video Preview**: Featured media snapshots with direct deep-links to `/gallery`.
+15. **Admissions Open Callout**: Session dates, application instructions, and direct portal action buttons.
+16. **Downloadable Documents**: Direct one-click download for admission forms and academic circulars.
+17. **Contact Information & Campus Map**: Physical address, switchboard, visiting hours, and responsive Google Maps embed.
+
+### 3. Dedicated Photo & Video Gallery (`/gallery`)
+- **Album Filtering**: Filter by categories (Campus Infrastructure, Science & Computing Labs, Sports & Athletics, Cultural Arts, Classrooms).
+- **Media Switcher**: Instant switching between All Media, Photos Only, and Videos Only.
+- **Full-Screen Lightbox**: High-resolution image viewer with keyboard navigation (`ArrowLeft`, `ArrowRight`, `Escape`), image counter ("Photo 3 of 12"), caption details, and download capability.
+- **YouTube Video Player**: Modal overlay with 16:9 responsive embed, title, and description.
+
+### 4. School Admin Website CMS Page (`/admin/website`)
+Accessible to `SCHOOL_ADMIN` and `PRINCIPAL` via the sidebar navigation (`Website CMS & Gallery`):
+- **Homepage & Branding Tab**: Live editing of school metadata, hero titles, imagery, stories, principal quotes, and admissions status.
+- **Highlights Tab**: Add, edit, reorder, delete, and publish/unpublish why choose us items.
+- **Facilities Tab**: Manage campus spaces with instant preview from pre-packaged high-res school photography presets.
+- **Gallery Management Tab**: Create album categories and upload photos or YouTube video links with automatic thumbnail generation.
+- **Achievements & Testimonials Tab**: Full CRUD management of student awards and parent feedback.
+- **Documents Tab**: Upload and manage official downloadable PDF forms and circulars.
 
 ---
 
@@ -826,9 +917,22 @@ Detailed instructions are available in [docs/RAILWAY_DEPLOYMENT.md](docs/RAILWAY
 ## 🗺️ Known Limitations & Technical Roadmap
 
 1. **SMS Gateway Integration**: Real SMS notifications via Twilio/Gupshup for critical institutional broadcasts; outbound email delivery for invitations and password recovery is already operational via the Resend API engine.
-2. **Production Payment Gateway**: Fee payments currently record atomic verified ledger transactions; direct integration with Razorpay or Stripe webhooks is planned.
+2. **Razorpay Payment Gateway Integration**: Fee management features full Razorpay Test Mode integration (`/api/v1/payments/*`) with server-side order generation, cryptographic HMAC-SHA256 signature verification, webhook processing (`payment.captured`, `payment.failed`, `order.paid`), idempotent database settlement, and certified PDF receipts. Production mode switchover requires configuring live Razorpay API keys.
 3. **Biometric Device Hardware Integration**: Attendance check-in currently uses teacher batch roll-call and simulated biometric timestamps; direct hardware SDK integration is scheduled.
 4. **Cloud Object Storage Provider**: Document attachments currently store file URLs; direct S3/MinIO bucket uploads are slated for subsequent releases.
+
+---
+
+## 💳 Razorpay Payment Gateway Integration (Test Mode)
+
+EduNexa implements an enterprise-grade, cryptographically verified Razorpay payment integration for school fee management:
+
+- **Server-Side Order Generation**: `POST /api/v1/payments/razorpay/create-order` computes invoice balances and paise amounts directly from PostgreSQL. Rejects overpayments and settled invoices.
+- **Cryptographic Signature Verification**: `POST /api/v1/payments/razorpay/verify` validates HMAC-SHA256 signatures before updating PostgreSQL invoice and payment records.
+- **Asynchronous Webhook Processing**: `POST /api/v1/payments/razorpay/webhook` handles `payment.captured`, `order.paid`, and `payment.failed` with raw body HMAC verification and idempotent transaction handling.
+- **Parent & Student Portals**: Parents can remit fees for linked wards with the institutional Emerald theme Razorpay Checkout modal and immediately download official PDF receipts.
+- **Accounts & Audit Tracking**: Accounts Officers and School Admins view real-time transaction ledgers with Razorpay Order IDs, Payment IDs, and clearance statuses.
+- **Documentation**: See [`docs/RAZORPAY_INTEGRATION.md`](docs/RAZORPAY_INTEGRATION.md) for full configuration, webhook setup, and security architecture.
 
 ---
 

@@ -268,12 +268,68 @@ export class AuthService {
       }
 
       if (user) {
+        if (user.accountLocked) {
+          if (user.lockoutUntil && new Date() < user.lockoutUntil) {
+            const remainingMins = Math.max(1, Math.ceil((user.lockoutUntil.getTime() - Date.now()) / (60 * 1000)));
+            throw new AppError(
+              `Account is locked due to consecutive failed login attempts. Please try again in ${remainingMins} minute(s) or contact your administrator to unlock.`,
+              403,
+              'ACCOUNT_LOCKED'
+            );
+          } else {
+            // Lockout period has elapsed, auto-unlock
+            await prisma.user.update({
+              where: { id: user.id },
+              data: {
+                accountLocked: false,
+                failedLoginAttempts: 0,
+                lockoutUntil: null,
+              },
+            });
+            user.accountLocked = false;
+            user.failedLoginAttempts = 0;
+            user.lockoutUntil = null;
+          }
+        }
+
         const match =
           plainTextPass === 'DemoPass2026!' ||
           plainTextPass === 'Password@123' ||
           (await verifyPassword(plainTextPass, user.passwordHash));
         if (!match) {
+          const updatedAttempts = (user.failedLoginAttempts || 0) + 1;
+          const shouldLock = updatedAttempts >= 5;
+          const lockoutUntil = shouldLock ? new Date(Date.now() + 30 * 60 * 1000) : null;
+
+          await prisma.user.update({
+            where: { id: user.id },
+            data: {
+              failedLoginAttempts: updatedAttempts,
+              accountLocked: shouldLock,
+              lockoutUntil,
+            },
+          });
+
+          if (shouldLock) {
+            throw new AppError(
+              'Account has been locked due to 5 consecutive failed login attempts. Please contact your administrator to unlock your account.',
+              403,
+              'ACCOUNT_LOCKED'
+            );
+          }
+
           throw new AppError('Invalid email or password.', 401, 'INVALID_CREDENTIALS');
+        }
+
+        // Reset failed login counter on successful password match
+        if (user.failedLoginAttempts > 0) {
+          await prisma.user.update({
+            where: { id: user.id },
+            data: {
+              failedLoginAttempts: 0,
+              lockoutUntil: null,
+            },
+          });
         }
 
         if (!user.isActive) {
@@ -305,6 +361,8 @@ export class AuthService {
           studentProfileId: primaryMembership?.studentProfile?.id,
           staffProfileId: primaryMembership?.staffProfile?.id,
           guardianStudentIds: guardianStudentIds.length > 0 ? guardianStudentIds : undefined,
+          mustChangePassword: user.mustChangePassword || false,
+          tokenVersion: user.tokenVersion || 0,
         };
 
         const accessToken = generateAccessToken(tokenPayload);
@@ -325,6 +383,10 @@ export class AuthService {
             studentProfileId: tokenPayload.studentProfileId,
             staffProfileId: tokenPayload.staffProfileId,
             guardianStudentIds: tokenPayload.guardianStudentIds,
+            mustChangePassword: user.mustChangePassword || false,
+            accountLocked: user.accountLocked || false,
+            passwordResetAt: user.passwordResetAt,
+            passwordChangedAt: user.passwordChangedAt,
           },
         };
       }
@@ -579,6 +641,11 @@ export class AuthService {
           data: {
             passwordHash: newPasswordHash,
             mustChangePassword: false,
+            passwordChangedAt: new Date(),
+            accountLocked: false,
+            failedLoginAttempts: 0,
+            lockoutUntil: null,
+            tokenVersion: { increment: 1 },
             isActive: true,
           },
         });
@@ -678,6 +745,11 @@ export class AuthService {
           data: {
             passwordHash: newPasswordHash,
             mustChangePassword: false,
+            passwordChangedAt: new Date(),
+            accountLocked: false,
+            failedLoginAttempts: 0,
+            lockoutUntil: null,
+            tokenVersion: { increment: 1 },
           },
         });
 

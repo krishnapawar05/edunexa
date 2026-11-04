@@ -15,11 +15,22 @@ describe('STAGE 6: School Operations and Reporting Test Suite', () => {
     await prisma.feePayment.deleteMany({
       where: { invoice: { invoiceNumber: 'INV-2026-0413' } },
     });
-    await prisma.feeInvoice.updateMany({
+    await prisma.feeInvoice.upsert({
       where: { invoiceNumber: 'INV-2026-0413' },
-      data: {
+      update: {
         amountPaid: 20000,
         discountApplied: 0,
+        status: 'PARTIALLY_PAID',
+        auditTrail: [],
+      },
+      create: {
+        feeStructureId: 'fee-struct-g10-tuition',
+        studentProfileId: '5ce6c497-5c4e-4751-8a37-54f58e5e796a',
+        invoiceNumber: 'INV-2026-0413',
+        amountDue: 45000,
+        amountPaid: 20000,
+        discountApplied: 0,
+        dueDate: new Date('2026-10-15'),
         status: 'PARTIALLY_PAID',
         auditTrail: [],
       },
@@ -359,7 +370,7 @@ describe('STAGE 6: School Operations and Reporting Test Suite', () => {
       .post('/api/v1/operations/fees/payments')
       .set('Authorization', `Bearer ${accountsToken}`)
       .send({
-        invoiceId: 'inv-ananya-02',
+        invoiceId: 'INV-2026-0413',
         amountPaid: 15000,
         paymentMethod: 'UPI',
         transactionRef: 'UPI-SIM-77123-AXIS',
@@ -380,7 +391,7 @@ describe('STAGE 6: School Operations and Reporting Test Suite', () => {
       .post('/api/v1/operations/fees/payments')
       .set('Authorization', `Bearer ${accountsToken}`)
       .send({
-        invoiceId: 'inv-ananya-02',
+        invoiceId: 'INV-2026-0413',
         amountPaid: 50000, // Exceeds remaining 10,000 balance
         paymentMethod: 'CASH',
         transactionRef: 'CSH-001',
@@ -396,7 +407,7 @@ describe('STAGE 6: School Operations and Reporting Test Suite', () => {
       .patch('/api/v1/operations/fees/concessions')
       .set('Authorization', `Bearer ${accountsToken}`)
       .send({
-        invoiceId: 'inv-ananya-02',
+        invoiceId: 'INV-2026-0413',
         concessionAmount: 5000,
         reason: 'Merit scholarship awarded by Academic Council for state rank',
       });
@@ -413,7 +424,7 @@ describe('STAGE 6: School Operations and Reporting Test Suite', () => {
       .patch('/api/v1/operations/fees/refunds')
       .set('Authorization', `Bearer ${accountsToken}`)
       .send({
-        invoiceId: 'inv-ananya-02',
+        invoiceId: 'INV-2026-0413',
         refundAmount: 2000,
         reason: 'Refund for cancelled optional excursion activity',
       });
@@ -575,8 +586,16 @@ describe('STAGE 6: School Operations and Reporting Test Suite', () => {
   });
 
   it('8e. Accounts Officer can record audited reconciliation decision in PostgreSQL', async () => {
-    // Get an existing payment
-    const payment = await prisma.feePayment.findFirst();
+    // Get an existing payment for this school
+    const payment = await prisma.feePayment.findFirst({
+      where: {
+        invoice: {
+          feeStructure: {
+            school: { slug: 'apex-academy' },
+          },
+        },
+      },
+    });
     if (payment) {
       const res = await request(app)
         .post('/api/v1/operations/fees/reconcile')

@@ -1,4 +1,6 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { websiteApi } from '../services/api.js';
+import { PublicWebsiteData } from '@edunexa/shared';
 
 export interface SchoolBranding {
   schoolName: string;
@@ -12,6 +14,7 @@ export interface SchoolBranding {
   address: string;
   primaryAccent: string; // CSS color
   monogram: string;
+  logoUrl?: string;
 }
 
 export const DEFAULT_BRANDING: SchoolBranding = {
@@ -26,6 +29,7 @@ export const DEFAULT_BRANDING: SchoolBranding = {
   address: 'Sector 14, Institutional Area, New Delhi, India 110025',
   primaryAccent: '#244C3A', // Institutional Forest Green
   monogram: 'A',
+  logoUrl: '',
 };
 
 interface SchoolBrandingContextType {
@@ -34,6 +38,9 @@ interface SchoolBrandingContextType {
   resetBranding: () => void;
   isCustomizing: boolean;
   setIsCustomizing: (val: boolean) => void;
+  websiteData: PublicWebsiteData | null;
+  loadingWebsiteData: boolean;
+  refreshWebsiteData: () => Promise<void>;
 }
 
 const SchoolBrandingContext = createContext<SchoolBrandingContextType | undefined>(undefined);
@@ -51,6 +58,52 @@ export const SchoolBrandingProvider: React.FC<{ children: ReactNode }> = ({ chil
     return DEFAULT_BRANDING;
   });
   const [isCustomizing, setIsCustomizing] = useState(false);
+  const [websiteData, setWebsiteData] = useState<PublicWebsiteData | null>(null);
+  const [loadingWebsiteData, setLoadingWebsiteData] = useState<boolean>(true);
+
+  const fetchWebsiteData = useCallback(async () => {
+    try {
+      setLoadingWebsiteData(true);
+      const res = await websiteApi.getPublicData();
+      if (res && res.success && res.data) {
+        setWebsiteData(res.data);
+        const sc = res.data.school;
+        const config = (sc.brandingConfig as any) || {};
+
+        setBranding((prev) => {
+          const updated: SchoolBranding = {
+            ...prev,
+            schoolName: sc.name || prev.schoolName,
+            shortName: config.shortName || sc.name?.split(' ')[0] || prev.shortName,
+            code: sc.code || prev.code,
+            tagline: sc.motto || config.tagline || prev.tagline,
+            affiliation: config.affiliation || prev.affiliation,
+            establishedYear: sc.establishedYear || config.establishedYear || prev.establishedYear,
+            contactEmail: sc.email || prev.contactEmail,
+            contactPhone: sc.phone || prev.contactPhone,
+            address: sc.address ? `${sc.address}, ${sc.city || ''} ${sc.postalCode || ''}`.trim() : prev.address,
+            primaryAccent: config.primaryAccent || prev.primaryAccent,
+            monogram: config.monogram || sc.name?.charAt(0) || prev.monogram,
+            logoUrl: sc.logoUrl || prev.logoUrl,
+          };
+          try {
+            localStorage.setItem(BRANDING_STORAGE_KEY, JSON.stringify(updated));
+          } catch {
+            // ignore
+          }
+          return updated;
+        });
+      }
+    } catch (err) {
+      console.warn('Could not fetch public website data dynamically:', err);
+    } finally {
+      setLoadingWebsiteData(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchWebsiteData();
+  }, [fetchWebsiteData]);
 
   const updateBranding = (updates: Partial<SchoolBranding>) => {
     setBranding((prev) => {
@@ -81,6 +134,9 @@ export const SchoolBrandingProvider: React.FC<{ children: ReactNode }> = ({ chil
         resetBranding,
         isCustomizing,
         setIsCustomizing,
+        websiteData,
+        loadingWebsiteData,
+        refreshWebsiteData: fetchWebsiteData,
       }}
     >
       {children}

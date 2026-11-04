@@ -84,6 +84,14 @@ enum FeePaymentStatus {
   REFUNDED
 }
 
+enum PaymentTxnStatus {
+  CREATED
+  ATTEMPTED
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
 enum EventAudience {
   ALL
   STUDENTS_ONLY
@@ -153,6 +161,15 @@ model School {
   admissionApplications AdmissionApplication[]
   notifications     Notification[]
   invitations       AccountInvitation[]
+  paymentTransactions PaymentTransaction[]
+  websiteContent      WebsiteContent?
+  highlights          SchoolHighlight[]
+  facilities          SchoolFacility[]
+  achievements        StudentAchievement[]
+  testimonials        ParentTestimonial[]
+  downloadableDocs    DownloadableDocument[]
+  galleryCategories   GalleryCategory[]
+  galleryItems        GalleryItem[]
 
   @@index([slug])
   @@index([status])
@@ -170,6 +187,12 @@ model User {
   isActive           Boolean      @default(true)
   mustChangePassword Boolean      @default(false)
   lastLoginAt        DateTime?
+  passwordResetAt    DateTime?
+  passwordChangedAt  DateTime?
+  accountLocked      Boolean      @default(false)
+  failedLoginAttempts Int         @default(0)
+  lockoutUntil       DateTime?
+  tokenVersion       Int          @default(0)
 
   createdAt          DateTime     @default(now())
   updatedAt          DateTime     @updatedAt
@@ -179,6 +202,7 @@ model User {
   notifications      Notification[]
   invitations        AccountInvitation[]
   passwordResetTokens PasswordResetToken[]
+  paymentTransactions PaymentTransaction[]
 
   @@index([email])
   @@index([username])
@@ -841,26 +865,60 @@ model FeeInvoice {
   feeStructure     FeeStructure     @relation(fields: [feeStructureId], references: [id], onDelete: Cascade)
   student          StudentProfile   @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
   payments         FeePayment[]
+  transactions     PaymentTransaction[]
 
   @@index([studentProfileId, status])
   @@index([invoiceNumber])
 }
 
 model FeePayment {
-  id            String       @id @default(uuid())
-  feeInvoiceId  String
-  receiptNumber String       @unique
-  amountPaid    Float
-  paidAt        DateTime     @default(now())
-  paymentMethod String
+  id             String       @id @default(uuid())
+  feeInvoiceId   String
+  receiptNumber  String       @unique
+  amountPaid     Float
+  paidAt         DateTime     @default(now())
+  paymentMethod  String
   transactionRef String?
-  isSimulated   Boolean      @default(true)
-  collectedBy   String?
-  notes         String?
+  isSimulated    Boolean      @default(true)
+  collectedBy    String?
+  notes          String?
+  orderId        String?
+  paymentId      String?
 
-  invoice       FeeInvoice   @relation(fields: [feeInvoiceId], references: [id], onDelete: Cascade)
+  invoice        FeeInvoice   @relation(fields: [feeInvoiceId], references: [id], onDelete: Cascade)
 
   @@index([receiptNumber])
+  @@index([orderId])
+  @@index([paymentId])
+}
+
+model PaymentTransaction {
+  id               String           @id @default(uuid())
+  schoolId         String
+  feeInvoiceId     String
+  userId           String
+  orderId          String           @unique
+  paymentId        String?          @unique
+  signature        String?
+  amount           Float
+  currency         String           @default("INR")
+  status           PaymentTxnStatus @default(CREATED)
+  paymentMethod    String?
+  receiptNumber    String?
+  errorCode        String?
+  errorDescription String?
+  metadata         Json?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  feeInvoice       FeeInvoice       @relation(fields: [feeInvoiceId], references: [id], onDelete: Cascade)
+  school           School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, status])
+  @@index([feeInvoiceId])
+  @@index([orderId])
+  @@index([paymentId])
 }
 
 model Notification {
@@ -897,4 +955,203 @@ model AuditLog {
 
   @@index([schoolId, createdAt])
   @@index([action])
+}
+
+// ============================================================================
+// DYNAMIC WEBSITE CMS & PHOTO/VIDEO GALLERY MODELS
+// ============================================================================
+
+model WebsiteContent {
+  id                        String   @id @default(uuid())
+  schoolId                  String   @unique
+  heroTitle                 String   @default("Empowering Future Innovators & Ethical Leaders")
+  heroSubtitle              String   @default("CBSE & Cambridge Affiliated Center of Excellence")
+  heroDescription           String   @default("Nurturing critical inquiry, scientific discovery, and global consciousness through holistic pedagogy and world-class campus facilities.")
+  heroCtaText               String   @default("Apply for Admissions")
+  heroCtaLink               String   @default("/admissions")
+  heroSecondaryCtaText      String   @default("Explore Campus Life")
+  heroSecondaryCtaLink      String   @default("/gallery")
+  heroImageUrl              String   @default("/images/school/hero_classroom.jpg")
+  heroSliderImages          Json?
+
+  aboutTitle                String   @default("About Our Institution")
+  aboutSubtitle             String   @default("A Legacy of Academic Rigor & Ethical Foundation")
+  aboutDescription          String   @default("Founded on the pillars of intellectual integrity, scientific innovation, and community stewardship, our institution provides comprehensive K-12 education combining CBSE standards with global inquiry.")
+  aboutPhilosophy           String?
+  aboutHistory              String?
+  aboutImageUrl             String   @default("/images/school/campus_building.jpg")
+
+  principalName             String   @default("Dr. Alistair Thorne")
+  principalDesignation      String   @default("Principal & Academic Director")
+  principalMessage          String   @default("Welcome to an environment where curiosity is celebrated and character is forged. We prepare students not merely for examinations, but for life with resilience and empathy.")
+  principalPhotoUrl         String   @default("/images/school/school_assembly.jpg")
+
+  visionTitle               String   @default("Our Vision")
+  visionDescription         String   @default("To be a nationally benchmarked citadel of learning, producing visionary thinkers and compassionate changemakers.")
+  missionTitle              String   @default("Our Mission")
+  missionDescription        String   @default("Cultivating holistic intellect through inquiry-driven pedagogy, state-of-the-art laboratory infrastructure, and values-centered student mentoring.")
+
+  smartClassroomsHeading    String   @default("Smart Classrooms & STEM Labs")
+  smartClassroomsDescription String  @default("Interactive digital display boards, AI workstations, and dedicated robotics kits empowering experiential learning.")
+  smartClassroomsImageUrl   String   @default("/images/school/computer_lab.jpg")
+
+  sportsActivitiesHeading   String   @default("Athletics, Performing Arts & Culture")
+  sportsActivitiesDescription String @default("Synthetic running tracks, Olympic-standard courts, and multi-disciplinary music and theatre amphitheatres.")
+  sportsActivitiesImageUrl  String   @default("/images/school/sports_ground.jpg")
+
+  admissionHeading          String   @default("Admissions Open 2026–2027")
+  admissionDescription      String   @default("Accepting applications for Pre-Primary through Grade 11. Limited seats available per section to ensure personalized faculty attention.")
+  admissionImageUrl         String   @default("/images/school/science_lab.jpg")
+  admissionProcedure        Json?
+  admissionEligibility      Json?
+  admissionDates            Json?
+
+  admissionFormTitle        String   @default("Official Admission Application Form 2026-27")
+  admissionFormDescription  String   @default("Download the official PDF admission form. Complete and submit at the admissions desk along with required academic records.")
+  admissionFormUrl          String?
+
+  officeTimings             String   @default("Monday - Saturday: 8:00 AM - 4:00 PM")
+  mapEmbedUrl               String?
+
+  sectionVisibility         Json?
+  sectionOrder              Json?
+  isPublished               Boolean  @default(true)
+  updatedAt                 DateTime @updatedAt
+  createdAt                 DateTime @default(now())
+
+  school                    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId])
+}
+
+model SchoolHighlight {
+  id           String   @id @default(uuid())
+  schoolId     String
+  title        String
+  description  String
+  iconName     String   @default("Award")
+  imageUrl     String?
+  displayOrder Int      @default(0)
+  isPublished  Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  school       School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, displayOrder])
+}
+
+model SchoolFacility {
+  id           String   @id @default(uuid())
+  schoolId     String
+  name         String
+  description  String
+  category     String   @default("Academic")
+  imageUrl     String
+  displayOrder Int      @default(0)
+  isPublished  Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  school       School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, displayOrder])
+}
+
+model StudentAchievement {
+  id           String   @id @default(uuid())
+  schoolId     String
+  studentName  String
+  title        String
+  description  String
+  competition  String
+  academicYear String   @default("2026-2027")
+  photoUrl     String?
+  displayOrder Int      @default(0)
+  isPublished  Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  school       School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, displayOrder])
+}
+
+model ParentTestimonial {
+  id           String   @id @default(uuid())
+  schoolId     String
+  parentName   String
+  parentRole   String   @default("Parent")
+  content      String
+  avatarUrl    String?
+  rating       Int      @default(5)
+  displayOrder Int      @default(0)
+  isPublished  Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  school       School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, displayOrder])
+}
+
+model DownloadableDocument {
+  id           String   @id @default(uuid())
+  schoolId     String
+  title        String
+  description  String?
+  category     String   @default("GENERAL") // ADMISSION_FORM, CURRICULUM, PROSPECTUS, CALENDAR
+  fileUrl      String
+  fileSize     String?
+  fileType     String   @default("PDF")
+  displayOrder Int      @default(0)
+  isPublished  Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  school       School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, category])
+}
+
+model GalleryCategory {
+  id            String        @id @default(uuid())
+  schoolId      String
+  slug          String
+  name          String
+  description   String?
+  coverImageUrl String?
+  displayOrder  Int           @default(0)
+  isPublished   Boolean       @default(true)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  school        School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  items         GalleryItem[]
+
+  @@unique([schoolId, slug])
+  @@index([schoolId, displayOrder])
+}
+
+model GalleryItem {
+  id           String          @id @default(uuid())
+  schoolId     String
+  categoryId   String
+  mediaType    String          @default("PHOTO") // PHOTO, VIDEO
+  title        String
+  caption      String?
+  description  String?
+  mediaUrl     String
+  thumbnailUrl String?
+  videoUrl     String?
+  displayOrder Int             @default(0)
+  isPublished  Boolean         @default(true)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  school       School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  category     GalleryCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, categoryId])
+  @@index([schoolId, mediaType, isPublished])
 }

@@ -23,6 +23,11 @@ import {
   Ban,
   UserPlus,
   Clock,
+  KeyRound,
+  Unlock,
+  Lock,
+  Copy,
+  Check,
 } from 'lucide-react';
 import {
   useBulkSelection,
@@ -32,7 +37,11 @@ import {
   BulkActionConfirmationDialog,
   BulkActionItem,
 } from '../../components/bulk/index.js';
-import { superadminApi } from '../../services/api.js';
+import {
+  superadminApi,
+  superAdminResetPasswordApi,
+  superAdminUnlockAccountApi,
+} from '../../services/api.js';
 
 export const SchoolTenantsPage: React.FC = () => {
   const [schools, setSchools] = useState<any[]>([]);
@@ -68,6 +77,56 @@ export const SchoolTenantsPage: React.FC = () => {
     adminPhone: '',
     sendInvitation: true,
   });
+
+  // Super Admin Password Reset & Account Recovery State
+  const [resetTargetUser, setResetTargetUser] = useState<any | null>(null);
+  const [resetModalOpen, setResetModalOpen] = useState(false);
+  const [superAdminTempPassword, setSuperAdminTempPassword] = useState('');
+  const [superAdminResetResult, setSuperAdminResetResult] = useState<{ temporaryPassword: string; email: string } | null>(null);
+  const [superAdminCopied, setSuperAdminCopied] = useState(false);
+
+  const handleOpenSuperAdminReset = (targetUser: any) => {
+    setResetTargetUser(targetUser);
+    setSuperAdminTempPassword('');
+    setSuperAdminResetResult(null);
+    setResetModalOpen(true);
+  };
+
+  const handleExecuteSuperAdminReset = async () => {
+    if (!resetTargetUser) return;
+    try {
+      setIsSubmitting(true);
+      const res = await superAdminResetPasswordApi(resetTargetUser.id || resetTargetUser.userId, {
+        temporaryPassword: superAdminTempPassword ? superAdminTempPassword.trim() : undefined,
+        mustChangePassword: true,
+        reason: 'Password reset by Platform Super Admin',
+      });
+      setSuperAdminResetResult({
+        temporaryPassword: res.temporaryPassword,
+        email: res.user.email,
+      });
+      setToastMessage(`Password reset successfully for ${res.user.email}.`);
+    } catch (err: any) {
+      setToastMessage(err.message || 'Failed to reset password.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSuperAdminUnlock = async (userId: string) => {
+    try {
+      setIsSubmitting(true);
+      await superAdminUnlockAccountApi(userId, 'Unlocked by Platform Super Admin');
+      setToastMessage('Account unlocked successfully.');
+      if (selectedSchool) {
+        handleOpenInvitationsModal(selectedSchool);
+      }
+    } catch (err: any) {
+      setToastMessage(err.message || 'Failed to unlock account.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   // Bulk Selection & Actions State
   const selection = useBulkSelection();
@@ -1279,6 +1338,20 @@ export const SchoolTenantsPage: React.FC = () => {
                           (selectedSchool.schoolAdmin.isActive ? 'ACCEPTED' : 'PENDING')
                       )}
                     </div>
+                    <div style={{ marginTop: '8px', display: 'flex', gap: '6px' }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowDetailModal(false);
+                          handleOpenSuperAdminReset(selectedSchool.schoolAdmin);
+                        }}
+                        className="ed-btn ed-btn-secondary"
+                        style={{ padding: '3px 8px', fontSize: '0.74rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                      >
+                        <KeyRound size={12} />
+                        <span>Reset Password</span>
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <div style={{ fontSize: '0.82rem', padding: '10px', backgroundColor: 'var(--bg-subtle)', borderRadius: 'var(--radius-sm)', color: 'var(--text-muted)' }}>
@@ -1571,9 +1644,24 @@ export const SchoolTenantsPage: React.FC = () => {
                         )}
 
                         {inv.status === 'ACCEPTED' && (
-                          <span style={{ fontSize: '0.75rem', color: 'var(--success-text)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <CheckCircle2 size={13} /> Active Account
-                          </span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--success-text)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <CheckCircle2 size={13} /> Active
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowInvitationsModal(false);
+                                handleOpenSuperAdminReset({ id: inv.userId, email: inv.email, name: inv.recipientName });
+                              }}
+                              className="ed-btn ed-btn-secondary"
+                              style={{ padding: '3px 8px', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                              title="Reset Password & Issue Temporary Credentials"
+                            >
+                              <KeyRound size={12} />
+                              <span>Reset Password</span>
+                            </button>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -1656,6 +1744,133 @@ export const SchoolTenantsPage: React.FC = () => {
           onConfirm={() => handleBulkAction(confirmDialog.action as any)}
           onClose={() => setConfirmDialog(null)}
         />
+      )}
+
+      {/* Super Admin Reset Password Modal */}
+      {resetModalOpen && resetTargetUser && (
+        <div className="ed-modal-overlay">
+          <div className="ed-modal" style={{ maxWidth: '480px' }}>
+            <div className="ed-modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, fontSize: '1.05rem' }}>
+                <KeyRound size={18} style={{ color: 'var(--primary-600)' }} />
+                <span>Reset Administrator Password</span>
+              </div>
+              <button
+                onClick={() => {
+                  setResetModalOpen(false);
+                  setResetTargetUser(null);
+                  setSuperAdminResetResult(null);
+                }}
+                className="ed-btn-icon"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="ed-modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+              {superAdminResetResult ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div
+                    style={{
+                      backgroundColor: 'var(--bg-subtle)',
+                      border: '1px solid var(--border-default)',
+                      borderRadius: 'var(--radius-sm)',
+                      padding: '14px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--success-text)', fontWeight: 600, fontSize: '0.9rem', marginBottom: '6px' }}>
+                      <CheckCircle2 size={16} />
+                      <span>Password Reset & Persisted</span>
+                    </div>
+                    <p style={{ fontSize: '0.80rem', color: 'var(--text-muted)', margin: '0 0 10px' }}>
+                      New temporary credentials generated for <strong>{superAdminResetResult.email}</strong>. The user must update their password upon next sign-in.
+                    </p>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '10px',
+                        backgroundColor: 'var(--bg-surface)',
+                        border: '1px solid var(--border-default)',
+                        borderRadius: 'var(--radius-sm)',
+                      }}
+                    >
+                      <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '1rem', color: 'var(--text-primary)' }}>
+                        {superAdminResetResult.temporaryPassword}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(superAdminResetResult.temporaryPassword);
+                          setSuperAdminCopied(true);
+                          setTimeout(() => setSuperAdminCopied(false), 2000);
+                        }}
+                        className="ed-btn ed-btn-secondary"
+                        style={{ padding: '4px 8px', fontSize: '0.74rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                      >
+                        {superAdminCopied ? <Check size={12} /> : <Copy size={12} />}
+                        <span>{superAdminCopied ? 'Copied' : 'Copy'}</span>
+                      </button>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setResetModalOpen(false);
+                        setResetTargetUser(null);
+                        setSuperAdminResetResult(null);
+                      }}
+                      className="ed-btn ed-btn-primary"
+                    >
+                      Done
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                  <div style={{ fontSize: '0.84rem', color: 'var(--text-muted)' }}>
+                    Reset password for <strong>{resetTargetUser.name || resetTargetUser.email}</strong> ({resetTargetUser.email}).
+                    Active sessions will be invalidated and the account will be unlocked.
+                  </div>
+
+                  <div className="ed-input-group">
+                    <label className="ed-label">Temporary Password (Leave blank to auto-generate)</label>
+                    <input
+                      type="text"
+                      className="ed-input"
+                      placeholder="Leave empty for secure random password..."
+                      value={superAdminTempPassword}
+                      onChange={(e) => setSuperAdminTempPassword(e.target.value)}
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)', marginTop: '8px' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setResetModalOpen(false);
+                        setResetTargetUser(null);
+                      }}
+                      className="ed-btn ed-btn-secondary"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isSubmitting}
+                      onClick={handleExecuteSuperAdminReset}
+                      className="ed-btn ed-btn-primary"
+                    >
+                      {isSubmitting ? 'Resetting...' : 'Reset Password'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Toast Alert */}

@@ -2,7 +2,14 @@ import { Router } from 'express';
 import { tenantController } from './tenant.controller.js';
 import { authenticateUser, requireRole } from '../../middleware/auth.middleware.js';
 import { validateRequest } from '../../middleware/validate.js';
-import { PlatformRole, SchoolOnboardingSchema, BulkActionRequestSchema } from '@edunexa/shared';
+import {
+  PlatformRole,
+  SchoolOnboardingSchema,
+  BulkActionRequestSchema,
+  AdminResetPasswordSchema,
+  AdminUnlockAccountSchema,
+  UpdateAccountStatusSchema,
+} from '@edunexa/shared';
 
 const router = Router();
 
@@ -91,6 +98,23 @@ router.put('/settings', (req, res, next) => {
 // 6. Role Membership Adjustments
 router.post('/memberships/role', (req, res, next) => {
   tenantController.assignUserRole(req, res, next);
+});
+
+// 7. Super Admin Account & Password Recovery Management
+router.get('/accounts', (req, res, next) => {
+  tenantController.listSuperAdminAccounts(req, res, next);
+});
+
+router.post('/accounts/:userId/reset-password', validateRequest({ body: AdminResetPasswordSchema }), (req, res, next) => {
+  tenantController.resetAccountPassword(req, res, next);
+});
+
+router.post('/accounts/:userId/unlock', validateRequest({ body: AdminUnlockAccountSchema }), (req, res, next) => {
+  tenantController.unlockAccount(req, res, next);
+});
+
+router.patch('/accounts/:userId/status', validateRequest({ body: UpdateAccountStatusSchema }), (req, res, next) => {
+  tenantController.updateAccountStatus(req, res, next);
 });
 
 export default router;

@@ -17,6 +17,9 @@ import {
   AdmissionReviewSchema,
   UpdateAccountStatusSchema,
   BulkActionRequestSchema,
+  AdminResetPasswordSchema,
+  AdminUnlockAccountSchema,
+  BulkUserAccountActionSchema,
 } from '@edunexa/shared';
 
 const router = Router();
@@ -329,6 +332,45 @@ router.get(
 );
 
 // Account Provisioning, Credential Management & Recovery Administration
+router.get(
+  '/accounts',
+  requireRole(PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.SUPER_ADMIN),
+  requireTenantScope,
+  (req, res, next) => {
+    coreSchoolController.listTenantAccounts(req, res, next);
+  }
+);
+
+router.post(
+  '/accounts/:userId/admin-reset-password',
+  requireRole(PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.SUPER_ADMIN),
+  requireTenantScope,
+  validateRequest({ body: AdminResetPasswordSchema }),
+  (req, res, next) => {
+    coreSchoolController.adminResetPassword(req, res, next);
+  }
+);
+
+router.post(
+  '/accounts/:userId/unlock',
+  requireRole(PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.SUPER_ADMIN),
+  requireTenantScope,
+  validateRequest({ body: AdminUnlockAccountSchema }),
+  (req, res, next) => {
+    coreSchoolController.adminUnlockAccount(req, res, next);
+  }
+);
+
+router.post(
+  '/accounts/bulk-actions',
+  requireRole(PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.SUPER_ADMIN),
+  requireTenantScope,
+  validateRequest({ body: BulkUserAccountActionSchema }),
+  (req, res, next) => {
+    coreSchoolController.bulkUserAccountActions(req, res, next);
+  }
+);
+
 router.get(
   '/invitations',
   requireRole(PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.SUPER_ADMIN),

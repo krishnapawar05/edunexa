@@ -1481,6 +1481,107 @@ export class TenantService {
       results,
     };
   }
+
+  /**
+   * Super Admin lists accounts across all school tenants
+   */
+  async listAccounts(filters: { search?: string; schoolId?: string; role?: string; status?: string; page?: number; limit?: number } = {}) {
+    return accountProvisioningService.listSuperAdminAccounts(filters);
+  }
+
+  /**
+   * Super Admin resets any school administrator or user password with direct database persistence
+   */
+  async resetAccountPassword(params: {
+    targetUserId: string;
+    temporaryPassword?: string;
+    mustChangePassword?: boolean;
+    actingUserId?: string;
+    reason?: string;
+  }) {
+    return accountProvisioningService.adminResetPassword({
+      targetUserId: params.targetUserId,
+      temporaryPassword: params.temporaryPassword,
+      mustChangePassword: params.mustChangePassword,
+      actingUserId: params.actingUserId,
+      actingUserRole: PlatformRole.SUPER_ADMIN,
+      reason: params.reason,
+    });
+  }
+
+  /**
+   * Super Admin unlocks any locked account
+   */
+  async unlockAccount(params: { targetUserId: string; actingUserId?: string; reason?: string }) {
+    return accountProvisioningService.adminUnlockAccount({
+      targetUserId: params.targetUserId,
+      actingUserId: params.actingUserId,
+      actingUserRole: PlatformRole.SUPER_ADMIN,
+      reason: params.reason,
+    });
+  }
+
+  /**
+   * Super Admin activates or deactivates any account platform-wide
+   */
+  async updateAccountStatus(params: { targetUserId: string; isActive: boolean; actingUserId?: string; reason?: string }) {
+    const user = await prisma.user.findUnique({
+      where: { id: params.targetUserId },
+      include: { memberships: true },
+    });
+
+    if (!user) {
+      throw new AppError('User not found.', 404, 'USER_NOT_FOUND');
+    }
+
+    const primaryMembership = user.memberships[0];
+
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: user.id },
+        data: { isActive: params.isActive },
+      });
+
+      await tx.userMembership.updateMany({
+        where: { userId: user.id },
+        data: { isActive: params.isActive },
+      });
+
+      const actingDbUser = params.actingUserId
+        ? await tx.user.findFirst({
+            where: {
+              OR: [{ id: params.actingUserId }, { email: params.actingUserId }],
+            },
+          })
+        : null;
+
+      await tx.auditLog.create({
+        data: {
+          schoolId: primaryMembership?.schoolId || null,
+          userId: actingDbUser ? actingDbUser.id : null,
+          action: params.isActive ? 'ACCOUNT_REACTIVATED' : 'ACCOUNT_SUSPENDED',
+          entityType: 'USER_ACCOUNT',
+          entityId: user.id,
+          details: {
+            targetUserEmail: user.email,
+            performedByRole: PlatformRole.SUPER_ADMIN,
+            reason: params.reason || (params.isActive ? 'Reactivated by Super Admin' : 'Suspended by Super Admin'),
+            timestamp: new Date().toISOString(),
+          },
+        },
+      });
+    });
+
+    return {
+      success: true,
+      message: `Account has been ${params.isActive ? 'activated' : 'deactivated'} successfully.`,
+      user: {
+        id: user.id,
+        email: user.email,
+        isActive: params.isActive,
+      },
+    };
+  }
 }
 
 export const tenantService = new TenantService();

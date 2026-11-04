@@ -249,6 +249,83 @@ export class TenantController {
       next(err);
     }
   }
+
+  async listSuperAdminAccounts(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { search, schoolId, role, status, page, limit } = req.query;
+      const result = await tenantService.listAccounts({
+        search: search as string,
+        schoolId: schoolId as string,
+        role: role as string,
+        status: status as string,
+        page: page ? Number(page) : undefined,
+        limit: limit ? Number(limit) : undefined,
+      });
+      res.status(200).json({ success: true, data: result });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async resetAccountPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { userId } = req.params;
+      const { temporaryPassword, mustChangePassword, reason } = req.body;
+      const result = await tenantService.resetAccountPassword({
+        targetUserId: userId,
+        temporaryPassword,
+        mustChangePassword,
+        actingUserId: req.user?.userId,
+        reason,
+      });
+      res.status(200).json({
+        success: true,
+        data: result,
+        message: result.message,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async unlockAccount(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { userId } = req.params;
+      const { reason } = req.body;
+      const result = await tenantService.unlockAccount({
+        targetUserId: userId,
+        actingUserId: req.user?.userId,
+        reason,
+      });
+      res.status(200).json({
+        success: true,
+        data: result,
+        message: result.message,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async updateAccountStatus(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { userId } = req.params;
+      const { isActive, reason } = req.body;
+      const result = await tenantService.updateAccountStatus({
+        targetUserId: userId,
+        isActive,
+        actingUserId: req.user?.userId,
+        reason,
+      });
+      res.status(200).json({
+        success: true,
+        data: result,
+        message: result.message,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
 }
 
 export const tenantController = new TenantController();

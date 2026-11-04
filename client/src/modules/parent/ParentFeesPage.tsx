@@ -14,7 +14,8 @@ import {
   ShieldCheck,
   Check,
 } from 'lucide-react';
-import { coreApi, operationsApi } from '../../services/api.js';
+import { coreApi, operationsApi, paymentsApi } from '../../services/api.js';
+import { launchRazorpayModal } from '../../utils/razorpay.js';
 import { downloadFeeReceiptPdf, downloadFeeInvoicePdf } from '../../services/pdfGenerator.js';
 import { Breadcrumbs } from '../../components/Breadcrumbs.js';
 
@@ -43,9 +44,11 @@ export const ParentFeesPage: React.FC = () => {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [paymentAmount, setPaymentAmount] = useState<number>(0);
+  const [paymentMode, setPaymentMode] = useState<'RAZORPAY' | 'MANUAL'>('RAZORPAY');
   const [paymentMethod, setPaymentMethod] = useState<string>('ONLINE');
   const [transactionRef, setTransactionRef] = useState<string>('');
   const [submittingPayment, setSubmittingPayment] = useState(false);
+  const [paymentSuccessData, setPaymentSuccessData] = useState<any>(null);
   const [paymentSuccess, setPaymentSuccess] = useState<string | null>(null);
   const [paymentError, setPaymentError] = useState<string | null>(null);
 
@@ -140,15 +143,81 @@ export const ParentFeesPage: React.FC = () => {
     const due = Math.max(0, inv.amountDue - inv.amountPaid - (inv.discountApplied || 0));
     setSelectedInvoice(inv);
     setPaymentAmount(due);
+    setPaymentMode('RAZORPAY');
     setPaymentMethod('ONLINE');
     setTransactionRef(`TXN-${Date.now().toString().slice(-6)}`);
+    setPaymentSuccessData(null);
     setPaymentSuccess(null);
     setPaymentError(null);
     setShowPaymentModal(true);
   };
 
+  const handleRazorpayPayment = async () => {
+    if (!selectedInvoice) return;
+    try {
+      setSubmittingPayment(true);
+      setPaymentError(null);
+
+      // 1. Create order on server
+      const order = await paymentsApi.createRazorpayOrder({
+        invoiceId: selectedInvoice.id,
+        amount: Number(paymentAmount),
+      });
+
+      // 2. Fetch gateway public config
+      const config = await paymentsApi.getConfig();
+
+      try {
+        const result = await launchRazorpayModal({
+          key: config.keyId,
+          amount: order.amount,
+          currency: order.currency,
+          name: order.schoolName || 'Apex Academy of Sciences & Arts',
+          description: `Fee: ${selectedInvoice.feeStructureHead || selectedInvoice.invoiceNumber}`,
+          order_id: order.orderId,
+          prefill: {
+            name: selectedChild?.name,
+          },
+          theme: {
+            color: '#047857',
+          },
+        });
+
+        // 3. Cryptographically verify signature on server
+        const verifyResult = await paymentsApi.verifyRazorpayPayment({
+          invoiceId: selectedInvoice.id,
+          orderId: result.razorpay_order_id,
+          paymentId: result.razorpay_payment_id,
+          signature: result.razorpay_signature,
+        });
+
+        setPaymentSuccessData(verifyResult);
+        setPaymentSuccess(`Payment settled successfully! Receipt: ${verifyResult.receiptNumber}`);
+      } catch (checkoutErr: any) {
+        if (checkoutErr.message?.includes('cancelled')) {
+          setPaymentError('Payment was cancelled.');
+        } else {
+          setPaymentError(`Razorpay Checkout: ${checkoutErr.message}`);
+        }
+        return;
+      }
+
+      if (selectedChild) {
+        loadInvoices(selectedChild.id);
+      }
+    } catch (err: any) {
+      setPaymentError(err.message || 'Payment initiation failed. Please check the amount and try again.');
+    } finally {
+      setSubmittingPayment(false);
+    }
+  };
+
   const handleSubmitPayment = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (paymentMode === 'RAZORPAY') {
+      return handleRazorpayPayment();
+    }
+
     if (!selectedInvoice) return;
     try {
       setSubmittingPayment(true);
@@ -159,7 +228,7 @@ export const ParentFeesPage: React.FC = () => {
         amountPaid: Number(paymentAmount),
         paymentMethod,
         transactionRef,
-        notes: `Parent online fee remittance via gateway reference ${transactionRef}`,
+        notes: `Parent offline remittance via manual reference ${transactionRef}`,
       });
 
       setPaymentSuccess(`Payment of ₹ ${Number(paymentAmount).toLocaleString()} committed successfully!`);
@@ -466,10 +535,16 @@ export const ParentFeesPage: React.FC = () => {
                           ₹ {Number(p.amountPaid).toLocaleString()}
                         </td>
                         <td>
-                          <span className="ed-badge ed-badge-neutral">{p.paymentMethod}</span>
+                          {p.paymentMethod?.includes('RAZORPAY') || (!p.isSimulated && p.paymentId) ? (
+                            <span className="ed-badge ed-badge-success" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.74rem' }}>
+                              <ShieldCheck size={11} /> Razorpay Verified
+                            </span>
+                          ) : (
+                            <span className="ed-badge ed-badge-neutral">{p.paymentMethod}</span>
+                          )}
                         </td>
                         <td style={{ fontSize: '0.82rem', fontFamily: 'monospace' }}>
-                          {p.transactionRef || 'DIRECT'}
+                          {p.transactionRef || p.paymentId || 'DIRECT'}
                         </td>
                         <td>
                           <div style={{ display: 'flex', gap: '4px' }}>
@@ -547,7 +622,53 @@ export const ParentFeesPage: React.FC = () => {
               <div style={{ padding: '24px', textAlign: 'center' }}>
                 <CheckCircle2 size={48} style={{ color: 'var(--success-solid)', margin: '0 auto 12px' }} />
                 <h4 style={{ margin: '0 0 6px', fontWeight: 800, color: 'var(--text-primary)' }}>Payment Successful</h4>
-                <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-secondary)' }}>{paymentSuccess}</p>
+                <p style={{ margin: '0 0 16px', fontSize: '0.88rem', color: 'var(--text-secondary)' }}>{paymentSuccess}</p>
+
+                {paymentSuccessData && (
+                  <div style={{ backgroundColor: 'var(--bg-subtle)', padding: '14px', borderRadius: 'var(--radius-sm)', marginBottom: '16px', textAlign: 'left', fontSize: '0.82rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                      <span style={{ color: 'var(--text-muted)' }}>Receipt Number:</span>
+                      <strong style={{ color: 'var(--primary-700)' }}>{paymentSuccessData.receiptNumber}</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                      <span style={{ color: 'var(--text-muted)' }}>Payment Reference:</span>
+                      <span style={{ fontFamily: 'monospace' }}>{paymentSuccessData.paymentId}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--text-muted)' }}>Settled Amount:</span>
+                      <strong>₹ {Number(paymentSuccessData.amountPaid).toLocaleString()}</strong>
+                    </div>
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                  {paymentSuccessData && (
+                    <button
+                      className="ed-btn ed-btn-sm ed-btn-primary"
+                      onClick={() => {
+                        downloadFeeReceiptPdf({
+                          schoolName: paymentSuccessData.schoolName || 'Apex Academy of Sciences & Arts',
+                          receiptNumber: paymentSuccessData.receiptNumber,
+                          invoiceNumber: paymentSuccessData.invoiceNumber,
+                          date: paymentSuccessData.paidAt ? paymentSuccessData.paidAt.split('T')[0] : new Date().toISOString().split('T')[0],
+                          studentName: paymentSuccessData.studentName || selectedChild?.name || 'Student',
+                          admissionNumber: selectedChild?.admissionNumber || 'ADM-2026',
+                          className: selectedChild?.grade || 'Grade 10',
+                          feeHead: selectedInvoice?.feeStructureHead || 'School Fees',
+                          amountPaid: Number(paymentSuccessData.amountPaid),
+                          paymentMethod: 'RAZORPAY_ONLINE',
+                          transactionRef: paymentSuccessData.paymentId,
+                          balanceRemaining: paymentSuccessData.remainingBalance || 0,
+                        });
+                      }}
+                    >
+                      <Download size={13} /> Download Receipt
+                    </button>
+                  )}
+                  <button className="ed-btn ed-btn-sm ed-btn-secondary" onClick={() => setShowPaymentModal(false)}>
+                    Close
+                  </button>
+                </div>
               </div>
             ) : (
               <form onSubmit={handleSubmitPayment}>
@@ -556,6 +677,26 @@ export const ParentFeesPage: React.FC = () => {
                     {paymentError}
                   </div>
                 )}
+
+                {/* Gateway Mode Selector */}
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+                  <button
+                    type="button"
+                    className={`ed-btn ed-btn-sm ${paymentMode === 'RAZORPAY' ? 'ed-btn-primary' : 'ed-btn-secondary'}`}
+                    style={{ flex: 1, justifyContent: 'center' }}
+                    onClick={() => setPaymentMode('RAZORPAY')}
+                  >
+                    <ShieldCheck size={14} /> Razorpay Checkout
+                  </button>
+                  <button
+                    type="button"
+                    className={`ed-btn ed-btn-sm ${paymentMode === 'MANUAL' ? 'ed-btn-primary' : 'ed-btn-secondary'}`}
+                    style={{ flex: 1, justifyContent: 'center' }}
+                    onClick={() => setPaymentMode('MANUAL')}
+                  >
+                    Desk / Offline Ref
+                  </button>
+                </div>
 
                 <div style={{ backgroundColor: 'var(--bg-subtle)', padding: '12px', borderRadius: 'var(--radius-sm)', marginBottom: '16px', fontSize: '0.85rem' }}>
                   <div><strong>Invoice:</strong> {selectedInvoice.invoiceNumber}</div>
@@ -579,35 +720,48 @@ export const ParentFeesPage: React.FC = () => {
                   />
                 </div>
 
-                <div style={{ marginBottom: '14px' }}>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '6px' }}>
-                    Payment Method
-                  </label>
-                  <select
-                    className="ed-input"
-                    style={{ width: '100%' }}
-                    value={paymentMethod}
-                    onChange={(e) => setPaymentMethod(e.target.value)}
-                  >
-                    <option value="ONLINE">Unified Payments Interface (UPI)</option>
-                    <option value="CARD">Credit / Debit Card</option>
-                    <option value="NET_BANKING">Net Banking (NEFT / RTGS)</option>
-                  </select>
-                </div>
+                {paymentMode === 'RAZORPAY' ? (
+                  <div style={{ marginBottom: '20px', padding: '12px', backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: 'var(--radius-sm)', fontSize: '0.82rem', color: '#065f46' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700, marginBottom: '4px' }}>
+                      <ShieldCheck size={15} style={{ color: '#059669' }} /> Razorpay Secure Payment (Test Mode)
+                    </div>
+                    <div>Instant HMAC-SHA256 verified digital clearance. Supports UPI, Net Banking, Cards & Wallets with official timestamped PDF receipt.</div>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ marginBottom: '14px' }}>
+                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '6px' }}>
+                        Payment Method
+                      </label>
+                      <select
+                        className="ed-input"
+                        style={{ width: '100%' }}
+                        value={paymentMethod}
+                        onChange={(e) => setPaymentMethod(e.target.value)}
+                      >
+                        <option value="ONLINE">Unified Payments Interface (UPI)</option>
+                        <option value="CARD">Credit / Debit Card</option>
+                        <option value="NET_BANKING">Net Banking (NEFT / RTGS)</option>
+                        <option value="CHEQUE">Cheque / Demand Draft</option>
+                        <option value="CASH">Cash at Desk</option>
+                      </select>
+                    </div>
 
-                <div style={{ marginBottom: '20px' }}>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '6px' }}>
-                    Transaction Reference
-                  </label>
-                  <input
-                    type="text"
-                    className="ed-input"
-                    style={{ width: '100%', fontFamily: 'monospace' }}
-                    value={transactionRef}
-                    onChange={(e) => setTransactionRef(e.target.value)}
-                    required
-                  />
-                </div>
+                    <div style={{ marginBottom: '20px' }}>
+                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '6px' }}>
+                        Transaction Reference
+                      </label>
+                      <input
+                        type="text"
+                        className="ed-input"
+                        style={{ width: '100%', fontFamily: 'monospace' }}
+                        value={transactionRef}
+                        onChange={(e) => setTransactionRef(e.target.value)}
+                        required
+                      />
+                    </div>
+                  </>
+                )}
 
                 <button
                   type="submit"
@@ -615,7 +769,11 @@ export const ParentFeesPage: React.FC = () => {
                   style={{ width: '100%', justifyContent: 'center', padding: '10px' }}
                   disabled={submittingPayment || paymentAmount <= 0}
                 >
-                  {submittingPayment ? 'Processing Remittance...' : `Confirm & Pay ₹ ${paymentAmount.toLocaleString()}`}
+                  {submittingPayment
+                    ? 'Processing Remittance...'
+                    : paymentMode === 'RAZORPAY'
+                    ? `Launch Razorpay • Pay ₹ ${paymentAmount.toLocaleString()}`
+                    : `Record Manual Payment ₹ ${paymentAmount.toLocaleString()}`}
                 </button>
               </form>
             )}

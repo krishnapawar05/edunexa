@@ -12,7 +12,8 @@ import {
   ShieldCheck,
   ChevronRight,
 } from 'lucide-react';
-import { operationsApi, coreApi, getStoredUser } from '../../services/api.js';
+import { operationsApi, coreApi, paymentsApi, getStoredUser } from '../../services/api.js';
+import { launchRazorpayModal } from '../../utils/razorpay.js';
 
 export const StudentFeesPage: React.FC = () => {
   const [invoices, setInvoices] = useState<any[]>([]);
@@ -23,7 +24,7 @@ export const StudentFeesPage: React.FC = () => {
   // Payment Modal State
   const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);
   const [payAmount, setPayAmount] = useState<string>('');
-  const [paymentMethod, setPaymentMethod] = useState<string>('ONLINE_CARD');
+  const [paymentMethod, setPaymentMethod] = useState<string>('RAZORPAY');
   const [paying, setPaying] = useState<boolean>(false);
   const [paySuccess, setPaySuccess] = useState<any | null>(null);
   const [payError, setPayError] = useState<string | null>(null);
@@ -78,17 +79,48 @@ export const StudentFeesPage: React.FC = () => {
       setPaying(true);
       setPayError(null);
 
-      const res = await operationsApi.recordFeePayment({
-        invoiceId: selectedInvoice.id,
-        amount: amountNum,
-        paymentMethod: paymentMethod,
-        transactionReference: `SIM-TXN-${Date.now().toString().slice(-6)}`,
-      });
+      if (paymentMethod === 'RAZORPAY') {
+        const order = await paymentsApi.createRazorpayOrder({
+          invoiceId: selectedInvoice.id,
+          amount: amountNum,
+        });
 
-      setPaySuccess(res);
-      await loadFeeData();
+        const config = await paymentsApi.getConfig();
+        const rzpResponse = await launchRazorpayModal({
+          key: config.keyId,
+          amount: order.amount,
+          currency: order.currency,
+          name: order.schoolName || 'Apex Academy',
+          description: `Fee: ${selectedInvoice.feeStructureHead || selectedInvoice.invoiceNumber}`,
+          order_id: order.orderId,
+          prefill: {
+            name: `${student?.firstName || ''} ${student?.lastName || ''}`.trim(),
+          },
+          theme: { color: '#047857' },
+        });
+
+        const verifyRes = await paymentsApi.verifyRazorpayPayment({
+          invoiceId: selectedInvoice.id,
+          orderId: rzpResponse.razorpay_order_id,
+          paymentId: rzpResponse.razorpay_payment_id,
+          signature: rzpResponse.razorpay_signature,
+        });
+
+        setPaySuccess(verifyRes);
+        await loadFeeData();
+      } else {
+        const res = await operationsApi.recordFeePayment({
+          invoiceId: selectedInvoice.id,
+          amount: amountNum,
+          paymentMethod: paymentMethod,
+          transactionReference: `SIM-TXN-${Date.now().toString().slice(-6)}`,
+        });
+
+        setPaySuccess(res);
+        await loadFeeData();
+      }
     } catch (err: any) {
-      setPayError(err.message || 'Failed to record simulated payment to PostgreSQL ledger.');
+      setPayError(err.message || 'Payment execution failed.');
     } finally {
       setPaying(false);
     }
@@ -419,21 +451,22 @@ export const StudentFeesPage: React.FC = () => {
 
                   <div>
                     <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, marginBottom: '6px' }}>
-                      Simulated Payment Method
+                      Payment Channel
                     </label>
                     <select
                       className="ed-input"
                       value={paymentMethod}
                       onChange={(e) => setPaymentMethod(e.target.value)}
                     >
+                      <option value="RAZORPAY">Razorpay Secure Checkout (Test Mode)</option>
+                      <option value="UPI">UPI Direct Instant (Simulated)</option>
                       <option value="ONLINE_CARD">Online Credit/Debit Card (Simulated)</option>
                       <option value="NET_BANKING">Institutional Net Banking (Simulated)</option>
-                      <option value="UPI">UPI Direct Instant (Simulated)</option>
                     </select>
                   </div>
 
                   <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)', margin: 0 }}>
-                    Notice: In accordance with EduNexa development protocols, this simulates payment execution without billing real cards, recording genuine atomic mutations in PostgreSQL.
+                    Notice: Razorpay operates in certified sandbox test mode. Transactions generate verifiable digital receipts without debiting real funds.
                   </p>
 
                   <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)' }}>

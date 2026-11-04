@@ -987,6 +987,8 @@ export class OperationsService {
         amountPaid: p.amountPaid,
         paymentMethod: p.paymentMethod,
         transactionRef: p.transactionRef,
+        orderId: p.orderId,
+        paymentId: p.paymentId,
         date: p.paidAt.toISOString().split('T')[0],
         notes: p.notes,
         isSimulated: p.isSimulated,

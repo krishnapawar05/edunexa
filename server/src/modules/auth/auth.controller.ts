@@ -8,6 +8,7 @@ import {
   ChangePasswordSchema,
 } from '@edunexa/shared';
 import { accountProvisioningService } from '../core/provisioning.service.js';
+import { prisma, checkDatabaseConnection } from '../../config/db.js';
 
 export class AuthController {
   async verifyInvitation(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -108,10 +109,38 @@ export class AuthController {
 
   async getCurrentUser(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
+      let userContext: any = req.user;
+      const dbCheck = await checkDatabaseConnection();
+      if (dbCheck.connected && req.user?.userId) {
+        const dbUser = await prisma.user.findUnique({
+          where: { id: req.user.userId },
+          select: {
+            id: true,
+            email: true,
+            username: true,
+            firstName: true,
+            lastName: true,
+            phone: true,
+            avatarUrl: true,
+            isActive: true,
+            accountLocked: true,
+            mustChangePassword: true,
+            passwordResetAt: true,
+            passwordChangedAt: true,
+          },
+        });
+        if (dbUser) {
+          userContext = {
+            ...req.user,
+            ...dbUser,
+          };
+        }
+      }
+
       const response: ApiSuccessResponse<any> = {
         success: true,
         data: {
-          user: req.user,
+          user: userContext,
         },
       };
 

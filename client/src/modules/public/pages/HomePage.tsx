@@ -26,183 +26,106 @@ import {
   Phone,
   Bell,
   Calendar,
+  Download,
+  Mail,
+  MapPin,
+  ExternalLink,
+  Star,
+  FileText,
+  Play,
+  Video,
+  ChevronRight,
 } from 'lucide-react';
 import { useSchoolBranding } from '../../../context/SchoolBrandingContext.js';
-import { coreApi } from '../../../services/api.js';
+import { websiteApi } from '../../../services/api.js';
+import { PublicWebsiteData } from '@edunexa/shared';
 
 export const HomePage: React.FC = () => {
-  const { branding } = useSchoolBranding();
-  const [liveEvents, setLiveEvents] = useState<any[]>([]);
-  const [liveNotices, setLiveNotices] = useState<any[]>([]);
+  const { branding, websiteData: contextData, loadingWebsiteData } = useSchoolBranding();
+
+  const [data, setData] = useState<PublicWebsiteData | null>(contextData);
+  const [loading, setLoading] = useState<boolean>(!contextData);
 
   useEffect(() => {
+    if (contextData) {
+      setData(contextData);
+      setLoading(false);
+      return;
+    }
+
     let isMounted = true;
-    const fetchPublicData = async () => {
+    const fetchWebsiteData = async () => {
       try {
-        const [evs, nots] = await Promise.allSettled([
-          coreApi.getPublicEvents('apex-academy'),
-          coreApi.getPublicNotices('apex-academy'),
-        ]);
-        if (isMounted) {
-          if (evs.status === 'fulfilled' && Array.isArray(evs.value)) {
-            setLiveEvents(evs.value.slice(0, 3));
-          }
-          if (nots.status === 'fulfilled' && Array.isArray(nots.value)) {
-            setLiveNotices(nots.value.slice(0, 3));
-          }
+        setLoading(true);
+        const res = await websiteApi.getPublicData();
+        if (isMounted && res.success && res.data) {
+          setData(res.data);
         }
-      } catch {
-        // Fallbacks preserved
+      } catch (err) {
+        console.warn('Failed to load public website content:', err);
+      } finally {
+        if (isMounted) setLoading(false);
       }
     };
-    fetchPublicData();
+
+    fetchWebsiteData();
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [contextData]);
 
-  // Realistic Image-Led Facilities inspired by St. Joseph's Public School
-  const facilitiesWithPhotos = [
-    {
-      title: 'Smart Classrooms',
-      badge: 'Interactive Learning',
-      image: '/images/school/hero_classroom.jpg',
-      icon: Laptop,
-      desc: 'Digital audiovisual projection suites and modern ergonomic desks encouraging interactive group inquiry.',
-    },
-    {
-      title: 'Central Library',
-      badge: 'Academic Resource',
-      image: '/images/school/library.jpg',
-      icon: Library,
-      desc: 'Vast collection of curriculum reference volumes, periodicals, literature, and quiet study alcoves.',
-    },
-    {
-      title: 'Science Laboratories',
-      badge: 'Practical Inquiry',
-      image: '/images/school/science_lab.jpg',
-      icon: FlaskConical,
-      desc: 'Specialized physics, chemistry, and biology experimental stations with safety and analytical equipment.',
-    },
-    {
-      title: 'Computer Workstations',
-      badge: 'Technology Skills',
-      image: '/images/school/computer_lab.jpg',
-      icon: BookOpen,
-      desc: 'High-speed networked computing laboratories dedicated to algorithmic thinking and digital literacy.',
-    },
-    {
-      title: 'Sports Fields & Athletics',
-      badge: 'Physical Wellness',
-      image: '/images/school/sports_ground.jpg',
-      icon: Dumbbell,
-      desc: 'Sprawling grass sports grounds, cricket pitches, and athletic tracks fostering teamwork and endurance.',
-    },
-    {
-      title: 'Regulated Transport Fleet',
-      badge: 'Commute Services',
-      image: '/images/school/school_bus.jpg',
-      icon: Bus,
-      desc: 'Dedicated institutional bus network serving regional routes with verified drivers and student escorts.',
-    },
-  ];
-
-  // Activities & Co-Curricular Photo Gallery
-  const activityGallery = [
-    {
-      title: 'Morning Campus Assembly',
-      tag: 'Discipline & Prayer',
-      image: '/images/school/school_assembly.jpg',
-      desc: 'Unified student morning assembly instilling patriotic values, moral thought, and institutional spirit.',
-    },
-    {
-      title: 'Athletic Sports & Box Leagues',
-      tag: 'Sports & Teamwork',
-      image: '/images/school/sports_ground.jpg',
-      desc: 'Competitive sports meets, football tournaments, and track championships.',
-    },
-    {
-      title: 'Creative Art & Studio Craft',
-      tag: 'Fine Arts Studio',
-      image: '/images/school/cultural_arts.jpg',
-      desc: 'Expressive painting, pottery, and sketching workshops cultivating aesthetic excellence.',
-    },
-    {
-      title: 'Interactive Classroom Debates',
-      tag: 'Scholastic Life',
-      image: '/images/school/hero_classroom.jpg',
-      desc: 'Socratic discussions and science demonstrations encouraging every student to speak and think critically.',
-    },
-  ];
-
-  // Why Choose Us Pillars inspired by St. Joseph's Public School
-  const whyChooseUsPillars = [
-    {
-      title: 'Dedicated & Qualified Faculty',
-      desc: 'Experienced educators with postgraduate and doctoral credentials, committed to pastoral care and personal mentoring.',
-    },
-    {
-      title: 'Values-Based Education & Discipline',
-      desc: 'Balancing CBSE benchmarked academics with timeless moral principles, civic responsibility, and mutual respect.',
-    },
-    {
-      title: 'Safe, Green & Nurturing Campus',
-      desc: 'A secure, serene, and clean environment where each student feels valued, safe, heard, and inspired.',
-    },
-    {
-      title: 'Holistic 360-Degree Growth',
-      desc: 'Active integration of co-curricular athletics, performing arts, and scientific inquiry alongside textbook studies.',
-    },
-    {
-      title: 'Verifiable Digital Credentials',
-      desc: 'Official anti-tamper student ID verification with cryptographic QR tokens for child safety and institutional transparency.',
-    },
-    {
-      title: 'Active Parent-Teacher Partnership',
-      desc: 'Dedicated portal communication, transparent academic evaluations, and responsive administrative desks.',
-    },
-  ];
+  const content = data?.content || {};
+  const highlights = data?.highlights?.filter((h: any) => h.isPublished) || [];
+  const facilities = data?.facilities?.filter((f: any) => f.isPublished) || [];
+  const academicPrograms = data?.academicPrograms || [];
+  const faculty = data?.faculty || [];
+  const achievements = data?.achievements?.filter((a: any) => a.isPublished) || [];
+  const testimonials = data?.testimonials?.filter((t: any) => t.isPublished) || [];
+  const latestNotices = data?.latestNotices || [];
+  const upcomingEvents = data?.upcomingEvents || [];
+  const galleryPhotos = data?.galleryPreview?.photos || [];
+  const galleryVideos = data?.galleryPreview?.videos || [];
+  const downloadableDocs = data?.downloadableDocs?.filter((d: any) => d.isPublished) || [];
 
   return (
     <div>
       {/* =========================================================================
-          SECTION 1 & 2: PHOTOGRAPHIC HERO BANNER (Full-Bleed Classroom Atmosphere)
+          SECTION 1: HERO BANNER (Full-Bleed Photographic Atmosphere & Primary CTAs)
           ========================================================================= */}
       <section className="ed-hero-photo-banner" aria-label="Welcome Banner">
-        {/* Realistic High-Resolution Classroom Photo */}
         <img
-          src="/images/school/hero_classroom.jpg"
+          src={content.heroImageUrl || '/images/school/hero_classroom.jpg'}
           alt={`${branding.schoolName} Active Classroom in Session`}
           className="ed-hero-bg-image"
           loading="eager"
         />
 
-        {/* Soft Contrast Gradient Overlay */}
         <div className="ed-hero-overlay" />
 
         <div className="ed-public-container">
           <div className="ed-hero-photo-content">
             <div className="ed-hero-eyebrow-badge">
               <Award size={15} style={{ color: 'var(--academic-gold-500)' }} />
-              <span>Welcome to {branding.schoolName}</span>
+              <span>{content.heroEyebrowBadge || `Welcome to ${branding.schoolName}`}</span>
             </div>
 
             <h1 className="ed-hero-photo-title">
-              Where Learning Inspires Every Possibility
+              {content.heroTitle || 'Where Learning Inspires Every Possibility'}
             </h1>
 
             <p className="ed-hero-photo-desc">
-              We nurture curious minds, encourage creativity, and help students build the knowledge and confidence to shape their future. Affiliated to CBSE, New Delhi (Code: {branding.code}).
+              {content.heroSubtitle ||
+                `We nurture curious minds, encourage creativity, and help students build the knowledge and confidence to shape their future. Affiliated to CBSE, New Delhi (Code: ${branding.code}).`}
             </p>
 
             <div className="ed-hero-photo-actions">
-              <Link to="/admissions" className="ed-btn-academic-gold">
-                <span>Admissions Open 2026–2027</span>
+              <Link to={content.heroCtaLink || '/admissions'} className="ed-btn-academic-gold">
+                <span>{content.heroCtaText || 'Admissions Open 2026–2027'}</span>
                 <ArrowRight size={17} />
               </Link>
 
               <Link to="/about" className="ed-btn-academic-forest">
-                <span>Explore Our School</span>
+                <span>{content.heroSecondaryCtaText || 'Explore Our School'}</span>
               </Link>
 
               <Link
@@ -228,26 +151,25 @@ export const HomePage: React.FC = () => {
       </section>
 
       {/* =========================================================================
-          SECTION 3: ABOUT OUR SCHOOL / "LET US TELL YOU OUR STORY"
-          Two-column composition with realistic campus building photograph
+          SECTION 2: ABOUT THE SCHOOL ("OUR STORY & HERITAGE")
           ========================================================================= */}
       <section className="ed-section-white">
         <div className="ed-public-container">
           <div className="ed-section-heading">
-            <span className="ed-section-eyebrow">About Our School</span>
-            <h2 className="ed-section-title">Let Us Tell You Our Story</h2>
+            <span className="ed-section-eyebrow">Institutional Profile</span>
+            <h2 className="ed-section-title">{content.aboutTitle || 'Let Us Tell You Our Story'}</h2>
             <div className="ed-section-rule" />
             <p className="ed-section-subtitle">
-              Founded on the belief that education is the bedrock of character, scientific inquiry, and societal welfare.
+              {content.aboutSubtitle ||
+                'Founded on the belief that education is the bedrock of character, scientific inquiry, and societal welfare.'}
             </p>
           </div>
 
           <div className="ed-story-grid">
-            {/* Real Campus Photograph Frame */}
             <div className="ed-photo-frame" style={{ height: '360px' }}>
               <img
-                src="/images/school/campus_building.jpg"
-                alt={`${branding.schoolName} Campus Building Exterior`}
+                src={content.aboutImageUrl || '/images/school/campus_building.jpg'}
+                alt={`${branding.schoolName} Campus Exterior`}
                 loading="lazy"
               />
               <div className="ed-photo-caption-tag">
@@ -255,7 +177,6 @@ export const HomePage: React.FC = () => {
               </div>
             </div>
 
-            {/* Authentic School Story Narrative */}
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
                 <Compass size={24} style={{ color: 'var(--color-primary)' }} />
@@ -264,13 +185,24 @@ export const HomePage: React.FC = () => {
                 </h3>
               </div>
 
-              <p style={{ fontSize: '0.94rem', color: 'var(--text-secondary)', lineHeight: 1.75, marginBottom: '14px' }}>
-                Established with a vision to deliver authentic, values-centered education, <strong>{branding.schoolName}</strong> stands as a sanctuary of disciplined learning and personal transformation. Drawing inspiration from dedicated educators and social pioneers, our campus creates an environment where young scholars flourish in character, intellect, and empathy.
-              </p>
-
-              <p style={{ fontSize: '0.94rem', color: 'var(--text-secondary)', lineHeight: 1.75, marginBottom: '20px' }}>
-                From our foundational kindergarten classrooms to pre-university senior secondary tracks, we uphold the Central Board of Secondary Education curriculum with structured formative assessments, modern laboratories, and individualized pastoral guidance.
-              </p>
+              {content.aboutStory ? (
+                <div style={{ fontSize: '0.94rem', color: 'var(--text-secondary)', lineHeight: 1.75, marginBottom: '20px' }}>
+                  {content.aboutStory.split('\n\n').map((para: string, idx: number) => (
+                    <p key={idx} style={{ marginBottom: '12px' }}>
+                      {para}
+                    </p>
+                  ))}
+                </div>
+              ) : (
+                <>
+                  <p style={{ fontSize: '0.94rem', color: 'var(--text-secondary)', lineHeight: 1.75, marginBottom: '14px' }}>
+                    Established with a vision to deliver authentic, values-centered education, <strong>{branding.schoolName}</strong> stands as a sanctuary of disciplined learning and personal transformation. Drawing inspiration from dedicated educators and social pioneers, our campus creates an environment where young scholars flourish in character, intellect, and empathy.
+                  </p>
+                  <p style={{ fontSize: '0.94rem', color: 'var(--text-secondary)', lineHeight: 1.75, marginBottom: '20px' }}>
+                    From our foundational primary classrooms to pre-university senior secondary tracks, we uphold the Central Board of Secondary Education curriculum with structured formative assessments, modern laboratories, and individualized pastoral guidance.
+                  </p>
+                </>
+              )}
 
               <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
                 <Link to="/about" className="ed-btn-academic-forest" style={{ padding: '9px 20px', fontSize: '0.88rem' }}>
@@ -286,95 +218,11 @@ export const HomePage: React.FC = () => {
       </section>
 
       {/* =========================================================================
-          SECTION 4: CAMPUS FACILITIES (Realistic Image-Led Grid)
-          ========================================================================= */}
-      <section className="ed-section-warm">
-        <div className="ed-public-container">
-          <div className="ed-section-heading">
-            <span className="ed-section-eyebrow">Campus Infrastructure</span>
-            <h2 className="ed-section-title">Our School Facilities</h2>
-            <div className="ed-section-rule" />
-            <p className="ed-section-subtitle">
-              Equipped with purposeful learning facilities that support intellectual discovery, athletic fitness, and student wellbeing.
-            </p>
-          </div>
-
-          <div className="ed-responsive-3col">
-            {facilitiesWithPhotos.map((fac, idx) => {
-              const FacIcon = fac.icon;
-              return (
-                <div key={idx} className="ed-facility-photo-card">
-                  {/* Real Facility Photograph */}
-                  <div className="ed-facility-photo-thumb">
-                    <img
-                      src={fac.image}
-                      alt={fac.title}
-                      loading="lazy"
-                    />
-                    <span className="ed-facility-photo-badge">
-                      {fac.badge}
-                    </span>
-                  </div>
-
-                  <div className="ed-facility-photo-body">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                      <FacIcon size={18} style={{ color: 'var(--color-primary)' }} />
-                      <h4 style={{ fontSize: '1.08rem', color: 'var(--text-primary)', margin: 0 }}>
-                        {fac.title}
-                      </h4>
-                    </div>
-                    <p style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: 1.6, flex: 1, marginTop: '4px' }}>
-                      {fac.desc}
-                    </p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* =========================================================================
-          SECTION 5: WHY CHOOSE US (Institutional Strengths)
-          ========================================================================= */}
-      <section className="ed-section-white">
-        <div className="ed-public-container">
-          <div className="ed-section-heading">
-            <span className="ed-section-eyebrow">Institutional Strengths</span>
-            <h2 className="ed-section-title">Why Choose {branding.schoolName}?</h2>
-            <div className="ed-section-rule" />
-            <p className="ed-section-subtitle">
-              Six core commitments that make our learning community a trusted choice for parents and students.
-            </p>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem' }}>
-            {whyChooseUsPillars.map((pillar, idx) => (
-              <div key={idx} className="ed-why-choose-item">
-                <div className="ed-why-choose-check">
-                  <Check size={16} />
-                </div>
-                <div>
-                  <h4 style={{ fontSize: '1rem', color: 'var(--text-primary)', marginBottom: '4px' }}>
-                    {pillar.title}
-                  </h4>
-                  <p style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: 1.55 }}>
-                    {pillar.desc}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* =========================================================================
-          SECTION 6: PRINCIPAL'S WELCOME DESK
+          SECTION 3: PRINCIPAL'S DESK & WELCOME MESSAGE
           ========================================================================= */}
       <section className="ed-section-warm">
         <div className="ed-public-container">
           <div className="ed-responsive-split">
-            {/* Principal Profile Box */}
             <div
               className="ed-card"
               style={{
@@ -401,16 +249,23 @@ export const HomePage: React.FC = () => {
                   fontFamily: 'var(--font-crest)',
                 }}
               >
-                AT
+                {content.principalName
+                  ? content.principalName
+                      .split(' ')
+                      .map((n: string) => n[0])
+                      .join('')
+                      .slice(0, 2)
+                  : 'AT'}
               </div>
+
               <h3 style={{ fontSize: '1.22rem', color: 'var(--text-primary)', marginBottom: '4px' }}>
-                Dr. Alistair Thorne
+                {content.principalName || 'Dr. Alistair Thorne'}
               </h3>
               <div style={{ fontSize: '0.84rem', color: 'var(--color-primary)', fontWeight: 700 }}>
-                Principal & Head of Faculty
+                {content.principalTitle || 'Principal & Head of Faculty'}
               </div>
               <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px', lineHeight: 1.4 }}>
-                Ph.D. in Applied Physics • 24 Years Academic Leadership
+                {content.principalQualification || 'Ph.D. in Applied Physics • 24 Years Academic Leadership'}
               </p>
               <div style={{ marginTop: 'var(--space-4)' }}>
                 <Link to="/principal-message" className="ed-btn-academic-forest" style={{ padding: '7px 16px', fontSize: '0.82rem' }}>
@@ -419,7 +274,6 @@ export const HomePage: React.FC = () => {
               </div>
             </div>
 
-            {/* Welcome Message Column */}
             <div>
               <div style={{ color: 'var(--color-primary)', fontWeight: 700, fontSize: '0.82rem', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>
                 From the Principal's Desk
@@ -428,7 +282,8 @@ export const HomePage: React.FC = () => {
                 "Education must awaken moral clarity as purposefully as intellectual skill."
               </h2>
               <p style={{ fontSize: '0.94rem', color: 'var(--text-secondary)', lineHeight: 1.7, marginBottom: 'var(--space-4)' }}>
-                At {branding.schoolName}, we consider each child a sacred trust. Our calling goes beyond preparing scholars for examinations; we guide them to cultivate sincere discipline, thoughtful observation, moral strength, and a spirit of service.
+                {content.principalMessageExcerpt ||
+                  `At ${branding.schoolName}, we consider each child a sacred trust. Our calling goes beyond preparing scholars for examinations; we guide them to cultivate sincere discipline, thoughtful observation, moral strength, and a spirit of service.`}
               </p>
               <p style={{ fontSize: '0.92rem', color: 'var(--text-secondary)', lineHeight: 1.7, marginBottom: 'var(--space-5)' }}>
                 We welcome parents to visit our campus, observe our classrooms, and join us in partnership for the holistic formation of our young scholars.
@@ -454,97 +309,32 @@ export const HomePage: React.FC = () => {
       </section>
 
       {/* =========================================================================
-          SECTION 7: ACADEMIC STAGES & CURRICULUM
+          SECTION 4: WHY CHOOSE OUR SCHOOL (INSTITUTIONAL PILLARS / HIGHLIGHTS)
           ========================================================================= */}
       <section className="ed-section-white">
         <div className="ed-public-container">
           <div className="ed-section-heading">
-            <span className="ed-section-eyebrow">Academic Progression</span>
-            <h2 className="ed-section-title">Academic Wings & Curriculum Stages</h2>
+            <span className="ed-section-eyebrow">Institutional Strengths</span>
+            <h2 className="ed-section-title">Why Choose {branding.schoolName}?</h2>
             <div className="ed-section-rule" />
             <p className="ed-section-subtitle">
-              Seamless curriculum progression from foundational early-childhood activity up to pre-university senior secondary excellence.
+              Core commitments that make our learning community a trusted choice for parents and students.
             </p>
           </div>
 
-          <div className="ed-responsive-3col">
-            {/* Primary Wing */}
-            <div className="ed-facility-photo-card" style={{ padding: '1.5rem' }}>
-              <span className="ed-facility-badge" style={{ backgroundColor: 'var(--bg-subtle)', color: 'var(--color-primary)', borderColor: 'var(--border-default)', alignSelf: 'flex-start' }}>
-                GRADES 1–5
-              </span>
-              <h4 style={{ fontSize: '1.15rem', color: 'var(--text-primary)', marginTop: '12px', marginBottom: '8px' }}>
-                Primary Wing: Foundations
-              </h4>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '16px' }}>
-                Interactive phonics, foundational mathematics, environmental observation, bilingual literacy, and cooperative social play.
-              </p>
-              <Link to="/academics" style={{ fontSize: '0.84rem', color: 'var(--color-primary)', fontWeight: 700, textDecoration: 'none', marginTop: 'auto' }}>
-                View Primary Syllabus →
-              </Link>
-            </div>
-
-            {/* Middle Wing */}
-            <div className="ed-facility-photo-card" style={{ padding: '1.5rem' }}>
-              <span className="ed-facility-badge" style={{ backgroundColor: 'rgba(196, 164, 107, 0.15)', color: 'var(--color-accent)', borderColor: 'var(--color-accent)', alignSelf: 'flex-start' }}>
-                GRADES 6–8
-              </span>
-              <h4 style={{ fontSize: '1.15rem', color: 'var(--text-primary)', marginTop: '12px', marginBottom: '8px' }}>
-                Middle Wing: Discovery
-              </h4>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '16px' }}>
-                Laboratory-driven introduction to physics, chemistry, biology, geometry, historical inquiry, and introductory computational logic.
-              </p>
-              <Link to="/academics" style={{ fontSize: '0.84rem', color: 'var(--color-primary)', fontWeight: 700, textDecoration: 'none', marginTop: 'auto' }}>
-                View Middle Wing Syllabus →
-              </Link>
-            </div>
-
-            {/* Senior Secondary Wing */}
-            <div className="ed-facility-photo-card" style={{ padding: '1.5rem' }}>
-              <span className="ed-facility-badge" style={{ backgroundColor: 'var(--bg-subtle)', color: 'var(--color-primary)', borderColor: 'var(--border-default)', alignSelf: 'flex-start' }}>
-                GRADES 9–12
-              </span>
-              <h4 style={{ fontSize: '1.15rem', color: 'var(--text-primary)', marginTop: '12px', marginBottom: '8px' }}>
-                Senior Wing: Pre-University
-              </h4>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '16px' }}>
-                Specialized academic tracks in Pure Science (Physics, Chem, Math, Bio) and Commerce with career counseling and exam mentoring.
-              </p>
-              <Link to="/academics" style={{ fontSize: '0.84rem', color: 'var(--color-primary)', fontWeight: 700, textDecoration: 'none', marginTop: 'auto' }}>
-                View Senior Secondary Tracks →
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* =========================================================================
-          SECTION 8: SCHOOL ACTIVITIES & VISUAL GALLERY
-          Photographic showcase of assemblies, sports, arts, and classrooms
-          ========================================================================= */}
-      <section className="ed-section-warm">
-        <div className="ed-public-container">
-          <div className="ed-section-heading">
-            <span className="ed-section-eyebrow">Life at {branding.schoolName}</span>
-            <h2 className="ed-section-title">Co-Curricular & Campus Activities</h2>
-            <div className="ed-section-rule" />
-            <p className="ed-section-subtitle">
-              From morning assemblies and competitive sports to fine arts and science inquiry — a vibrant campus life.
-            </p>
-          </div>
-
-          <div className="ed-activity-gallery-grid">
-            {activityGallery.map((item, idx) => (
-              <div key={idx} className="ed-gallery-card">
-                <img
-                  src={item.image}
-                  alt={item.title}
-                  loading="lazy"
-                />
-                <div className="ed-gallery-card-overlay">
-                  <span className="ed-gallery-tag">{item.tag}</span>
-                  <h4 className="ed-gallery-title">{item.title}</h4>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem' }}>
+            {highlights.map((pillar: any, idx: number) => (
+              <div key={pillar.id || idx} className="ed-why-choose-item">
+                <div className="ed-why-choose-check">
+                  <Check size={16} />
+                </div>
+                <div>
+                  <h4 style={{ fontSize: '1rem', color: 'var(--text-primary)', marginBottom: '4px' }}>
+                    {pillar.title}
+                  </h4>
+                  <p style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: 1.55 }}>
+                    {pillar.description}
+                  </p>
                 </div>
               </div>
             ))}
@@ -553,10 +343,245 @@ export const HomePage: React.FC = () => {
       </section>
 
       {/* =========================================================================
-          SECTION: LIVE CAMPUS NOTICES & UPCOMING EVENTS (PostgreSQL-Driven)
+          SECTION 5: ACADEMIC CURRICULUM WINGS & PROGRAMS
           ========================================================================= */}
-      {(liveNotices.length > 0 || liveEvents.length > 0) && (
-        <section style={{ padding: 'clamp(2.5rem, 5vw, 4rem) 0', backgroundColor: 'var(--academic-cream)' }}>
+      <section className="ed-section-warm">
+        <div className="ed-public-container">
+          <div className="ed-section-heading">
+            <span className="ed-section-eyebrow">Curriculum Progression</span>
+            <h2 className="ed-section-title">Academic Wings & Stages</h2>
+            <div className="ed-section-rule" />
+            <p className="ed-section-subtitle">
+              Structured developmental curriculum stages from foundational primary play to pre-university senior secondary tracks.
+            </p>
+          </div>
+
+          <div className="ed-responsive-3col">
+            {academicPrograms.map((prog: any, idx: number) => (
+              <div key={idx} className="ed-facility-photo-card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
+                <span className="ed-facility-badge" style={{ backgroundColor: 'var(--bg-subtle)', color: 'var(--color-primary)', borderColor: 'var(--border-default)', alignSelf: 'flex-start' }}>
+                  {prog.gradeRange}
+                </span>
+                <h4 style={{ fontSize: '1.15rem', color: 'var(--text-primary)', marginTop: '12px', marginBottom: '8px' }}>
+                  {prog.title}
+                </h4>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '16px', flex: 1 }}>
+                  {prog.description}
+                </p>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '14px' }}>
+                  <strong>Curriculum:</strong> {prog.curriculum}
+                </div>
+                <Link to="/academics" style={{ fontSize: '0.84rem', color: 'var(--color-primary)', fontWeight: 700, textDecoration: 'none' }}>
+                  View Syllabus & Tracks →
+                </Link>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* =========================================================================
+          SECTION 6: CAMPUS INFRASTRUCTURE & FACILITIES
+          ========================================================================= */}
+      <section className="ed-section-white">
+        <div className="ed-public-container">
+          <div className="ed-section-heading">
+            <span className="ed-section-eyebrow">Campus Infrastructure</span>
+            <h2 className="ed-section-title">World-Class Facilities</h2>
+            <div className="ed-section-rule" />
+            <p className="ed-section-subtitle">
+              Equipped with purposeful learning facilities that support intellectual discovery, athletic fitness, and student wellbeing.
+            </p>
+          </div>
+
+          <div className="ed-responsive-3col">
+            {facilities.slice(0, 6).map((fac: any, idx: number) => (
+              <div key={fac.id || idx} className="ed-facility-photo-card">
+                <div className="ed-facility-photo-thumb">
+                  <img
+                    src={fac.imageUrl || '/images/school/hero_classroom.jpg'}
+                    alt={fac.name}
+                    loading="lazy"
+                  />
+                  <span className="ed-facility-photo-badge">
+                    {fac.category}
+                  </span>
+                </div>
+
+                <div className="ed-facility-photo-body">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                    <Building size={18} style={{ color: 'var(--color-primary)' }} />
+                    <h4 style={{ fontSize: '1.08rem', color: 'var(--text-primary)', margin: 0 }}>
+                      {fac.name}
+                    </h4>
+                  </div>
+                  <p style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: 1.6, flex: 1, marginTop: '4px' }}>
+                    {fac.description}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ textAlign: 'center', marginTop: '2.5rem' }}>
+            <Link to="/gallery" className="ed-btn-academic-forest">
+              <span>View All Campus Facilities & Gallery →</span>
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* =========================================================================
+          SECTION 7 & 8: SMART CLASSROOMS, STEM LABORATORIES & ATHLETICS
+          ========================================================================= */}
+      <section className="ed-section-warm">
+        <div className="ed-public-container">
+          <div className="ed-responsive-split">
+            {/* STEM & Classrooms */}
+            <div className="ed-card ed-card-body">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                <Laptop size={22} style={{ color: 'var(--color-primary)' }} />
+                <span className="ed-badge ed-badge-info" style={{ fontSize: '0.72rem' }}>STEM & DIGITAL INNOVATION</span>
+              </div>
+              <h3 style={{ fontSize: '1.25rem', fontFamily: 'var(--font-crest)', marginBottom: '8px' }}>
+                {content.stemHeadline || 'Interactive Smart Classrooms & High-Tech Labs'}
+              </h3>
+              <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', lineHeight: 1.65, marginBottom: '16px' }}>
+                {content.stemDescription ||
+                  'Equipped with multi-touch interactive digital panels, high-precision science apparatus, and computational workstations to foster experiential reasoning and scientific mastery.'}
+              </p>
+              <div style={{ height: '180px', borderRadius: 'var(--radius-sm)', overflow: 'hidden' }}>
+                <img
+                  src="/images/school/science_lab.jpg"
+                  alt="Science Lab"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  loading="lazy"
+                />
+              </div>
+            </div>
+
+            {/* Athletics & Extracurriculars */}
+            <div className="ed-card ed-card-body">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                <Dumbbell size={22} style={{ color: 'var(--academic-gold-500)' }} />
+                <span className="ed-badge ed-badge-neutral" style={{ fontSize: '0.72rem' }}>ATHLETICS & PERFORMING ARTS</span>
+              </div>
+              <h3 style={{ fontSize: '1.25rem', fontFamily: 'var(--font-crest)', marginBottom: '8px' }}>
+                {content.athleticsHeadline || 'Comprehensive Sports, Track & Fine Arts'}
+              </h3>
+              <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', lineHeight: 1.65, marginBottom: '16px' }}>
+                {content.athleticsDescription ||
+                  'An all-weather 400m synthetic running track, turf football pitch, indoor badminton courts, and fine arts studio ensure every scholar discovers and hones their passions.'}
+              </p>
+              <div style={{ height: '180px', borderRadius: 'var(--radius-sm)', overflow: 'hidden' }}>
+                <img
+                  src="/images/school/sports_ground.jpg"
+                  alt="Sports Ground"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  loading="lazy"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* =========================================================================
+          SECTION 9: FACULTY & TEACHING STAFF HIGHLIGHTS
+          ========================================================================= */}
+      {faculty.length > 0 && (
+        <section className="ed-section-white">
+          <div className="ed-public-container">
+            <div className="ed-section-heading">
+              <span className="ed-section-eyebrow">Academic Mentors</span>
+              <h2 className="ed-section-title">Distinguished Teaching Faculty</h2>
+              <div className="ed-section-rule" />
+              <p className="ed-section-subtitle">
+                Passionate educators with postgraduate credentials, dedicated to individualized student growth and cognitive inquiry.
+              </p>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.5rem' }}>
+              {faculty.slice(0, 4).map((f: any) => (
+                <div key={f.id} className="ed-card" style={{ padding: '1.25rem', textAlign: 'center' }}>
+                  <div
+                    style={{
+                      width: '80px',
+                      height: '80px',
+                      borderRadius: '50%',
+                      margin: '0 auto 12px',
+                      overflow: 'hidden',
+                      backgroundColor: 'var(--bg-subtle)',
+                      border: '2px solid var(--border-default)',
+                    }}
+                  >
+                    <img
+                      src={f.photoUrl || '/images/school/hero_classroom.jpg'}
+                      alt={f.name}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                  </div>
+                  <h4 style={{ fontSize: '1.05rem', margin: '0 0 4px', color: 'var(--text-primary)' }}>{f.name}</h4>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--color-primary)', marginBottom: '2px' }}>
+                    {f.designation}
+                  </div>
+                  <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>{f.qualification}</div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ textAlign: 'center', marginTop: '2rem' }}>
+              <Link to="/faculty" style={{ color: 'var(--color-primary)', fontWeight: 700, fontSize: '0.9rem', textDecoration: 'none' }}>
+                Meet Full Academic Faculty & Mentors →
+              </Link>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* =========================================================================
+          SECTION 10: STUDENT HONORS & ACHIEVEMENTS
+          ========================================================================= */}
+      {achievements.length > 0 && (
+        <section className="ed-section-warm">
+          <div className="ed-public-container">
+            <div className="ed-section-heading">
+              <span className="ed-section-eyebrow">Excellence in Action</span>
+              <h2 className="ed-section-title">Student Honors & Achievements</h2>
+              <div className="ed-section-rule" />
+              <p className="ed-section-subtitle">
+                Celebrating exceptional student performance in national Olympiads, science fairs, sports leagues, and cultural contests.
+              </p>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.25rem' }}>
+              {achievements.map((ach: any) => (
+                <div key={ach.id} className="ed-card ed-card-body" style={{ display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                    <span className="ed-badge ed-badge-info" style={{ fontSize: '0.72rem' }}>
+                      {ach.academicYear}
+                    </span>
+                    <Trophy size={16} style={{ color: 'var(--academic-gold-500)' }} />
+                  </div>
+                  <h4 style={{ fontSize: '1.05rem', margin: '0 0 4px', color: 'var(--text-primary)' }}>{ach.title}</h4>
+                  <div style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--color-primary)', marginBottom: '6px' }}>
+                    {ach.studentName} {ach.competition ? `• ${ach.competition}` : ''}
+                  </div>
+                  <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.5, margin: 0 }}>
+                    {ach.description}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* =========================================================================
+          SECTION 11 & 12: LATEST NOTICES & UPCOMING EVENTS (PostgreSQL-Driven)
+          ========================================================================= */}
+      {(latestNotices.length > 0 || upcomingEvents.length > 0) && (
+        <section className="ed-section-white">
           <div className="ed-public-container">
             <div className="ed-section-heading">
               <span className="ed-section-eyebrow">Institutional Updates</span>
@@ -568,8 +593,8 @@ export const HomePage: React.FC = () => {
             </div>
 
             <div className="ed-responsive-split">
-              {/* Left Column: Official Notices */}
-              <div className="ed-card ed-card-body" style={{ height: 'fit-content' }}>
+              {/* Official Notices */}
+              <div className="ed-card ed-card-body">
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-3)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <Bell size={20} style={{ color: 'var(--color-primary)' }} />
@@ -581,27 +606,27 @@ export const HomePage: React.FC = () => {
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {liveNotices.map((n) => (
+                  {latestNotices.map((n: any) => (
                     <div key={n.id} style={{ borderBottom: '1px solid var(--border-default)', paddingBottom: '10px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                        <span className={`ed-badge ${n.isUrgent ? 'ed-badge-danger' : 'ed-badge-neutral'}`} style={{ fontSize: '0.68rem', padding: '1px 6px' }}>
-                          {n.badge}
+                        <span className={`ed-badge ${n.priority === 'URGENT' ? 'ed-badge-danger' : 'ed-badge-neutral'}`} style={{ fontSize: '0.68rem', padding: '1px 6px' }}>
+                          {n.priority}
                         </span>
-                        <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>{n.dateFormatted}</span>
+                        <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>{n.publishedAt}</span>
                       </div>
                       <div style={{ fontSize: '0.92rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
                         {n.title}
                       </div>
                       <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                        {n.summary}
+                        {n.content}
                       </div>
                     </div>
                   ))}
                 </div>
               </div>
 
-              {/* Right Column: Key Upcoming Events */}
-              <div className="ed-card ed-card-body" style={{ height: 'fit-content' }}>
+              {/* Upcoming Events */}
+              <div className="ed-card ed-card-body">
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-3)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <Calendar size={20} style={{ color: 'var(--color-primary)' }} />
@@ -613,13 +638,15 @@ export const HomePage: React.FC = () => {
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {liveEvents.map((ev) => (
+                  {upcomingEvents.map((ev: any) => (
                     <div key={ev.id} style={{ borderBottom: '1px solid var(--border-default)', paddingBottom: '10px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
                         <span className="ed-badge ed-badge-info" style={{ fontSize: '0.68rem', padding: '1px 6px' }}>
-                          {ev.category}
+                          {ev.category || 'School Event'}
                         </span>
-                        <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>{ev.dateFormatted}</span>
+                        <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                          {new Date(ev.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </span>
                       </div>
                       <div style={{ fontSize: '0.92rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
                         {ev.title}
@@ -637,20 +664,96 @@ export const HomePage: React.FC = () => {
       )}
 
       {/* =========================================================================
-          SECTION 9: ADMISSIONS CALLOUT BANNER
+          SECTION 13: PARENT TESTIMONIALS & COMMUNITY ENDORSEMENTS
+          ========================================================================= */}
+      {testimonials.length > 0 && (
+        <section className="ed-section-warm">
+          <div className="ed-public-container">
+            <div className="ed-section-heading">
+              <span className="ed-section-eyebrow">Parent Voices</span>
+              <h2 className="ed-section-title">What Our Parents Say</h2>
+              <div className="ed-section-rule" />
+              <p className="ed-section-subtitle">
+                Hear from parents about the holistic transformation, moral culture, and academic growth experienced by their children.
+              </p>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem' }}>
+              {testimonials.map((t: any) => (
+                <div key={t.id} className="ed-card ed-card-body" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div>
+                    <div style={{ display: 'flex', color: 'var(--academic-gold-500)', fontSize: '0.95rem', marginBottom: '8px' }}>
+                      {'★'.repeat(t.rating || 5)}
+                    </div>
+                    <p style={{ fontStyle: 'italic', fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: 1.65, margin: '0 0 12px' }}>
+                      "{t.content}"
+                    </p>
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '0.92rem', color: 'var(--text-primary)' }}>{t.parentName}</div>
+                    <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{t.studentRelation}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* =========================================================================
+          SECTION 14: PHOTO & VIDEO GALLERY PREVIEW
+          ========================================================================= */}
+      <section className="ed-section-white">
+        <div className="ed-public-container">
+          <div className="ed-section-heading">
+            <span className="ed-section-eyebrow">Life at {branding.schoolName}</span>
+            <h2 className="ed-section-title">Campus Photography & Video Moments</h2>
+            <div className="ed-section-rule" />
+            <p className="ed-section-subtitle">
+              From morning assemblies and athletic track meets to fine arts exhibitions and science discoveries.
+            </p>
+          </div>
+
+          <div className="ed-activity-gallery-grid">
+            {galleryPhotos.slice(0, 4).map((p: any) => (
+              <Link to="/gallery" key={p.id} className="ed-gallery-card">
+                <img
+                  src={p.thumbnailUrl || p.mediaUrl || '/images/school/hero_classroom.jpg'}
+                  alt={p.title}
+                  loading="lazy"
+                />
+                <div className="ed-gallery-card-overlay">
+                  <span className="ed-gallery-tag">Photo Album</span>
+                  <h4 className="ed-gallery-title">{p.title}</h4>
+                </div>
+              </Link>
+            ))}
+          </div>
+
+          <div style={{ textAlign: 'center', marginTop: '2.5rem' }}>
+            <Link to="/gallery" className="ed-btn-academic-gold">
+              <span>Explore Complete Photo & Video Gallery →</span>
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* =========================================================================
+          SECTION 15: ADMISSIONS OPEN NOTICE & CALLOUT
           ========================================================================= */}
       <section style={{ padding: 'clamp(2.5rem, 5vw, 4rem) 0', backgroundColor: 'var(--academic-warm-white)' }}>
         <div className="ed-public-container">
           <div className="ed-admissions-banner">
             <div>
               <div style={{ fontSize: '0.82rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--academic-gold-500)', fontWeight: 700, marginBottom: '6px' }}>
-                Enrolling for Academic Session 2026–2027
+                Enrolling for Academic Session {content.admissionSession || '2026–2027'}
               </div>
               <h2 style={{ fontFamily: 'var(--font-crest)', fontSize: 'clamp(1.5rem, 3vw, 2.2rem)', color: '#ffffff', marginBottom: '8px' }}>
-                Join the {branding.schoolName} Family
+                {content.admissionNoticeTitle || `Join the ${branding.schoolName} Family`}
               </h2>
               <p style={{ fontSize: '0.94rem', color: '#cbd5e1', maxWidth: '580px', lineHeight: 1.6 }}>
-                Applications are open for Pre-Primary through Grade 11. Complete our transparent online application or schedule an orientation visit with our admissions committee.
+                {content.admissionNoticeDesc ||
+                  'Applications are open for Pre-Primary through Grade 11. Complete our transparent online application or schedule an orientation visit with our admissions committee.'}
               </p>
             </div>
 
@@ -662,6 +765,152 @@ export const HomePage: React.FC = () => {
               <Link to="/contact" style={{ backgroundColor: 'rgba(255,255,255,0.1)', color: '#ffffff', border: '1px solid rgba(255,255,255,0.3)', padding: '12px 22px', borderRadius: 'var(--radius-sm)', textDecoration: 'none', fontWeight: 600, fontSize: '0.94rem' }}>
                 Campus Inquiries
               </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* =========================================================================
+          SECTION 16: DOWNLOAD ADMISSION FORMS & PROSPECTUS
+          ========================================================================= */}
+      {downloadableDocs.length > 0 && (
+        <section className="ed-section-white">
+          <div className="ed-public-container">
+            <div className="ed-section-heading">
+              <span className="ed-section-eyebrow">Official Resources</span>
+              <h2 className="ed-section-title">Download Admission Documents & Circulars</h2>
+              <div className="ed-section-rule" />
+              <p className="ed-section-subtitle">
+                Download printable PDF application forms, prospectus, academic curriculum guides, and fee schedules.
+              </p>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+              {downloadableDocs.map((doc: any) => (
+                <div key={doc.id} className="ed-card ed-card-body" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div
+                      style={{
+                        width: '42px',
+                        height: '42px',
+                        borderRadius: '6px',
+                        backgroundColor: 'var(--bg-subtle)',
+                        color: 'var(--color-primary)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <FileText size={22} />
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: '0.92rem', color: 'var(--text-primary)' }}>{doc.title}</div>
+                      <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+                        {doc.fileType} • {doc.fileSize}
+                      </div>
+                    </div>
+                  </div>
+
+                  <a
+                    href={doc.fileUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    download
+                    className="ed-btn-academic-forest"
+                    style={{ padding: '6px 14px', fontSize: '0.8rem', flexShrink: 0, textDecoration: 'none' }}
+                  >
+                    <Download size={13} style={{ marginRight: '4px' }} />
+                    <span>Download</span>
+                  </a>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* =========================================================================
+          SECTION 17: CONTACT INFORMATION & CAMPUS LOCATION
+          ========================================================================= */}
+      <section className="ed-section-warm" style={{ borderTop: '1px solid var(--border-default)' }}>
+        <div className="ed-public-container">
+          <div className="ed-section-heading">
+            <span className="ed-section-eyebrow">Connect With Us</span>
+            <h2 className="ed-section-title">Visit Our Campus & Inquiries</h2>
+            <div className="ed-section-rule" />
+            <p className="ed-section-subtitle">
+              We welcome prospective families for campus tours and admissions counseling during official institutional hours.
+            </p>
+          </div>
+
+          <div className="ed-responsive-split">
+            {/* Contact Details Card */}
+            <div className="ed-card ed-card-body">
+              <h3 style={{ fontSize: '1.15rem', marginBottom: 'var(--space-4)', fontFamily: 'var(--font-crest)' }}>
+                Campus Contact Information
+              </h3>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                  <MapPin size={20} style={{ color: 'var(--color-primary)', flexShrink: 0, marginTop: '2px' }} />
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: '0.88rem' }}>Campus Address</div>
+                    <div style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                      {branding.address}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                  <Phone size={20} style={{ color: 'var(--color-primary)', flexShrink: 0, marginTop: '2px' }} />
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: '0.88rem' }}>Admissions Helpline</div>
+                    <div style={{ fontSize: '0.84rem', color: 'var(--text-secondary)' }}>
+                      {branding.contactPhone}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                  <Mail size={20} style={{ color: 'var(--color-primary)', flexShrink: 0, marginTop: '2px' }} />
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: '0.88rem' }}>Inquiry Email</div>
+                    <div style={{ fontSize: '0.84rem', color: 'var(--text-secondary)' }}>
+                      {branding.contactEmail}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                  <Clock size={20} style={{ color: 'var(--color-primary)', flexShrink: 0, marginTop: '2px' }} />
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: '0.88rem' }}>Campus Visiting Hours</div>
+                    <div style={{ fontSize: '0.84rem', color: 'var(--text-secondary)' }}>
+                      Monday – Saturday: 8:00 AM – 4:00 PM
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ marginTop: '20px' }}>
+                <Link to="/contact" className="ed-btn-academic-forest" style={{ width: '100%', textAlign: 'center', display: 'block', textDecoration: 'none' }}>
+                  Send an Inquiry Message →
+                </Link>
+              </div>
+            </div>
+
+            {/* Interactive Campus Map View */}
+            <div className="ed-card" style={{ overflow: 'hidden', height: '100%', minHeight: '320px', position: 'relative' }}>
+              <iframe
+                title="School Campus Location Map"
+                src="https://maps.google.com/maps?q=Sector%2014,%20Institutional%20Area,%20New%20Delhi&t=&z=13&ie=UTF8&iwloc=&output=embed"
+                width="100%"
+                height="100%"
+                style={{ border: 0, minHeight: '320px' }}
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+              />
             </div>
           </div>
         </div>

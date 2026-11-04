@@ -333,3 +333,4 @@ describe('SUPER ADMIN: School Admin Onboarding, Invitation & Activation Test Sui
     expect(dupRes.body.error.code).toBe('DUPLICATE_SCHOOL_ADMIN');
   });
 });
+

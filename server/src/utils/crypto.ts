@@ -12,6 +12,8 @@ export interface TokenPayload {
   studentProfileId?: string;
   staffProfileId?: string;
   guardianStudentIds?: string[]; // IDs of children authorized for parent access
+  mustChangePassword?: boolean;
+  tokenVersion?: number;
 }
 
 export async function hashPassword(plainText: string): Promise<string> {

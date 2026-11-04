@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import { prisma } from '../../config/db.js';
 import { AppError } from '../../middleware/errorHandler.js';
-import { PlatformRole, PlatformRoleType } from '@edunexa/shared';
+import { PlatformRole, PlatformRoleType, BulkActionResponse, BulkItemResult } from '@edunexa/shared';
 import { hashPassword } from '../../utils/crypto.js';
 import { emailService } from '../../services/email.service.js';
 
@@ -742,6 +742,625 @@ export class AccountProvisioningService {
       schoolId,
       isActive,
       role: membership.role,
+    };
+  }
+
+  /**
+   * Generates a cryptographically secure 14-character temporary password
+   */
+  generateSecureTemporaryPassword(): string {
+    const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+    const lower = 'abcdefghijkmnopqrstuvwxyz';
+    const digits = '23456789';
+    const special = '!@#$%^&*';
+
+    let pass = '';
+    pass += upper[crypto.randomInt(0, upper.length)];
+    pass += lower[crypto.randomInt(0, lower.length)];
+    pass += digits[crypto.randomInt(0, digits.length)];
+    pass += special[crypto.randomInt(0, special.length)];
+
+    const allChars = upper + lower + digits + special;
+    for (let i = 4; i < 14; i++) {
+      pass += allChars[crypto.randomInt(0, allChars.length)];
+    }
+
+    return pass
+      .split('')
+      .sort(() => crypto.randomInt(0, 3) - 1)
+      .join('');
+  }
+
+  /**
+   * Lists all user accounts and memberships within a school tenant with multi-criteria filtering
+   */
+  async listTenantUsers(
+    schoolIdOrSlug: string,
+    filters: { role?: string; search?: string; status?: string; page?: number; limit?: number } = {}
+  ) {
+    const school = await prisma.school.findFirst({
+      where: {
+        OR: [{ id: schoolIdOrSlug }, { slug: schoolIdOrSlug }, { code: schoolIdOrSlug }],
+      },
+    });
+    const schoolId = school ? school.id : schoolIdOrSlug;
+
+    const where: any = { schoolId };
+
+    if (filters.role && filters.role !== 'ALL') {
+      where.role = filters.role;
+    }
+
+    if (filters.search && filters.search.trim()) {
+      const q = filters.search.trim();
+      where.user = {
+        OR: [
+          { firstName: { contains: q, mode: 'insensitive' } },
+          { lastName: { contains: q, mode: 'insensitive' } },
+          { email: { contains: q, mode: 'insensitive' } },
+          { username: { contains: q, mode: 'insensitive' } },
+        ],
+      };
+    }
+
+    if (filters.status && filters.status !== 'ALL') {
+      const st = filters.status.toUpperCase();
+      if (st === 'ACTIVE') {
+        where.isActive = true;
+        where.user = {
+          ...where.user,
+          isActive: true,
+          accountLocked: false,
+        };
+      } else if (st === 'INACTIVE' || st === 'SUSPENDED') {
+        where.OR = [
+          { isActive: false },
+          { user: { isActive: false } },
+        ];
+      } else if (st === 'LOCKED') {
+        where.user = {
+          ...where.user,
+          accountLocked: true,
+        };
+      } else if (st === 'MUST_CHANGE_PASSWORD') {
+        where.user = {
+          ...where.user,
+          mustChangePassword: true,
+        };
+      }
+    }
+
+    const page = Math.max(1, Number(filters.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(filters.limit) || 20));
+    const skip = (page - 1) * limit;
+
+    const [total, memberships] = await Promise.all([
+      prisma.userMembership.count({ where }),
+      prisma.userMembership.findMany({
+        where,
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              username: true,
+              firstName: true,
+              lastName: true,
+              phone: true,
+              avatarUrl: true,
+              isActive: true,
+              accountLocked: true,
+              failedLoginAttempts: true,
+              lockoutUntil: true,
+              mustChangePassword: true,
+              passwordResetAt: true,
+              passwordChangedAt: true,
+              createdAt: true,
+            },
+          },
+          studentProfile: {
+            select: {
+              id: true,
+              admissionNumber: true,
+              status: true,
+            },
+          },
+          staffProfile: {
+            select: {
+              id: true,
+              employeeId: true,
+              designation: true,
+              employmentStatus: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+    ]);
+
+    const users = memberships.map((m) => {
+      const isLocked = m.user.accountLocked || Boolean(m.user.lockoutUntil && new Date() < m.user.lockoutUntil);
+      return {
+        id: m.user.id,
+        membershipId: m.id,
+        schoolId: m.schoolId,
+        email: m.user.email,
+        username: m.user.username,
+        firstName: m.user.firstName,
+        lastName: m.user.lastName,
+        name: `${m.user.firstName} ${m.user.lastName}`.trim(),
+        phone: m.user.phone,
+        avatarUrl: m.user.avatarUrl,
+        role: m.role,
+        isActive: m.isActive && m.user.isActive,
+        accountLocked: isLocked,
+        failedLoginAttempts: m.user.failedLoginAttempts,
+        lockoutUntil: m.user.lockoutUntil,
+        mustChangePassword: m.user.mustChangePassword,
+        passwordResetAt: m.user.passwordResetAt,
+        passwordChangedAt: m.user.passwordChangedAt,
+        createdAt: m.user.createdAt,
+        studentProfile: m.studentProfile,
+        staffProfile: m.staffProfile,
+      };
+    });
+
+    return {
+      users,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  /**
+   * Administrator resets a user's password directly with PostgreSQL persistence
+   * Supports temporary password generation or manual specification, marks mustChangePassword,
+   * invalidates prior sessions, and records audit log.
+   */
+  async adminResetPassword(params: {
+    schoolId?: string;
+    targetUserId: string;
+    temporaryPassword?: string;
+    mustChangePassword?: boolean;
+    actingUserId?: string;
+    actingUserRole: PlatformRoleType;
+    reason?: string;
+  }) {
+    const school = params.schoolId
+      ? await prisma.school.findFirst({
+          where: {
+            OR: [{ id: params.schoolId }, { slug: params.schoolId }, { code: params.schoolId }],
+          },
+        })
+      : null;
+    const targetSchoolId = school ? school.id : params.schoolId;
+
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { id: params.targetUserId },
+          { email: params.targetUserId },
+        ],
+      },
+      include: {
+        memberships: {
+          include: {
+            school: true,
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      throw new AppError('Target user account not found.', 404, 'USER_NOT_FOUND');
+    }
+
+    // Role and tenant authorization boundaries
+    let targetMembership = user.memberships[0];
+
+    if (params.actingUserRole !== PlatformRole.SUPER_ADMIN) {
+      if (!targetSchoolId) {
+        throw new AppError('School tenant ID is required to reset user password.', 400, 'MISSING_SCHOOL_ID');
+      }
+
+      const match = user.memberships.find((m) => m.schoolId === targetSchoolId);
+      if (!match) {
+        throw new AppError('User not found within your school tenant.', 404, 'USER_NOT_FOUND');
+      }
+      targetMembership = match;
+
+      // Prevent resetting platform Super Admin accounts
+      const hasSuperAdminRole = user.memberships.some((m) => m.role === PlatformRole.SUPER_ADMIN);
+      if (hasSuperAdminRole) {
+        throw new AppError('School administrators cannot reset passwords for platform Super Admin accounts.', 403, 'FORBIDDEN_OPERATION');
+      }
+
+      // Principal cannot reset School Admin
+      if (params.actingUserRole === PlatformRole.PRINCIPAL && targetMembership.role === PlatformRole.SCHOOL_ADMIN) {
+        throw new AppError('Principals cannot reset passwords for School Administrators.', 403, 'FORBIDDEN_OPERATION');
+      }
+    } else if (targetSchoolId) {
+      const match = user.memberships.find((m) => m.schoolId === targetSchoolId);
+      if (match) targetMembership = match;
+    }
+
+    const rawPassword = params.temporaryPassword?.trim() || this.generateSecureTemporaryPassword();
+    this.validatePasswordStrength(rawPassword);
+    const newPasswordHash = await hashPassword(rawPassword);
+
+    const actingDbUser = params.actingUserId
+      ? await prisma.user.findFirst({
+          where: {
+            OR: [
+              { id: params.actingUserId },
+              { email: params.actingUserId },
+            ],
+          },
+        })
+      : null;
+
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: user.id },
+        data: {
+          passwordHash: newPasswordHash,
+          mustChangePassword: params.mustChangePassword !== false,
+          passwordResetAt: new Date(),
+          accountLocked: false,
+          failedLoginAttempts: 0,
+          lockoutUntil: null,
+          tokenVersion: { increment: 1 },
+        },
+      });
+
+      // Revoke any pending self-service password reset tokens
+      await tx.passwordResetToken.updateMany({
+        where: {
+          userId: user.id,
+          usedAt: null,
+          revokedAt: null,
+        },
+        data: {
+          revokedAt: new Date(),
+        },
+      });
+
+      // Record audit log without plaintext password
+      await tx.auditLog.create({
+        data: {
+          schoolId: targetSchoolId || user.memberships[0]?.schoolId || null,
+          userId: actingDbUser ? actingDbUser.id : null,
+          action: 'ADMIN_PASSWORD_RESET',
+          entityType: 'USER_ACCOUNT',
+          entityId: user.id,
+          details: {
+            targetUserEmail: user.email,
+            targetRole: targetMembership?.role,
+            resetByRole: params.actingUserRole,
+            mustChangePassword: params.mustChangePassword !== false,
+            reason: params.reason || 'Password reset by administrator',
+            timestamp: new Date().toISOString(),
+          },
+        },
+      });
+    });
+
+    return {
+      success: true,
+      message: 'Password has been reset successfully.',
+      temporaryPassword: rawPassword,
+      mustChangePassword: params.mustChangePassword !== false,
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: targetMembership?.role,
+      },
+    };
+  }
+
+  /**
+   * Unlocks a locked user account and clears failed login counters
+   */
+  async adminUnlockAccount(params: {
+    schoolId?: string;
+    targetUserId: string;
+    actingUserId?: string;
+    actingUserRole: PlatformRoleType;
+    reason?: string;
+  }) {
+    const school = params.schoolId
+      ? await prisma.school.findFirst({
+          where: {
+            OR: [{ id: params.schoolId }, { slug: params.schoolId }, { code: params.schoolId }],
+          },
+        })
+      : null;
+    const targetSchoolId = school ? school.id : params.schoolId;
+
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { id: params.targetUserId },
+          { email: params.targetUserId },
+        ],
+      },
+      include: {
+        memberships: true,
+      },
+    });
+
+    if (!user) {
+      throw new AppError('Target user account not found.', 404, 'USER_NOT_FOUND');
+    }
+
+    if (params.actingUserRole !== PlatformRole.SUPER_ADMIN) {
+      if (!targetSchoolId) {
+        throw new AppError('School tenant ID is required.', 400, 'MISSING_SCHOOL_ID');
+      }
+      const tenantMembership = user.memberships.find((m) => m.schoolId === targetSchoolId);
+      if (!tenantMembership) {
+        throw new AppError('User not found within your school tenant.', 404, 'USER_NOT_FOUND');
+      }
+      if (user.memberships.some((m) => m.role === PlatformRole.SUPER_ADMIN)) {
+        throw new AppError('School administrators cannot modify platform Super Admin accounts.', 403, 'FORBIDDEN_OPERATION');
+      }
+    }
+
+    const actingDbUser = params.actingUserId
+      ? await prisma.user.findFirst({
+          where: {
+            OR: [
+              { id: params.actingUserId },
+              { email: params.actingUserId },
+            ],
+          },
+        })
+      : null;
+
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: user.id },
+        data: {
+          accountLocked: false,
+          failedLoginAttempts: 0,
+          lockoutUntil: null,
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          schoolId: targetSchoolId || user.memberships[0]?.schoolId || null,
+          userId: actingDbUser ? actingDbUser.id : null,
+          action: 'ADMIN_UNLOCK_ACCOUNT',
+          entityType: 'USER_ACCOUNT',
+          entityId: user.id,
+          details: {
+            targetUserEmail: user.email,
+            unlockedByRole: params.actingUserRole,
+            reason: params.reason || 'Account unlocked by administrator',
+            timestamp: new Date().toISOString(),
+          },
+        },
+      });
+    });
+
+    return {
+      success: true,
+      message: 'Account unlocked successfully.',
+      user: {
+        id: user.id,
+        email: user.email,
+        accountLocked: false,
+      },
+    };
+  }
+
+  /**
+   * Universal Bulk Operations for User Accounts in a School Tenant
+   */
+  async bulkUserAccountActions(params: {
+    schoolId: string;
+    userIds: string[];
+    action: 'ACTIVATE' | 'DEACTIVATE' | 'UNLOCK' | 'RESET_PASSWORD';
+    actingUserId?: string;
+    actingUserRole: PlatformRoleType;
+    reason?: string;
+  }): Promise<BulkActionResponse> {
+    const results: BulkItemResult[] = [];
+    let processedCount = 0;
+    let failedCount = 0;
+
+    for (const userId of params.userIds) {
+      try {
+        switch (params.action) {
+          case 'ACTIVATE': {
+            await this.updateAccountStatus(params.schoolId, userId, true, params.actingUserId || 'admin', params.reason);
+            results.push({ id: userId, success: true, message: 'Account activated.' });
+            processedCount++;
+            break;
+          }
+          case 'DEACTIVATE': {
+            await this.updateAccountStatus(params.schoolId, userId, false, params.actingUserId || 'admin', params.reason);
+            results.push({ id: userId, success: true, message: 'Account deactivated.' });
+            processedCount++;
+            break;
+          }
+          case 'UNLOCK': {
+            await this.adminUnlockAccount({
+              schoolId: params.schoolId,
+              targetUserId: userId,
+              actingUserId: params.actingUserId,
+              actingUserRole: params.actingUserRole,
+              reason: params.reason,
+            });
+            results.push({ id: userId, success: true, message: 'Account unlocked.' });
+            processedCount++;
+            break;
+          }
+          case 'RESET_PASSWORD': {
+            await this.adminResetPassword({
+              schoolId: params.schoolId,
+              targetUserId: userId,
+              mustChangePassword: true,
+              actingUserId: params.actingUserId,
+              actingUserRole: params.actingUserRole,
+              reason: params.reason,
+            });
+            results.push({
+              id: userId,
+              success: true,
+              message: 'Password reset and temporary password generated.',
+            });
+            processedCount++;
+            break;
+          }
+          default:
+            results.push({ id: userId, success: false, message: `Unsupported action: '${params.action}'.` });
+            failedCount++;
+        }
+      } catch (err: any) {
+        results.push({ id: userId, success: false, message: err.message || 'Error processing action.' });
+        failedCount++;
+      }
+    }
+
+    return {
+      success: failedCount === 0 || processedCount > 0,
+      action: params.action,
+      processedCount,
+      failedCount,
+      totalRequested: params.userIds.length,
+      results,
+    };
+  }
+
+  /**
+   * Super Admin lists accounts across all school tenants with cross-tenant search and role filters
+   */
+  async listSuperAdminAccounts(
+    filters: { search?: string; schoolId?: string; role?: string; status?: string; page?: number; limit?: number } = {}
+  ) {
+    const where: any = {};
+
+    if (filters.schoolId && filters.schoolId !== 'ALL') {
+      const school = await prisma.school.findFirst({
+        where: {
+          OR: [{ id: filters.schoolId }, { slug: filters.schoolId }, { code: filters.schoolId }],
+        },
+      });
+      where.schoolId = school ? school.id : filters.schoolId;
+    }
+
+    if (filters.role && filters.role !== 'ALL') {
+      where.role = filters.role;
+    }
+
+    if (filters.search && filters.search.trim()) {
+      const q = filters.search.trim();
+      where.OR = [
+        { user: { firstName: { contains: q, mode: 'insensitive' } } },
+        { user: { lastName: { contains: q, mode: 'insensitive' } } },
+        { user: { email: { contains: q, mode: 'insensitive' } } },
+        { user: { username: { contains: q, mode: 'insensitive' } } },
+        { school: { name: { contains: q, mode: 'insensitive' } } },
+      ];
+    }
+
+    if (filters.status && filters.status !== 'ALL') {
+      const st = filters.status.toUpperCase();
+      if (st === 'ACTIVE') {
+        where.isActive = true;
+        where.user = { isActive: true, accountLocked: false };
+      } else if (st === 'INACTIVE') {
+        where.OR = [{ isActive: false }, { user: { isActive: false } }];
+      } else if (st === 'LOCKED') {
+        where.user = { accountLocked: true };
+      }
+    }
+
+    const page = Math.max(1, Number(filters.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(filters.limit) || 20));
+    const skip = (page - 1) * limit;
+
+    const [total, memberships] = await Promise.all([
+      prisma.userMembership.count({ where }),
+      prisma.userMembership.findMany({
+        where,
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              username: true,
+              firstName: true,
+              lastName: true,
+              phone: true,
+              avatarUrl: true,
+              isActive: true,
+              accountLocked: true,
+              failedLoginAttempts: true,
+              lockoutUntil: true,
+              mustChangePassword: true,
+              passwordResetAt: true,
+              passwordChangedAt: true,
+              createdAt: true,
+            },
+          },
+          school: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              status: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+    ]);
+
+    const users = memberships.map((m) => {
+      const isLocked = m.user.accountLocked || Boolean(m.user.lockoutUntil && new Date() < m.user.lockoutUntil);
+      return {
+        id: m.user.id,
+        membershipId: m.id,
+        schoolId: m.schoolId,
+        schoolName: m.school?.name,
+        schoolSlug: m.school?.slug,
+        schoolStatus: m.school?.status,
+        email: m.user.email,
+        username: m.user.username,
+        firstName: m.user.firstName,
+        lastName: m.user.lastName,
+        name: `${m.user.firstName} ${m.user.lastName}`.trim(),
+        phone: m.user.phone,
+        avatarUrl: m.user.avatarUrl,
+        role: m.role,
+        isActive: m.isActive && m.user.isActive,
+        accountLocked: isLocked,
+        failedLoginAttempts: m.user.failedLoginAttempts,
+        lockoutUntil: m.user.lockoutUntil,
+        mustChangePassword: m.user.mustChangePassword,
+        passwordResetAt: m.user.passwordResetAt,
+        passwordChangedAt: m.user.passwordChangedAt,
+        createdAt: m.user.createdAt,
+      };
+    });
+
+    return {
+      users,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
     };
   }
 }

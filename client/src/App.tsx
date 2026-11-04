@@ -12,6 +12,7 @@ import { LoginPage } from './modules/auth/LoginPage.js';
 import { RegisterPage } from './modules/auth/RegisterPage.js';
 import { ResetPasswordPage } from './modules/auth/ResetPasswordPage.js';
 import { AccountActivationPage } from './modules/auth/AccountActivationPage.js';
+import { ChangePasswordPage } from './modules/auth/ChangePasswordPage.js';
 import { PublicIdCardVerification } from './modules/public/PublicIdCardVerification.js';
 
 // Public School Website Subpages
@@ -36,6 +37,7 @@ import { SubscriptionsPage } from './modules/superadmin/SubscriptionsPage.js';
 import { AuditLogsPage } from './modules/superadmin/AuditLogsPage.js';
 import { PlatformSettingsPage } from './modules/superadmin/PlatformSettingsPage.js';
 import { SchoolOverviewPage } from './modules/schooladmin/SchoolOverviewPage.js';
+import { UserManagementPage } from './modules/schooladmin/UserManagementPage.js';
 import { StudentDirectoryPage } from './modules/schooladmin/StudentDirectoryPage.js';
 import { StudentDossierPage } from './modules/schooladmin/StudentDossierPage.js';
 import { AdmissionsQueuePage } from './modules/schooladmin/AdmissionsQueuePage.js';
@@ -44,6 +46,7 @@ import { VirtualIdCardsPage } from './modules/schooladmin/VirtualIdCardsPage.js'
 import { DailyAttendancePage } from './modules/schooladmin/DailyAttendancePage.js';
 import { FeesInvoicesPage } from './modules/schooladmin/FeesInvoicesPage.js';
 import { EventsNoticesPage } from './modules/schooladmin/EventsNoticesPage.js';
+import { WebsiteCmsPage } from './modules/schooladmin/WebsiteCmsPage.js';
 import { TeacherDashboard } from './modules/teacher/TeacherDashboard.js';
 import { TeacherSchedulePage } from './modules/teacher/TeacherSchedulePage.js';
 import { TeacherAttendancePage } from './modules/teacher/TeacherAttendancePage.js';
@@ -117,6 +120,14 @@ export const App: React.FC = () => {
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/activate" element={<AccountActivationPage />} />
         <Route path="/auth/activate" element={<AccountActivationPage />} />
+        <Route
+          path="/change-password"
+          element={
+            <ProtectedRoute>
+              <ChangePasswordPage />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/verify-id" element={<PublicIdCardVerification />} />
         <Route path="/verify-id/:token" element={<PublicIdCardVerification />} />
 
@@ -149,6 +160,8 @@ export const App: React.FC = () => {
           }
         >
           <Route path="/admin" element={<SchoolOverviewPage />} />
+          <Route path="/admin/users" element={<UserManagementPage />} />
+          <Route path="/admin/accounts" element={<Navigate to="/admin/users" replace />} />
           <Route path="/admin/students" element={<StudentDirectoryPage />} />
           <Route path="/admin/students/:id" element={<StudentDossierPage />} />
           <Route path="/admin/admissions" element={<AdmissionsQueuePage />} />
@@ -160,6 +173,8 @@ export const App: React.FC = () => {
           <Route path="/admin/finance" element={<Navigate to="/admin/fees" replace />} />
           <Route path="/admin/events-notices" element={<EventsNoticesPage />} />
           <Route path="/admin/notices" element={<Navigate to="/admin/events-notices" replace />} />
+          <Route path="/admin/website" element={<WebsiteCmsPage />} />
+          <Route path="/admin/cms" element={<Navigate to="/admin/website" replace />} />
         </Route>
 
         {/* Teacher Workspace */}

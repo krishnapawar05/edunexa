@@ -51,6 +51,13 @@ const envSchema = z.object({
     }
     return 'info';
   }),
+  RAZORPAY_KEY_ID: z.string().optional().transform((val) => (val && val.trim() ? val.trim() : 'rzp_test_placeholder')),
+  RAZORPAY_KEY_SECRET: z.string().optional().transform((val) => (val && val.trim() ? val.trim() : 'rzp_test_secret_placeholder')),
+  RAZORPAY_WEBHOOK_SECRET: z.string().optional().transform((val) => (val && val.trim() ? val.trim() : 'rzp_webhook_secret_placeholder')),
+  RAZORPAY_MODE: z.string().optional().transform((val) => {
+    if (val && val.trim().toLowerCase() === 'live') return 'live';
+    return 'test';
+  }),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);
@@ -71,6 +78,10 @@ export interface AppConfig {
   aiProviderApiKey: string;
   aiProviderModel: string;
   logLevel: string;
+  razorpayKeyId: string;
+  razorpayKeySecret: string;
+  razorpayWebhookSecret: string;
+  razorpayMode: 'test' | 'live';
 }
 
 export const env: AppConfig = {
@@ -83,4 +94,8 @@ export const env: AppConfig = {
   aiProviderApiKey: parsedEnv.data.AI_PROVIDER_API_KEY,
   aiProviderModel: parsedEnv.data.AI_PROVIDER_MODEL,
   logLevel: parsedEnv.data.LOG_LEVEL,
+  razorpayKeyId: parsedEnv.data.RAZORPAY_KEY_ID,
+  razorpayKeySecret: parsedEnv.data.RAZORPAY_KEY_SECRET,
+  razorpayWebhookSecret: parsedEnv.data.RAZORPAY_WEBHOOK_SECRET,
+  razorpayMode: parsedEnv.data.RAZORPAY_MODE,
 };

@@ -228,6 +228,42 @@ export const UpdateAccountStatusSchema = z.object({
   reason: z.string().optional(),
 });
 
+export const AdminResetPasswordSchema = z.object({
+  temporaryPassword: z
+    .string()
+    .min(8, 'Temporary password must be at least 8 characters long')
+    .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
+    .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
+    .regex(/[0-9]/, 'Password must contain at least one numeric digit')
+    .regex(/[^A-Za-z0-9]/, 'Password must contain at least one special character')
+    .optional(),
+  mustChangePassword: z.boolean().default(true).optional(),
+  reason: z.string().optional(),
+});
+export type AdminResetPasswordDTO = z.infer<typeof AdminResetPasswordSchema>;
+
+export const UserChangePasswordSchema = z.object({
+  currentPassword: z.string().min(1, 'Current password is required'),
+  newPassword: z.string().min(8, 'Password must be at least 8 characters long')
+    .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
+    .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
+    .regex(/[0-9]/, 'Password must contain at least one numeric digit')
+    .regex(/[^A-Za-z0-9]/, 'Password must contain at least one special character'),
+});
+export type UserChangePasswordDTO = z.infer<typeof UserChangePasswordSchema>;
+
+export const AdminUnlockAccountSchema = z.object({
+  reason: z.string().optional(),
+});
+export type AdminUnlockAccountDTO = z.infer<typeof AdminUnlockAccountSchema>;
+
+export const BulkUserAccountActionSchema = z.object({
+  userIds: z.array(z.string().min(1)),
+  action: z.enum(['ACTIVATE', 'DEACTIVATE', 'UNLOCK']),
+  reason: z.string().optional(),
+});
+export type BulkUserAccountActionDTO = z.infer<typeof BulkUserAccountActionSchema>;
+
 export const ForgotPasswordSchema = z.object({
   email: z.string().min(3, 'Email or username is required'),
   schoolSlug: z.string().optional(),
@@ -568,6 +604,16 @@ export const FeePaymentStatus = {
 
 export type FeePaymentStatusType = (typeof FeePaymentStatus)[keyof typeof FeePaymentStatus];
 
+export const PaymentTxnStatus = {
+  CREATED: 'CREATED',
+  ATTEMPTED: 'ATTEMPTED',
+  SUCCESS: 'SUCCESS',
+  FAILED: 'FAILED',
+  REFUNDED: 'REFUNDED',
+} as const;
+
+export type PaymentTxnStatusType = (typeof PaymentTxnStatus)[keyof typeof PaymentTxnStatus];
+
 // Timetable Slot Schema
 export const CreateTimetableSlotSchema = z.object({
   className: z.string().min(1),
@@ -710,6 +756,72 @@ export const RecordReconciliationSchema = z.object({
 });
 
 export type RecordReconciliationDTO = z.infer<typeof RecordReconciliationSchema>;
+
+// Razorpay Payment Gateway Schemas & Contracts
+export const CreateRazorpayOrderSchema = z.object({
+  invoiceId: z.string().min(1, 'Invoice ID is required'),
+  amount: z.number().positive('Amount must be positive').optional(),
+  notes: z.record(z.string()).optional(),
+});
+
+export type CreateRazorpayOrderDTO = z.infer<typeof CreateRazorpayOrderSchema>;
+
+export const VerifyRazorpayPaymentSchema = z.object({
+  invoiceId: z.string().min(1, 'Invoice ID is required'),
+  orderId: z.string().min(1, 'Razorpay Order ID is required'),
+  paymentId: z.string().min(1, 'Razorpay Payment ID is required'),
+  signature: z.string().min(1, 'Razorpay signature is required'),
+});
+
+export type VerifyRazorpayPaymentDTO = z.infer<typeof VerifyRazorpayPaymentSchema>;
+
+export interface RazorpayOrderResponse {
+  orderId: string;
+  amount: number; // in paise
+  amountInRupees: number;
+  currency: string;
+  keyId: string;
+  invoiceId: string;
+  invoiceNumber: string;
+  studentName: string;
+  studentAdmissionNo: string;
+  schoolName: string;
+  notes?: Record<string, any>;
+}
+
+export interface RazorpayVerifyResponse {
+  success: boolean;
+  orderId: string;
+  paymentId: string;
+  receiptNumber: string;
+  amountPaid: number;
+  invoiceStatus: FeePaymentStatusType;
+  remainingBalance: number;
+  paidAt: string;
+  schoolName: string;
+  studentName: string;
+  invoiceNumber: string;
+}
+
+export interface PaymentTransactionRecord {
+  id: string;
+  schoolId: string;
+  feeInvoiceId: string;
+  userId: string;
+  orderId: string;
+  paymentId?: string | null;
+  amount: number;
+  currency: string;
+  status: PaymentTxnStatusType;
+  paymentMethod?: string | null;
+  receiptNumber?: string | null;
+  invoiceNumber?: string;
+  studentName?: string;
+  errorCode?: string | null;
+  errorDescription?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
 
 // Financial Summary Report Contract
 export interface FinancialSummaryReport {
@@ -894,6 +1006,182 @@ export interface BulkActionResponse {
     succeeded: number;
     failed: number;
   };
+}
+
+// ============================================================================
+// DYNAMIC WEBSITE CMS & PHOTO/VIDEO GALLERY SCHEMAS & CONTRACTS
+// ============================================================================
+
+export const UpdateWebsiteContentSchema = z.object({
+  heroTitle: z.string().min(2).optional(),
+  heroSubtitle: z.string().optional(),
+  heroDescription: z.string().optional(),
+  heroCtaText: z.string().optional(),
+  heroCtaLink: z.string().optional(),
+  heroSecondaryCtaText: z.string().optional(),
+  heroSecondaryCtaLink: z.string().optional(),
+  heroImageUrl: z.string().optional(),
+  heroSliderImages: z.array(z.string()).optional(),
+
+  aboutTitle: z.string().min(2).optional(),
+  aboutSubtitle: z.string().optional(),
+  aboutDescription: z.string().optional(),
+  aboutStory: z.string().optional(),
+  aboutPhilosophy: z.string().optional(),
+  aboutHistory: z.string().optional(),
+  aboutImageUrl: z.string().optional(),
+
+  principalName: z.string().min(2).optional(),
+  principalDesignation: z.string().optional(),
+  principalMessage: z.string().optional(),
+  principalPhotoUrl: z.string().optional(),
+
+  visionTitle: z.string().optional(),
+  visionDescription: z.string().optional(),
+  missionTitle: z.string().optional(),
+  missionDescription: z.string().optional(),
+
+  smartClassroomsHeading: z.string().optional(),
+  smartClassroomsDescription: z.string().optional(),
+  smartClassroomsImageUrl: z.string().optional(),
+
+  sportsActivitiesHeading: z.string().optional(),
+  sportsActivitiesDescription: z.string().optional(),
+  sportsActivitiesImageUrl: z.string().optional(),
+
+  admissionHeading: z.string().optional(),
+  admissionDescription: z.string().optional(),
+  admissionImageUrl: z.string().optional(),
+  admissionProcedure: z.any().optional(),
+  admissionEligibility: z.any().optional(),
+  admissionDates: z.any().optional(),
+
+  admissionFormTitle: z.string().optional(),
+  admissionFormDescription: z.string().optional(),
+  admissionFormUrl: z.string().optional().nullable(),
+
+  officeTimings: z.string().optional(),
+  mapEmbedUrl: z.string().optional().nullable(),
+
+  sectionVisibility: z.record(z.boolean()).optional(),
+  sectionOrder: z.array(z.string()).optional(),
+  isPublished: z.boolean().optional(),
+});
+
+export type UpdateWebsiteContentDTO = z.infer<typeof UpdateWebsiteContentSchema>;
+
+export const CreateHighlightSchema = z.object({
+  title: z.string().min(2),
+  description: z.string().min(5),
+  iconName: z.string().default('Award'),
+  imageUrl: z.string().optional().nullable(),
+  displayOrder: z.number().int().default(0),
+  isPublished: z.boolean().default(true),
+});
+export type CreateHighlightDTO = z.infer<typeof CreateHighlightSchema>;
+
+export const CreateFacilitySchema = z.object({
+  name: z.string().min(2),
+  description: z.string().min(5),
+  category: z.string().default('Academic'),
+  imageUrl: z.string().min(1),
+  displayOrder: z.number().int().default(0),
+  isPublished: z.boolean().default(true),
+});
+export type CreateFacilityDTO = z.infer<typeof CreateFacilitySchema>;
+
+export const CreateAchievementSchema = z.object({
+  studentName: z.string().min(2),
+  title: z.string().min(2),
+  description: z.string().min(5),
+  competition: z.string().min(2),
+  academicYear: z.string().default('2026-2027'),
+  photoUrl: z.string().optional().nullable(),
+  displayOrder: z.number().int().default(0),
+  isPublished: z.boolean().default(true),
+});
+export type CreateAchievementDTO = z.infer<typeof CreateAchievementSchema>;
+
+export const CreateTestimonialSchema = z.object({
+  parentName: z.string().min(2),
+  parentRole: z.string().default('Parent'),
+  content: z.string().min(5),
+  avatarUrl: z.string().optional().nullable(),
+  rating: z.number().int().min(1).max(5).default(5),
+  displayOrder: z.number().int().default(0),
+  isPublished: z.boolean().default(true),
+});
+export type CreateTestimonialDTO = z.infer<typeof CreateTestimonialSchema>;
+
+export const CreateDocumentSchema = z.object({
+  title: z.string().min(2),
+  description: z.string().optional().nullable(),
+  category: z.string().default('GENERAL'),
+  fileUrl: z.string().min(1),
+  fileSize: z.string().optional().nullable(),
+  fileType: z.string().default('PDF'),
+  displayOrder: z.number().int().default(0),
+  isPublished: z.boolean().default(true),
+});
+export type CreateDocumentDTO = z.infer<typeof CreateDocumentSchema>;
+
+export const CreateGalleryCategorySchema = z.object({
+  name: z.string().min(2),
+  slug: z.string().min(2),
+  description: z.string().optional().nullable(),
+  coverImageUrl: z.string().optional().nullable(),
+  displayOrder: z.number().int().default(0),
+  isPublished: z.boolean().default(true),
+});
+export type CreateGalleryCategoryDTO = z.infer<typeof CreateGalleryCategorySchema>;
+
+export const CreateGalleryItemSchema = z.object({
+  categoryId: z.string().min(1),
+  mediaType: z.enum(['PHOTO', 'VIDEO', 'IMAGE']).default('PHOTO'),
+  title: z.string().min(2),
+  caption: z.string().optional().nullable(),
+  description: z.string().optional().nullable(),
+  mediaUrl: z.string().optional().nullable().default(''),
+  thumbnailUrl: z.string().optional().nullable(),
+  videoUrl: z.string().optional().nullable(),
+  displayOrder: z.number().int().default(0),
+  isPublished: z.boolean().default(true),
+});
+export type CreateGalleryItemDTO = z.infer<typeof CreateGalleryItemSchema>;
+
+export interface PublicWebsiteData {
+  school: {
+    id: string;
+    slug: string;
+    name: string;
+    code: string;
+    logoUrl?: string | null;
+    motto?: string | null;
+    email: string;
+    phone: string;
+    address: string;
+    city: string;
+    state: string;
+    postalCode: string;
+    country: string;
+    websiteUrl?: string | null;
+    brandingConfig?: any;
+    establishedYear?: number | null;
+  };
+  content: any;
+  highlights: any[];
+  facilities: any[];
+  academicPrograms: any[];
+  faculty: any[];
+  upcomingEvents: any[];
+  latestNotices: any[];
+  achievements: any[];
+  testimonials: any[];
+  galleryPreview: {
+    photos: any[];
+    videos: any[];
+  };
+  downloadableDocs: any[];
 }
 
 

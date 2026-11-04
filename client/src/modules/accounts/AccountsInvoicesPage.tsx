@@ -52,6 +52,8 @@ interface InvoiceRecord {
     amountPaid: number;
     paymentMethod: string;
     transactionRef?: string;
+    orderId?: string;
+    paymentId?: string;
     date: string;
     notes?: string;
     isSimulated: boolean;
@@ -114,6 +116,9 @@ export const AccountsInvoicesPage: React.FC = () => {
     amount: number;
     method: string;
     date: string;
+    transactionRef?: string;
+    orderId?: string;
+    paymentId?: string;
     isSimulated: boolean;
   } | null>(null);
 
@@ -584,10 +589,13 @@ export const AccountsInvoicesPage: React.FC = () => {
                                   studentName: inv.studentName,
                                   admissionNo: inv.studentProfileId,
                                   invoiceNo: inv.invoiceNumber,
-                                  amount: inv.amountDue,
+                                  amount: latestPayment?.amountPaid || inv.amountDue,
                                   method: latestPayment?.paymentMethod || 'Institutional Clearing',
                                   date: latestPayment?.date || inv.dueDate,
-                                  isSimulated: true,
+                                  transactionRef: latestPayment?.transactionRef,
+                                  orderId: latestPayment?.orderId,
+                                  paymentId: latestPayment?.paymentId,
+                                  isSimulated: latestPayment?.isSimulated ?? true,
                                 });
                               }}
                               className="ed-btn ed-btn-secondary"
@@ -974,6 +982,12 @@ export const AccountsInvoicesPage: React.FC = () => {
               <div><strong>Student Name:</strong> {activeReceipt.studentName}</div>
               <div><strong>Admission No:</strong> {activeReceipt.admissionNo}</div>
               <div><strong>Payment Method:</strong> {activeReceipt.method}</div>
+              {activeReceipt.paymentId && (
+                <div><strong>Razorpay Payment ID:</strong> <span style={{ fontFamily: 'monospace' }}>{activeReceipt.paymentId}</span></div>
+              )}
+              {activeReceipt.orderId && (
+                <div><strong>Razorpay Order ID:</strong> <span style={{ fontFamily: 'monospace' }}>{activeReceipt.orderId}</span></div>
+              )}
               <div><strong>Date of Clearing:</strong> {activeReceipt.date}</div>
               <div><strong>Institutional Seal:</strong> {branding.schoolName} Accounts Bureau</div>
             </div>

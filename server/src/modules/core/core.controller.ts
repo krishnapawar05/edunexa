@@ -423,6 +423,83 @@ export class CoreSchoolController {
       next(err);
     }
   }
+
+  async listTenantAccounts(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { role, search, status, page, limit } = req.query;
+      const result = await accountProvisioningService.listTenantUsers(req.schoolId!, {
+        role: role as string,
+        search: search as string,
+        status: status as string,
+        page: page ? Number(page) : undefined,
+        limit: limit ? Number(limit) : undefined,
+      });
+      res.status(200).json({ success: true, data: result });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async adminResetPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { userId } = req.params;
+      const { temporaryPassword, mustChangePassword, reason } = req.body;
+      const result = await accountProvisioningService.adminResetPassword({
+        schoolId: req.schoolId,
+        targetUserId: userId,
+        temporaryPassword,
+        mustChangePassword,
+        actingUserId: req.user?.userId,
+        actingUserRole: req.user!.role,
+        reason,
+      });
+      res.status(200).json({
+        success: true,
+        data: result,
+        message: result.message,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async adminUnlockAccount(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { userId } = req.params;
+      const { reason } = req.body;
+      const result = await accountProvisioningService.adminUnlockAccount({
+        schoolId: req.schoolId,
+        targetUserId: userId,
+        actingUserId: req.user?.userId,
+        actingUserRole: req.user!.role,
+        reason,
+      });
+      res.status(200).json({
+        success: true,
+        data: result,
+        message: result.message,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async bulkUserAccountActions(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { userIds, action, reason } = req.body;
+      const result = await accountProvisioningService.bulkUserAccountActions({
+        schoolId: req.schoolId!,
+        userIds,
+        action,
+        actingUserId: req.user?.userId,
+        actingUserRole: req.user!.role,
+        reason,
+      });
+      res.status(200).json({ success: true, data: result });
+    } catch (err) {
+      next(err);
+    }
+  }
 }
 
 export const coreSchoolController = new CoreSchoolController();

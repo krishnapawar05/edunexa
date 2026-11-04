@@ -3,7 +3,8 @@ import { Award, ShieldCheck, CheckCircle2, Building, Target, Compass, BookOpen }
 import { useSchoolBranding } from '../../../context/SchoolBrandingContext.js';
 
 export const AboutPage: React.FC = () => {
-  const { branding } = useSchoolBranding();
+  const { branding, websiteData } = useSchoolBranding();
+  const content = websiteData?.content || {};
 
   return (
     <div className="ed-public-container" style={{ padding: 'var(--space-8) 0' }}>
@@ -12,7 +13,7 @@ export const AboutPage: React.FC = () => {
         <span className="ed-badge ed-badge-info" style={{ marginBottom: '8px' }}>INSTITUTIONAL PROFILE</span>
         <h1>About {branding.schoolName}</h1>
         <p style={{ color: 'var(--text-muted)', maxWidth: '720px', margin: '8px auto 0', fontSize: '1rem', lineHeight: 1.6 }}>
-          Established under the CBSE Educational Charter with a commitment to scientific inquiry, intellectual resilience, and ethical leadership.
+          {content.aboutSubtitle || `Established under the CBSE Educational Charter with a commitment to scientific inquiry, intellectual resilience, and ethical leadership.`}
         </p>
       </div>
 
@@ -24,7 +25,7 @@ export const AboutPage: React.FC = () => {
             <h3 style={{ margin: 0 }}>Our Vision</h3>
           </div>
           <p style={{ fontSize: '0.92rem', color: 'var(--text-secondary)', lineHeight: 1.7 }}>
-            To emerge as a national exemplar of transformative school education where scientific reason, moral integrity, and social responsibility converge, empowering each graduate to lead and thrive in a complex, interconnected world.
+            {content.vision || 'To emerge as a national exemplar of transformative school education where scientific reason, moral integrity, and social responsibility converge, empowering each graduate to lead and thrive in a complex, interconnected world.'}
           </p>
         </div>
 
@@ -34,7 +35,7 @@ export const AboutPage: React.FC = () => {
             <h3 style={{ margin: 0 }}>Our Mission</h3>
           </div>
           <p style={{ fontSize: '0.92rem', color: 'var(--text-secondary)', lineHeight: 1.7 }}>
-            To deliver rigorous curriculum standards enriched by state-of-the-art laboratory research, personalized teacher mentorship, competitive examination mastery, and a culture of empathy, discipline, and lifelong discovery.
+            {content.mission || 'To deliver rigorous curriculum standards enriched by state-of-the-art laboratory research, personalized teacher mentorship, competitive examination mastery, and a culture of empathy, discipline, and lifelong discovery.'}
           </p>
         </div>
       </div>

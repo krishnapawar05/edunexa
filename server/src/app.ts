@@ -13,6 +13,8 @@ import securityTestRouter from './modules/test-fixtures/security-test.routes.js'
 import coreRouter from './modules/core/core.routes.js';
 import academicRouter from './modules/academic/academic.routes.js';
 import operationsRouter from './modules/operations/operations.routes.js';
+import paymentsRouter from './modules/payments/payments.routes.js';
+import websiteRouter from './modules/website/website.routes.js';
 import aiRouter from './modules/ai/ai.routes.js';
 
 export function createApp(): express.Application {
@@ -53,8 +55,13 @@ export function createApp(): express.Application {
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-School-Slug', 'x-audit-reason'],
   }));
 
-  // Body Parsing
-  app.use(express.json({ limit: '5mb' }));
+  // Body Parsing (with rawBody capture for webhook signature verification)
+  app.use(express.json({
+    limit: '5mb',
+    verify: (req: any, _res, buf) => {
+      req.rawBody = buf;
+    },
+  }));
   app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 
   // Structured Logging
@@ -69,6 +76,8 @@ export function createApp(): express.Application {
   app.use('/api/v1/core', coreRouter);
   app.use('/api/v1/academic', academicRouter);
   app.use('/api/v1/operations', operationsRouter);
+  app.use('/api/v1/payments', paymentsRouter);
+  app.use('/api/v1/website', websiteRouter);
   app.use('/api/v1/ai', aiRouter);
   if (env.nodeEnv !== 'production') {
     app.use('/api/v1/security-test', securityTestRouter);

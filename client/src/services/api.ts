@@ -1,4 +1,12 @@
-import { HealthCheckData, ApiResponse, BulkActionResponse } from '@edunexa/shared';
+import {
+  HealthCheckData,
+  ApiResponse,
+  BulkActionResponse,
+  RazorpayOrderResponse,
+  RazorpayVerifyResponse,
+  PaymentTransactionRecord,
+  PublicWebsiteData,
+} from '@edunexa/shared';
 
 export const API_BASE_URL: string = (import.meta as any).env?.VITE_API_BASE_URL || '';
 
@@ -22,6 +30,10 @@ export interface StoredUser {
   schoolId?: string;
   studentProfileId?: string;
   staffProfileId?: string;
+  mustChangePassword?: boolean;
+  accountLocked?: boolean;
+  passwordResetAt?: string;
+  passwordChangedAt?: string;
 }
 
 export function getStoredAuthToken(_role?: string): string {
@@ -932,6 +944,41 @@ export const operationsApi = {
 };
 
 // ============================================================================
+// 4b. PAYMENTS & RAZORPAY GATEWAY APIS
+// ============================================================================
+
+export const paymentsApi = {
+  getConfig: () =>
+    apiRequest<{ keyId: string; mode: string; currency: string }>('/api/v1/payments/config'),
+
+  createRazorpayOrder: (data: { invoiceId: string; amount?: number; notes?: Record<string, string> }) =>
+    apiRequest<RazorpayOrderResponse>('/api/v1/payments/razorpay/create-order', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  verifyRazorpayPayment: (data: {
+    invoiceId: string;
+    orderId: string;
+    paymentId: string;
+    signature: string;
+  }) =>
+    apiRequest<RazorpayVerifyResponse>('/api/v1/payments/razorpay/verify', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  listTransactions: (params: { invoiceId?: string } = {}) => {
+    const query = new URLSearchParams();
+    if (params.invoiceId) query.set('invoiceId', params.invoiceId);
+    return apiRequest<PaymentTransactionRecord[]>(`/api/v1/payments/transactions?${query.toString()}`);
+  },
+
+  getReceipt: (identifier: string) =>
+    apiRequest<any>(`/api/v1/payments/receipts/${identifier}`),
+};
+
+// ============================================================================
 // 5. AI ASSISTANT & QUIZ GENERATION APIS
 // ============================================================================
 
@@ -1117,3 +1164,361 @@ export async function fetchStaffMemberApi(staffId: string): Promise<any> {
     method: 'GET',
   });
 }
+
+// ============================================================================
+// ACCOUNT ACCESS & ADMIN PASSWORD RECOVERY MANAGEMENT
+// ============================================================================
+
+export interface TenantAccountUser {
+  id: string;
+  membershipId: string;
+  schoolId: string;
+  schoolName?: string;
+  schoolSlug?: string;
+  schoolStatus?: string;
+  email: string;
+  username?: string | null;
+  firstName: string;
+  lastName: string;
+  name: string;
+  phone?: string | null;
+  avatarUrl?: string | null;
+  role: string;
+  isActive: boolean;
+  accountLocked: boolean;
+  failedLoginAttempts: number;
+  lockoutUntil?: string | null;
+  mustChangePassword?: boolean;
+  passwordResetAt?: string | null;
+  passwordChangedAt?: string | null;
+  createdAt: string;
+  studentProfile?: {
+    id: string;
+    admissionNumber: string;
+    status: string;
+  } | null;
+  staffProfile?: {
+    id: string;
+    employeeId: string;
+    designation: string;
+    employmentStatus: string;
+  } | null;
+}
+
+export interface ListTenantAccountsResponse {
+  users: TenantAccountUser[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export async function listTenantAccountsApi(filters: {
+  role?: string;
+  search?: string;
+  status?: string;
+  page?: number;
+  limit?: number;
+} = {}): Promise<ListTenantAccountsResponse> {
+  const params = new URLSearchParams();
+  if (filters.role && filters.role !== 'ALL') params.set('role', filters.role);
+  if (filters.search) params.set('search', filters.search);
+  if (filters.status && filters.status !== 'ALL') params.set('status', filters.status);
+  if (filters.page) params.set('page', String(filters.page));
+  if (filters.limit) params.set('limit', String(filters.limit));
+  const queryStr = params.toString() ? `?${params.toString()}` : '';
+  return apiRequest(`/api/v1/core/accounts${queryStr}`, { method: 'GET' });
+}
+
+export async function adminResetPasswordApi(
+  userId: string,
+  data: {
+    temporaryPassword?: string;
+    mustChangePassword?: boolean;
+    reason?: string;
+  } = {}
+): Promise<{
+  success: boolean;
+  message: string;
+  temporaryPassword: string;
+  mustChangePassword: boolean;
+  user: { id: string; email: string; firstName: string; lastName: string; role?: string };
+}> {
+  return apiRequest(`/api/v1/core/accounts/${encodeURIComponent(userId)}/admin-reset-password`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function adminUnlockAccountApi(
+  userId: string,
+  reason?: string
+): Promise<{ success: boolean; message: string }> {
+  return apiRequest(`/api/v1/core/accounts/${encodeURIComponent(userId)}/unlock`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export async function bulkUserAccountActionsApi(
+  userIds: string[],
+  action: 'ACTIVATE' | 'DEACTIVATE' | 'UNLOCK' | 'RESET_PASSWORD',
+  reason?: string
+): Promise<BulkActionResponse> {
+  return apiRequest('/api/v1/core/accounts/bulk-actions', {
+    method: 'POST',
+    body: JSON.stringify({ userIds, action, reason }),
+  });
+}
+
+// Super Admin cross-tenant account APIs
+export async function listSuperAdminAccountsApi(filters: {
+  search?: string;
+  schoolId?: string;
+  role?: string;
+  status?: string;
+  page?: number;
+  limit?: number;
+} = {}): Promise<ListTenantAccountsResponse> {
+  const params = new URLSearchParams();
+  if (filters.schoolId && filters.schoolId !== 'ALL') params.set('schoolId', filters.schoolId);
+  if (filters.role && filters.role !== 'ALL') params.set('role', filters.role);
+  if (filters.search) params.set('search', filters.search);
+  if (filters.status && filters.status !== 'ALL') params.set('status', filters.status);
+  if (filters.page) params.set('page', String(filters.page));
+  if (filters.limit) params.set('limit', String(filters.limit));
+  const queryStr = params.toString() ? `?${params.toString()}` : '';
+  return apiRequest(`/api/v1/superadmin/accounts${queryStr}`, { method: 'GET' });
+}
+
+export async function superAdminResetPasswordApi(
+  userId: string,
+  data: {
+    temporaryPassword?: string;
+    mustChangePassword?: boolean;
+    reason?: string;
+  } = {}
+): Promise<{
+  success: boolean;
+  message: string;
+  temporaryPassword: string;
+  mustChangePassword: boolean;
+  user: { id: string; email: string; firstName: string; lastName: string };
+}> {
+  return apiRequest(`/api/v1/superadmin/accounts/${encodeURIComponent(userId)}/reset-password`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function superAdminUnlockAccountApi(
+  userId: string,
+  reason?: string
+): Promise<{ success: boolean; message: string }> {
+  return apiRequest(`/api/v1/superadmin/accounts/${encodeURIComponent(userId)}/unlock`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export async function superAdminUpdateAccountStatusApi(
+  userId: string,
+  isActive: boolean,
+  reason?: string
+): Promise<{ success: boolean; message: string }> {
+  return apiRequest(`/api/v1/superadmin/accounts/${encodeURIComponent(userId)}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ isActive, reason }),
+  });
+}
+
+// ============================================================================
+// DYNAMIC WEBSITE CMS & GALLERY API
+// ============================================================================
+
+export const websiteApi = {
+  // Public Endpoints
+  async getPublicData(schoolIdentifier?: string): Promise<ApiResponse<PublicWebsiteData>> {
+    const query = schoolIdentifier ? `?schoolId=${encodeURIComponent(schoolIdentifier)}` : '';
+    return apiRequest<ApiResponse<PublicWebsiteData>>(`/api/v1/website/public${query}`);
+  },
+
+  async getGalleryCategories(schoolIdentifier?: string): Promise<ApiResponse<any[]>> {
+    const query = schoolIdentifier ? `?schoolId=${encodeURIComponent(schoolIdentifier)}` : '';
+    return apiRequest<ApiResponse<any[]>>(`/api/v1/website/gallery/categories${query}`);
+  },
+
+  async getGalleryItems(params: {
+    categoryId?: string;
+    mediaType?: 'ALL' | 'IMAGE' | 'VIDEO';
+    page?: number;
+    limit?: number;
+    schoolIdentifier?: string;
+  } = {}): Promise<ApiResponse<{ items: any[]; total: number; page: number; limit: number }>> {
+    const q = new URLSearchParams();
+    if (params.categoryId) q.set('categoryId', params.categoryId);
+    if (params.mediaType && params.mediaType !== 'ALL') q.set('mediaType', params.mediaType);
+    if (params.page) q.set('page', String(params.page));
+    if (params.limit) q.set('limit', String(params.limit));
+    if (params.schoolIdentifier) q.set('schoolId', params.schoolIdentifier);
+    const qs = q.toString() ? `?${q.toString()}` : '';
+    return apiRequest<ApiResponse<{ items: any[]; total: number; page: number; limit: number }>>(`/api/v1/website/gallery/items${qs}`);
+  },
+
+  async getPublicDocuments(schoolIdentifier?: string): Promise<ApiResponse<any[]>> {
+    const query = schoolIdentifier ? `?schoolId=${encodeURIComponent(schoolIdentifier)}` : '';
+    return apiRequest<ApiResponse<any[]>>(`/api/v1/website/documents${query}`);
+  },
+
+  // School Admin Endpoints
+  async getAdminData(): Promise<ApiResponse<any>> {
+    return apiRequest<ApiResponse<any>>('/api/v1/website/admin');
+  },
+
+  async updateContent(data: any): Promise<ApiResponse<any>> {
+    return apiRequest<ApiResponse<any>>('/api/v1/website/admin/content', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async updateBranding(data: any): Promise<ApiResponse<any>> {
+    return apiRequest<ApiResponse<any>>('/api/v1/website/admin/branding', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  // Highlights
+  async createHighlight(data: any): Promise<ApiResponse<any>> {
+    return apiRequest<ApiResponse<any>>('/api/v1/website/admin/highlights', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  async updateHighlight(id: string, data: any): Promise<ApiResponse<any>> {
+    return apiRequest<ApiResponse<any>>(`/api/v1/website/admin/highlights/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+  async deleteHighlight(id: string): Promise<ApiResponse<any>> {
+    return apiRequest<ApiResponse<any>>(`/api/v1/website/admin/highlights/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // Facilities
+  async createFacility(data: any): Promise<ApiResponse<any>> {
+    return apiRequest<ApiResponse<any>>('/api/v1/website/admin/facilities', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  async updateFacility(id: string, data: any): Promise<ApiResponse<any>> {
+    return apiRequest<ApiResponse<any>>(`/api/v1/website/admin/facilities/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+  async deleteFacility(id: string): Promise<ApiResponse<any>> {
+    return apiRequest<ApiResponse<any>>(`/api/v1/website/admin/facilities/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // Achievements
+  async createAchievement(data: any): Promise<ApiResponse<any>> {
+    return apiRequest<ApiResponse<any>>('/api/v1/website/admin/achievements', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  async updateAchievement(id: string, data: any): Promise<ApiResponse<any>> {
+    return apiRequest<ApiResponse<any>>(`/api/v1/website/admin/achievements/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+  async deleteAchievement(id: string): Promise<ApiResponse<any>> {
+    return apiRequest<ApiResponse<any>>(`/api/v1/website/admin/achievements/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // Testimonials
+  async createTestimonial(data: any): Promise<ApiResponse<any>> {
+    return apiRequest<ApiResponse<any>>('/api/v1/website/admin/testimonials', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  async updateTestimonial(id: string, data: any): Promise<ApiResponse<any>> {
+    return apiRequest<ApiResponse<any>>(`/api/v1/website/admin/testimonials/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+  async deleteTestimonial(id: string): Promise<ApiResponse<any>> {
+    return apiRequest<ApiResponse<any>>(`/api/v1/website/admin/testimonials/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // Documents
+  async createDocument(data: any): Promise<ApiResponse<any>> {
+    return apiRequest<ApiResponse<any>>('/api/v1/website/admin/documents', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  async updateDocument(id: string, data: any): Promise<ApiResponse<any>> {
+    return apiRequest<ApiResponse<any>>(`/api/v1/website/admin/documents/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+  async deleteDocument(id: string): Promise<ApiResponse<any>> {
+    return apiRequest<ApiResponse<any>>(`/api/v1/website/admin/documents/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // Gallery Categories
+  async createGalleryCategory(data: any): Promise<ApiResponse<any>> {
+    return apiRequest<ApiResponse<any>>('/api/v1/website/admin/gallery/categories', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  async updateGalleryCategory(id: string, data: any): Promise<ApiResponse<any>> {
+    return apiRequest<ApiResponse<any>>(`/api/v1/website/admin/gallery/categories/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+  async deleteGalleryCategory(id: string): Promise<ApiResponse<any>> {
+    return apiRequest<ApiResponse<any>>(`/api/v1/website/admin/gallery/categories/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // Gallery Items
+  async createGalleryItem(data: any): Promise<ApiResponse<any>> {
+    return apiRequest<ApiResponse<any>>('/api/v1/website/admin/gallery/items', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  async updateGalleryItem(id: string, data: any): Promise<ApiResponse<any>> {
+    return apiRequest<ApiResponse<any>>(`/api/v1/website/admin/gallery/items/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+  async deleteGalleryItem(id: string): Promise<ApiResponse<any>> {
+    return apiRequest<ApiResponse<any>>(`/api/v1/website/admin/gallery/items/${id}`, {
+      method: 'DELETE',
+    });
+  },
+};
