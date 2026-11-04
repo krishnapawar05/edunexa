@@ -17,6 +17,8 @@ import {
   FinancialSummaryReport,
   PlatformRole,
   FeePaymentStatusType,
+  BulkActionResponse,
+  BulkItemResult,
 } from '@edunexa/shared';
 import { prisma } from '../../config/db.js';
 
@@ -621,6 +623,70 @@ export class OperationsService {
 
       return false;
     });
+  }
+
+  async bulkNoticeActions(
+    schoolIdOrIdentifier: string,
+    action: string,
+    ids: string[],
+    userId?: string
+  ): Promise<BulkActionResponse> {
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    const targetSchoolId = school ? school.id : schoolIdOrIdentifier;
+
+    const results: BulkItemResult[] = [];
+    let processedCount = 0;
+    let failedCount = 0;
+
+    for (const noticeId of ids) {
+      try {
+        const notice = await prisma.notice.findFirst({
+          where: { id: noticeId, schoolId: targetSchoolId },
+        });
+
+        if (!notice) {
+          results.push({ id: noticeId, success: false, message: 'Notice not found in this school.' });
+          failedCount++;
+          continue;
+        }
+
+        if (action.toUpperCase() === 'ARCHIVE') {
+          await prisma.notice.update({
+            where: { id: notice.id },
+            data: { expiresAt: new Date() },
+          });
+          results.push({ id: noticeId, success: true, message: 'Notice archived.' });
+          processedCount++;
+        } else if (action.toUpperCase() === 'MARK_READ') {
+          if (userId) {
+            await prisma.notification.updateMany({
+              where: {
+                userId,
+                link: { contains: noticeId },
+              },
+              data: { isRead: true },
+            });
+          }
+          results.push({ id: noticeId, success: true, message: 'Notice marked as read.' });
+          processedCount++;
+        } else {
+          results.push({ id: noticeId, success: false, message: `Unsupported action: '${action}'.` });
+          failedCount++;
+        }
+      } catch (err: any) {
+        results.push({ id: noticeId, success: false, message: err.message || 'Failed to process notice action.' });
+        failedCount++;
+      }
+    }
+
+    return {
+      success: failedCount === 0 || processedCount > 0,
+      action,
+      processedCount,
+      failedCount,
+      totalRequested: ids.length,
+      results,
+    };
   }
 
   async createSchoolEvent(schoolIdOrIdentifier: string, createdByUserId: string, data: CreateSchoolEventDTO) {

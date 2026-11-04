@@ -12,10 +12,19 @@ import {
   Clock,
   ChevronRight,
   ShieldAlert,
+  Download,
 } from 'lucide-react';
 import { Badge } from '../../components/ui/Badge.js';
 import { Button } from '../../components/ui/Button.js';
 import { Modal } from '../../components/ui/Modal.js';
+import {
+  useBulkSelection,
+  SelectAllCheckbox,
+  RowCheckbox,
+  BulkActionToolbar,
+  BulkActionConfirmationDialog,
+  BulkActionItem,
+} from '../../components/bulk/index.js';
 import { coreApi } from '../../services/api.js';
 
 interface AdmissionApplication {
@@ -52,6 +61,18 @@ export const AdmissionsQueuePage: React.FC = () => {
   const [reviewNotes, setReviewNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Bulk Selection & Actions State
+  const selection = useBulkSelection();
+  const [bulkActionLoading, setBulkActionLoading] = useState<string | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    action: string;
+    title: string;
+    message: string;
+    confirmLabel: string;
+    variant: 'danger' | 'warning' | 'primary';
+  } | null>(null);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -118,6 +139,125 @@ export const AdmissionsQueuePage: React.FC = () => {
       setIsSubmitting(false);
     }
   };
+
+  const handleBulkAction = async (action: string) => {
+    const targetIds = selection.isAllMatching
+      ? filteredApplications.map((a) => a.id)
+      : selection.getSelectedList();
+
+    if (targetIds.length === 0) {
+      showToast('Please select at least one application.');
+      return;
+    }
+
+    setBulkActionLoading(action);
+    try {
+      const res = await coreApi.bulkAdmissionsReview({
+        ids: targetIds,
+        action: action as any,
+        params: {
+          assignedClass: 'Grade 10',
+          assignedSection: 'A',
+          reviewNotes: `Bulk processed via Admissions Review Queue as ${action}`,
+        },
+      });
+
+      showToast(res.message || `Successfully processed ${res.processedCount} application(s).`);
+      selection.clearSelection();
+      loadApplications();
+    } catch (err: any) {
+      showToast(err.message || `Failed to process bulk ${action.toLowerCase()}.`);
+    } finally {
+      setBulkActionLoading(null);
+      setConfirmDialog(null);
+    }
+  };
+
+  const handleBulkExportCsv = () => {
+    const exportTargets = selection.selectedCount > 0
+      ? filteredApplications.filter((a) => selection.isSelected(a.id))
+      : filteredApplications;
+
+    if (exportTargets.length === 0) {
+      showToast('No applications available to export.');
+      return;
+    }
+
+    const headers = ['Application Number', 'Applicant Name', 'Applying Class', 'Gender', 'Guardian Name', 'Guardian Phone', 'Guardian Email', 'Status', 'Submission Date'];
+    const rows = exportTargets.map((a) => [
+      a.applicationNumber,
+      `"${a.studentFirstName} ${a.studentLastName}"`,
+      `"${a.applyingClass}"`,
+      a.gender,
+      `"${a.guardianName}"`,
+      `"${a.guardianPhone}"`,
+      `"${a.guardianEmail}"`,
+      a.status,
+      new Date(a.createdAt).toLocaleDateString(),
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `edunexa-admissions-${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast(`Exported ${exportTargets.length} application records to CSV.`);
+  };
+
+  const bulkActions: BulkActionItem[] = [
+    {
+      id: 'bulk-approve',
+      label: 'Approve & Enroll',
+      icon: <CheckCircle2 size={14} />,
+      onClick: () =>
+        setConfirmDialog({
+          isOpen: true,
+          action: 'APPROVE',
+          title: 'Approve Selected Admissions',
+          message:
+            'Are you sure you want to approve all selected applications and generate active student dossiers, admission numbers, and parent accounts?',
+          confirmLabel: 'Approve & Enroll',
+          variant: 'primary',
+        }),
+      loading: bulkActionLoading === 'APPROVE',
+      variant: 'primary',
+    },
+    {
+      id: 'bulk-reject',
+      label: 'Reject Applications',
+      icon: <XCircle size={14} />,
+      onClick: () =>
+        setConfirmDialog({
+          isOpen: true,
+          action: 'REJECT',
+          title: 'Reject Selected Admissions',
+          message:
+            'Are you sure you want to mark the selected applications as rejected? Notification updates will be dispatched to guardians.',
+          confirmLabel: 'Reject Applications',
+          variant: 'danger',
+        }),
+      loading: bulkActionLoading === 'REJECT',
+      variant: 'danger',
+    },
+    {
+      id: 'bulk-review',
+      label: 'Mark Under Review',
+      icon: <Clock size={14} />,
+      onClick: () => handleBulkAction('REVIEW'),
+      loading: bulkActionLoading === 'REVIEW',
+      variant: 'secondary',
+    },
+    {
+      id: 'bulk-export',
+      label: 'Export CSV',
+      icon: <Download size={14} />,
+      onClick: handleBulkExportCsv,
+      variant: 'outline',
+    },
+  ];
 
   const pendingCount = applications.filter((a) => a.status === 'SUBMITTED').length;
   const approvedCount = applications.filter((a) => a.status === 'APPROVED').length;
@@ -341,10 +481,21 @@ export const AdmissionsQueuePage: React.FC = () => {
           overflow: 'hidden',
         }}
       >
+        <BulkActionToolbar
+          selection={selection}
+          actions={bulkActions}
+          totalMatchingCount={filteredApplications.length}
+          currentPageIds={filteredApplications.map((a) => a.id)}
+          entityName="applications"
+        />
+
         <div style={{ overflowX: 'auto' }}>
           <table className="ed-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.84rem' }}>
             <thead>
               <tr style={{ backgroundColor: 'var(--bg-subtle)', borderBottom: '1px solid var(--border-default)', textAlign: 'left' }}>
+                <th style={{ width: '40px', padding: '12px 16px', textAlign: 'center' }}>
+                  <SelectAllCheckbox pageIds={filteredApplications.map((a) => a.id)} selection={selection} />
+                </th>
                 <th style={{ padding: '12px 16px', fontWeight: 600, color: 'var(--text-muted)' }}>App Number</th>
                 <th style={{ padding: '12px 16px', fontWeight: 600, color: 'var(--text-muted)' }}>Applicant Name</th>
                 <th style={{ padding: '12px 16px', fontWeight: 600, color: 'var(--text-muted)' }}>Applying Class</th>
@@ -357,13 +508,13 @@ export const AdmissionsQueuePage: React.FC = () => {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={7} style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                  <td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
                     Loading admissions queue...
                   </td>
                 </tr>
               ) : filteredApplications.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                  <td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
                     No admission applications found matching your criteria.
                   </td>
                 </tr>
@@ -371,8 +522,19 @@ export const AdmissionsQueuePage: React.FC = () => {
                 filteredApplications.map((app) => (
                   <tr
                     key={app.id}
-                    style={{ borderBottom: '1px solid var(--border-default)', transition: 'background-color 0.1s ease' }}
+                    style={{
+                      borderBottom: '1px solid var(--border-default)',
+                      backgroundColor: selection.isSelected(app.id) ? 'var(--primary-50, rgba(26, 77, 46, 0.05))' : undefined,
+                      transition: 'background-color 0.1s ease',
+                    }}
                   >
+                    <td style={{ width: '40px', padding: '12px 16px', textAlign: 'center' }}>
+                      <RowCheckbox
+                        id={app.id}
+                        checked={selection.isSelected(app.id)}
+                        onToggle={selection.toggleSelect}
+                      />
+                    </td>
                     <td style={{ padding: '12px 16px', fontWeight: 700, color: 'var(--text-primary)' }}>
                       {app.applicationNumber}
                     </td>
@@ -659,6 +821,22 @@ export const AdmissionsQueuePage: React.FC = () => {
             </div>
           </form>
         </Modal>
+      )}
+
+      {/* Bulk Action Confirmation Dialog */}
+      {confirmDialog && (
+        <BulkActionConfirmationDialog
+          isOpen={confirmDialog.isOpen}
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          confirmLabel={confirmDialog.confirmLabel}
+          variant={confirmDialog.variant}
+          count={selection.isAllMatching ? filteredApplications.length : selection.selectedCount}
+          entityName="applications"
+          isLoading={bulkActionLoading !== null}
+          onConfirm={() => handleBulkAction(confirmDialog.action)}
+          onClose={() => setConfirmDialog(null)}
+        />
       )}
     </div>
   );

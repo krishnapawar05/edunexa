@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { operationsController } from './operations.controller.js';
 import { authenticateUser, requireRole } from '../../middleware/auth.middleware.js';
-import { PlatformRole } from '@edunexa/shared';
+import { validateRequest } from '../../middleware/validate.js';
+import { PlatformRole, BulkActionRequestSchema } from '@edunexa/shared';
 
 const router = Router();
 
@@ -63,6 +64,12 @@ router.post(
 );
 
 router.get('/notices', operationsController.listNotices);
+
+router.post(
+  '/notices/bulk-actions',
+  validateRequest({ body: BulkActionRequestSchema }),
+  operationsController.bulkNoticeActions
+);
 
 router.post(
   '/events',

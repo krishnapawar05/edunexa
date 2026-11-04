@@ -375,6 +375,54 @@ export class CoreSchoolController {
       next(err);
     }
   }
+
+  async bulkStudentActions(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { ids, action, params } = req.body;
+      const result = await coreSchoolService.bulkStudentActions(
+        req.schoolId!,
+        action,
+        ids,
+        params,
+        req.user?.userId
+      );
+      res.status(200).json({ success: true, data: result });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async bulkAdmissionsReview(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { ids, action, params } = req.body;
+      const result = await coreSchoolService.bulkAdmissionsReview(
+        req.schoolId!,
+        action,
+        ids,
+        params,
+        req.user?.userId
+      );
+      res.status(200).json({ success: true, data: result });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async bulkStaffActions(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { ids, action, params } = req.body;
+      const result = await coreSchoolService.bulkStaffActions(
+        req.schoolId!,
+        action,
+        ids,
+        params,
+        req.user?.userId
+      );
+      res.status(200).json({ success: true, data: result });
+    } catch (err) {
+      next(err);
+    }
+  }
 }
 
 export const coreSchoolController = new CoreSchoolController();

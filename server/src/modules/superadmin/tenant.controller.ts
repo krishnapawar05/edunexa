@@ -63,6 +63,28 @@ export class TenantController {
     }
   }
 
+  async bulkSchoolActions(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { ids, action } = req.body;
+      const adminUserId = req.user?.userId || 'system-admin';
+      const result = await tenantService.bulkSchoolActions(action, ids, adminUserId);
+      res.status(200).json({ success: true, data: result });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async bulkSubscriptionActions(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { ids, action } = req.body;
+      const adminUserId = req.user?.userId || 'system-admin';
+      const result = await tenantService.bulkSubscriptionActions(action, ids, adminUserId);
+      res.status(200).json({ success: true, data: result });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   async updateSchool(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { id } = req.params;

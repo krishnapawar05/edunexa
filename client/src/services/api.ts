@@ -1,4 +1,4 @@
-import { HealthCheckData, ApiResponse } from '@edunexa/shared';
+import { HealthCheckData, ApiResponse, BulkActionResponse } from '@edunexa/shared';
 
 export const API_BASE_URL: string = (import.meta as any).env?.VITE_API_BASE_URL || '';
 
@@ -150,6 +150,17 @@ export async function fetchServerHealth(): Promise<HealthCheckData | null> {
 // 1. SUPER ADMIN APIS
 // ============================================================================
 
+function parseBulkArgs(
+  idsOrPayload: string[] | { ids: string[]; action: string; params?: any },
+  actionArg?: string,
+  paramsArg?: any
+): { ids: string[]; action: string; params?: any } {
+  if (Array.isArray(idsOrPayload)) {
+    return { ids: idsOrPayload, action: actionArg || '', params: paramsArg };
+  }
+  return idsOrPayload;
+}
+
 export const superadminApi = {
   getTelemetry: () => apiRequest<any>('/api/v1/superadmin/telemetry'),
   listSchools: (params: { query?: string; status?: string } = {}) => {
@@ -169,12 +180,26 @@ export const superadminApi = {
       method: 'PATCH',
       body: JSON.stringify({ status }),
     }),
+  bulkSchoolActions: (idsOrPayload: string[] | { ids: string[]; action: string; params?: any }, action?: string, params?: any) => {
+    const payload = parseBulkArgs(idsOrPayload, action, params);
+    return apiRequest<BulkActionResponse>('/api/v1/superadmin/schools/bulk-actions', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
   updateSchool: (id: string, data: any) =>
     apiRequest<any>(`/api/v1/superadmin/schools/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     }),
   listSubscriptions: () => apiRequest<any[]>('/api/v1/superadmin/subscriptions'),
+  bulkSubscriptionActions: (idsOrPayload: string[] | { ids: string[]; action: string; params?: any }, action?: string, params?: any) => {
+    const payload = parseBulkArgs(idsOrPayload, action, params);
+    return apiRequest<BulkActionResponse>('/api/v1/superadmin/subscriptions/bulk-actions', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
   updateSubscription: (id: string, data: any) =>
     apiRequest<any>(`/api/v1/superadmin/subscriptions/${id}`, {
       method: 'PATCH',
@@ -353,6 +378,30 @@ export const coreApi = {
       method: 'DELETE',
     }),
 
+  bulkStudentActions: (idsOrPayload: string[] | { ids: string[]; action: string; params?: any }, action?: string, params?: any) => {
+    const payload = parseBulkArgs(idsOrPayload, action, params);
+    return apiRequest<BulkActionResponse>('/api/v1/core/students/bulk-actions', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  bulkAdmissionsReview: (idsOrPayload: string[] | { ids: string[]; action: string; params?: any }, action?: string, params?: any) => {
+    const payload = parseBulkArgs(idsOrPayload, action, params);
+    return apiRequest<BulkActionResponse>('/api/v1/core/admissions/bulk-review', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  bulkStaffActions: (idsOrPayload: string[] | { ids: string[]; action: string; params?: any }, action?: string, params?: any) => {
+    const payload = parseBulkArgs(idsOrPayload, action, params);
+    return apiRequest<BulkActionResponse>('/api/v1/core/staff/bulk-actions', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
   updateStaffStatus: (staffId: string, status: string) =>
     apiRequest<any>(`/api/v1/core/staff/${staffId}/status`, {
       method: 'PATCH',
@@ -497,6 +546,14 @@ export const academicApi = {
       method: 'PATCH',
       body: JSON.stringify({ decision: status, reviewNotes }),
     }),
+
+  bulkReviewStaffLeaves: (idsOrPayload: string[] | { ids: string[]; action: 'APPROVE' | 'REJECT'; params?: any }, action?: 'APPROVE' | 'REJECT', params?: any) => {
+    const payload = parseBulkArgs(idsOrPayload as any, action, params);
+    return apiRequest<BulkActionResponse>('/api/v1/academic/attendance/staff/leave/bulk-review', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
 
   listStaffLeaves: (status?: string) => {
     const url = status && status !== 'ALL' ? `/api/v1/academic/attendance/staff/leave?status=${status}` : '/api/v1/academic/attendance/staff/leave';
@@ -693,6 +750,14 @@ export const operationsApi = {
     }),
 
   listNotices: () => apiRequest<any[]>('/api/v1/operations/notices'),
+
+  bulkNoticeActions: (idsOrPayload: string[] | { ids: string[]; action: string; params?: any }, action?: string, params?: any) => {
+    const payload = parseBulkArgs(idsOrPayload, action, params);
+    return apiRequest<BulkActionResponse>('/api/v1/operations/notices/bulk-actions', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
 
   broadcastNotice: (data: any) =>
     apiRequest<any>('/api/v1/operations/notices', {

@@ -6,6 +6,8 @@ import {
   TeacherAssignmentDTO,
   AdmissionReviewDTO,
   PublicIdCardVerificationResponse,
+  BulkActionResponse,
+  BulkItemResult,
 } from '@edunexa/shared';
 import {
   CardStatus,
@@ -2271,6 +2273,389 @@ export class CoreSchoolService {
         idCardStatus: student.virtualIdCard?.status || null,
       };
     });
+  }
+
+  /**
+   * Universal Bulk Operations for Student Records
+   * Validates IDs, enforces tenant boundaries, and executes operations safely.
+   */
+  async bulkStudentActions(
+    schoolIdOrIdentifier: string,
+    action: string,
+    ids: string[],
+    params?: any,
+    actingUserId?: string
+  ): Promise<BulkActionResponse> {
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    const targetSchoolId = school ? school.id : schoolIdOrIdentifier;
+
+    const results: BulkItemResult[] = [];
+    let processedCount = 0;
+    let failedCount = 0;
+
+    for (const studentId of ids) {
+      try {
+        const student = await resolveStudentProfile(targetSchoolId, studentId);
+        if (!student) {
+          results.push({ id: studentId, success: false, message: 'Student record not found in this school.' });
+          failedCount++;
+          continue;
+        }
+
+        switch (action.toUpperCase()) {
+          case 'ACTIVATE': {
+            await prisma.studentProfile.update({
+              where: { id: student.id },
+              data: { status: 'ACTIVE' },
+            });
+            results.push({ id: studentId, success: true, message: 'Student status updated to ACTIVE.' });
+            processedCount++;
+            break;
+          }
+          case 'SUSPEND': {
+            await prisma.studentProfile.update({
+              where: { id: student.id },
+              data: { status: 'INACTIVE' },
+            });
+            results.push({ id: studentId, success: true, message: 'Student status updated to INACTIVE.' });
+            processedCount++;
+            break;
+          }
+          case 'ARCHIVE': {
+            await prisma.studentProfile.update({
+              where: { id: student.id },
+              data: { status: 'TRANSFERRED' },
+            });
+            results.push({ id: studentId, success: true, message: 'Student archived as TRANSFERRED.' });
+            processedCount++;
+            break;
+          }
+          case 'REVIEW': {
+            let validUserId: string | null = null;
+            if (actingUserId) {
+              const u = await prisma.user.findUnique({ where: { id: actingUserId } });
+              if (u) validUserId = u.id;
+            }
+            if (!validUserId && student.membership?.userId) {
+              const mu = await prisma.user.findUnique({ where: { id: student.membership.userId } });
+              if (mu) validUserId = mu.id;
+            }
+
+            await prisma.auditLog.create({
+              data: {
+                schoolId: targetSchoolId,
+                userId: validUserId,
+                action: 'STUDENT_BULK_REVIEW',
+                entityType: 'StudentProfile',
+                entityId: student.id,
+                details: { notes: params?.notes || 'Marked as reviewed via SIS bulk action.' },
+              },
+            });
+            results.push({ id: studentId, success: true, message: 'Student marked as reviewed.' });
+            processedCount++;
+            break;
+          }
+          case 'INVITE': {
+            const userId = student.membership.userId;
+            const user = await prisma.user.findUnique({ where: { id: userId } });
+            if (!user) {
+              results.push({ id: studentId, success: false, message: 'No linked user account found.' });
+              failedCount++;
+            } else {
+              const existingInv = await prisma.accountInvitation.findFirst({
+                where: { userId, schoolId: targetSchoolId },
+                orderBy: { createdAt: 'desc' },
+              });
+              if (existingInv) {
+                await accountProvisioningService.resendInvitation(targetSchoolId, existingInv.id, actingUserId || 'admin');
+                results.push({ id: studentId, success: true, message: 'Invitation resent successfully.' });
+              } else {
+                await accountProvisioningService.provisionAccount(prisma, {
+                  schoolId: targetSchoolId,
+                  email: user.email,
+                  firstName: user.firstName,
+                  lastName: user.lastName,
+                  role: PlatformRole.STUDENT,
+                  sendInvitation: true,
+                  isAssistedActivation: false,
+                  actingUserId: actingUserId || 'admin',
+                  actingUserRole: PlatformRole.SCHOOL_ADMIN,
+                });
+                results.push({ id: studentId, success: true, message: 'Account provisioned and invitation dispatched.' });
+              }
+              processedCount++;
+            }
+            break;
+          }
+          case 'RESET_PASSWORD': {
+            const userId = student.membership.userId;
+            const user = await prisma.user.findUnique({ where: { id: userId } });
+            if (!user) {
+              results.push({ id: studentId, success: false, message: 'No linked user account found.' });
+              failedCount++;
+            } else {
+              await this.triggerUserPasswordReset(targetSchoolId, userId, actingUserId || 'admin');
+              results.push({ id: studentId, success: true, message: 'Password recovery initiated.' });
+              processedCount++;
+            }
+            break;
+          }
+          case 'DELETE': {
+            const depCounts = await prisma.studentProfile.findUnique({
+              where: { id: student.id },
+              include: {
+                _count: {
+                  select: {
+                    attendance: true,
+                    examMarks: true,
+                    feeInvoices: true,
+                  },
+                },
+              },
+            });
+
+            const hasDependencies =
+              (depCounts?._count.attendance ?? 0) > 0 ||
+              (depCounts?._count.examMarks ?? 0) > 0 ||
+              (depCounts?._count.feeInvoices ?? 0) > 0;
+
+            if (hasDependencies) {
+              await prisma.studentProfile.update({
+                where: { id: student.id },
+                data: { status: 'INACTIVE' },
+              });
+              results.push({
+                id: studentId,
+                success: true,
+                message: 'Historical records (attendance/exams/fees) exist. Safely archived as INACTIVE to protect audit integrity.',
+              });
+              processedCount++;
+            } else {
+              await prisma.$transaction(async (tx) => {
+                await tx.virtualIdCard.deleteMany({ where: { studentProfileId: student.id } });
+                await tx.studentEnrollment.deleteMany({ where: { studentProfileId: student.id } });
+                await tx.parentStudentLink.deleteMany({ where: { studentProfileId: student.id } });
+                await tx.studentProfile.delete({ where: { id: student.id } });
+                await tx.userMembership.delete({ where: { id: student.membershipId } });
+              });
+              results.push({ id: studentId, success: true, message: 'Student record and enrollments removed.' });
+              processedCount++;
+            }
+            break;
+          }
+          default:
+            results.push({ id: studentId, success: false, message: `Unsupported action: '${action}'.` });
+            failedCount++;
+        }
+      } catch (err: any) {
+        results.push({ id: studentId, success: false, message: err.message || 'Error processing action.' });
+        failedCount++;
+      }
+    }
+
+    return {
+      success: failedCount === 0 || processedCount > 0,
+      action,
+      processedCount,
+      failedCount,
+      totalRequested: ids.length,
+      results,
+    };
+  }
+
+  /**
+   * Universal Bulk Review for Admission Applications
+   */
+  async bulkAdmissionsReview(
+    schoolIdOrIdentifier: string,
+    action: string,
+    ids: string[],
+    params?: any,
+    actingUserId?: string
+  ): Promise<BulkActionResponse> {
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    const targetSchoolId = school ? school.id : schoolIdOrIdentifier;
+
+    const results: BulkItemResult[] = [];
+    let processedCount = 0;
+    let failedCount = 0;
+
+    for (const applicationId of ids) {
+      try {
+        const normalizedAction = action.toUpperCase();
+        if (normalizedAction === 'APPROVE') {
+          const res = await this.reviewAdmission(targetSchoolId, applicationId, {
+            decision: 'APPROVED',
+            reviewNotes: params?.reviewNotes || 'Bulk admission approval',
+            assignedClass: params?.assignedClass,
+            assignedSection: params?.assignedSection || 'A',
+          });
+          results.push({
+            id: applicationId,
+            success: true,
+            message: `Approved and enrolled as ${res.enrolledStudent?.student?.admissionNumber || 'Student'}.`,
+          });
+          processedCount++;
+        } else if (normalizedAction === 'REJECT') {
+          await this.reviewAdmission(targetSchoolId, applicationId, {
+            decision: 'REJECTED',
+            reviewNotes: params?.reviewNotes || 'Bulk admission rejection',
+          });
+          results.push({ id: applicationId, success: true, message: 'Application rejected.' });
+          processedCount++;
+        } else if (normalizedAction === 'REVIEW' || normalizedAction === 'UNDER_REVIEW') {
+          const updateRes = await prisma.admissionApplication.updateMany({
+            where: {
+              OR: [{ id: applicationId }, { applicationNumber: applicationId }],
+              schoolId: targetSchoolId,
+            },
+            data: {
+              status: ApplicationStatus.UNDER_REVIEW,
+              reviewNotes: params?.reviewNotes || 'Marked under review via bulk action.',
+            },
+          });
+          if (updateRes.count === 0) {
+            results.push({ id: applicationId, success: false, message: 'Application not found.' });
+            failedCount++;
+          } else {
+            results.push({ id: applicationId, success: true, message: 'Application marked under review.' });
+            processedCount++;
+          }
+        } else {
+          results.push({ id: applicationId, success: false, message: `Unsupported action: '${action}'.` });
+          failedCount++;
+        }
+      } catch (err: any) {
+        results.push({ id: applicationId, success: false, message: err.message || 'Failed to review application.' });
+        failedCount++;
+      }
+    }
+
+    return {
+      success: failedCount === 0 || processedCount > 0,
+      action,
+      processedCount,
+      failedCount,
+      totalRequested: ids.length,
+      results,
+    };
+  }
+
+  /**
+   * Universal Bulk Operations for Staff Records
+   */
+  async bulkStaffActions(
+    schoolIdOrIdentifier: string,
+    action: string,
+    ids: string[],
+    params?: any,
+    actingUserId?: string
+  ): Promise<BulkActionResponse> {
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    const targetSchoolId = school ? school.id : schoolIdOrIdentifier;
+
+    const results: BulkItemResult[] = [];
+    let processedCount = 0;
+    let failedCount = 0;
+
+    for (const staffId of ids) {
+      try {
+        const staff = await resolveStaffProfile(targetSchoolId, staffId);
+        if (!staff) {
+          results.push({ id: staffId, success: false, message: 'Staff member not found in this school.' });
+          failedCount++;
+          continue;
+        }
+
+        switch (action.toUpperCase()) {
+          case 'ACTIVATE': {
+            await prisma.staffProfile.update({
+              where: { id: staff.id },
+              data: { employmentStatus: 'ACTIVE' },
+            });
+            results.push({ id: staffId, success: true, message: 'Employment status set to ACTIVE.' });
+            processedCount++;
+            break;
+          }
+          case 'SUSPEND': {
+            await prisma.staffProfile.update({
+              where: { id: staff.id },
+              data: { employmentStatus: 'ON_LEAVE' },
+            });
+            results.push({ id: staffId, success: true, message: 'Employment status set to ON_LEAVE (Suspended).' });
+            processedCount++;
+            break;
+          }
+          case 'REVIEW': {
+            let validUserId: string | null = null;
+            if (actingUserId) {
+              const u = await prisma.user.findUnique({ where: { id: actingUserId } });
+              if (u) validUserId = u.id;
+            }
+            if (!validUserId && staff.membership?.userId) {
+              const mu = await prisma.user.findUnique({ where: { id: staff.membership.userId } });
+              if (mu) validUserId = mu.id;
+            }
+
+            await prisma.auditLog.create({
+              data: {
+                schoolId: targetSchoolId,
+                userId: validUserId,
+                action: 'STAFF_BULK_REVIEW',
+                entityType: 'StaffProfile',
+                entityId: staff.id,
+                details: { notes: params?.notes || 'Marked as reviewed via HR bulk action.' },
+              },
+            });
+            results.push({ id: staffId, success: true, message: 'Staff record marked as reviewed.' });
+            processedCount++;
+            break;
+          }
+          case 'INVITE': {
+            const userId = staff.membership.userId;
+            const existingInv = await prisma.accountInvitation.findFirst({
+              where: { userId, schoolId: targetSchoolId },
+              orderBy: { createdAt: 'desc' },
+            });
+            if (existingInv) {
+              await accountProvisioningService.resendInvitation(targetSchoolId, existingInv.id, actingUserId || 'admin');
+              results.push({ id: staffId, success: true, message: 'Invitation resent successfully.' });
+            } else {
+              const staffUser = staff.membership.user;
+              await accountProvisioningService.provisionAccount(prisma, {
+                schoolId: targetSchoolId,
+                email: staffUser.email,
+                firstName: staffUser.firstName,
+                lastName: staffUser.lastName,
+                role: staff.membership.role,
+                sendInvitation: true,
+                isAssistedActivation: false,
+                actingUserId: actingUserId || 'admin',
+                actingUserRole: PlatformRole.SCHOOL_ADMIN,
+              });
+              results.push({ id: staffId, success: true, message: 'Account provisioned and invitation dispatched.' });
+            }
+            processedCount++;
+            break;
+          }
+          default:
+            results.push({ id: staffId, success: false, message: `Unsupported action: '${action}'.` });
+            failedCount++;
+        }
+      } catch (err: any) {
+        results.push({ id: staffId, success: false, message: err.message || 'Error processing action.' });
+        failedCount++;
+      }
+    }
+
+    return {
+      success: failedCount === 0 || processedCount > 0,
+      action,
+      processedCount,
+      failedCount,
+      totalRequested: ids.length,
+      results,
+    };
   }
 }
 

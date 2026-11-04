@@ -1,6 +1,13 @@
 import { prisma, checkDatabaseConnection } from '../../config/db.js';
 import { AppError } from '../../middleware/errorHandler.js';
-import { SchoolOnboardingDTO, TenantStatus, PlatformRole, PlatformRoleType } from '@edunexa/shared';
+import {
+  SchoolOnboardingDTO,
+  TenantStatus,
+  PlatformRole,
+  PlatformRoleType,
+  BulkActionResponse,
+  BulkItemResult,
+} from '@edunexa/shared';
 
 // Persistent memory state store for test environments or offline database fallbacks
 let MEMORY_SCHOOLS: Array<{
@@ -797,6 +804,123 @@ export class TenantService {
       schoolId,
       role: newRole,
       assignedAt: new Date().toISOString(),
+    };
+  }
+
+  async bulkSchoolActions(
+    action: string,
+    schoolIds: string[],
+    adminUserId: string
+  ): Promise<BulkActionResponse> {
+    const results: BulkItemResult[] = [];
+    let processedCount = 0;
+    let failedCount = 0;
+
+    for (const schoolId of schoolIds) {
+      try {
+        if (action.toUpperCase() === 'ACTIVATE') {
+          await this.updateSchoolStatus(schoolId, 'ACTIVE', adminUserId);
+          results.push({ id: schoolId, success: true, message: 'School activated.' });
+          processedCount++;
+        } else if (action.toUpperCase() === 'SUSPEND') {
+          await this.updateSchoolStatus(schoolId, 'SUSPENDED', adminUserId);
+          results.push({ id: schoolId, success: true, message: 'School suspended.' });
+          processedCount++;
+        } else if (action.toUpperCase() === 'REVIEW') {
+          const school = await prisma.school.findFirst({
+            where: { OR: [{ id: schoolId }, { slug: schoolId }, { code: schoolId }] },
+          });
+          const targetSchoolId = school ? school.id : schoolId;
+
+          let validUserId: string | null = null;
+          if (adminUserId) {
+            const adminUser = await prisma.user.findUnique({ where: { id: adminUserId } });
+            if (adminUser) validUserId = adminUser.id;
+          }
+
+          try {
+            await prisma.auditLog.create({
+              data: {
+                schoolId: targetSchoolId,
+                userId: validUserId,
+                action: 'TENANT_BULK_REVIEW',
+                entityType: 'School',
+                entityId: targetSchoolId,
+                details: { reviewedAt: new Date().toISOString() },
+              },
+            });
+          } catch (auditErr) {
+            console.warn('[TenantService] Audit log creation non-fatal error:', auditErr);
+          }
+
+          results.push({ id: schoolId, success: true, message: 'School marked as reviewed.' });
+          processedCount++;
+        } else {
+          results.push({ id: schoolId, success: false, message: `Unsupported action: '${action}'.` });
+          failedCount++;
+        }
+      } catch (err: any) {
+        results.push({ id: schoolId, success: false, message: err.message || 'Failed to process school.' });
+        failedCount++;
+      }
+    }
+
+    return {
+      success: failedCount === 0 || processedCount > 0,
+      action,
+      processedCount,
+      failedCount,
+      totalRequested: schoolIds.length,
+      results,
+    };
+  }
+
+  async bulkSubscriptionActions(
+    action: string,
+    subscriptionIds: string[],
+    adminUserId: string
+  ): Promise<BulkActionResponse> {
+    const results: BulkItemResult[] = [];
+    let processedCount = 0;
+    let failedCount = 0;
+
+    for (const subId of subscriptionIds) {
+      try {
+        if (action.toUpperCase() === 'REVIEW') {
+          results.push({ id: subId, success: true, message: 'Subscription reviewed.' });
+          processedCount++;
+        } else if (action.toUpperCase() === 'EXTEND') {
+          const sub = await prisma.subscription.findUnique({ where: { id: subId } });
+          if (!sub) {
+            results.push({ id: subId, success: false, message: 'Subscription not found.' });
+            failedCount++;
+            continue;
+          }
+          const newEndDate = new Date(sub.endDate);
+          newEndDate.setDate(newEndDate.getDate() + 30);
+          await prisma.subscription.update({
+            where: { id: sub.id },
+            data: { endDate: newEndDate, status: 'ACTIVE' },
+          });
+          results.push({ id: subId, success: true, message: 'Subscription extended by 30 days.' });
+          processedCount++;
+        } else {
+          results.push({ id: subId, success: false, message: `Unsupported action: '${action}'.` });
+          failedCount++;
+        }
+      } catch (err: any) {
+        results.push({ id: subId, success: false, message: err.message || 'Failed to process subscription.' });
+        failedCount++;
+      }
+    }
+
+    return {
+      success: failedCount === 0 || processedCount > 0,
+      action,
+      processedCount,
+      failedCount,
+      totalRequested: subscriptionIds.length,
+      results,
     };
   }
 }

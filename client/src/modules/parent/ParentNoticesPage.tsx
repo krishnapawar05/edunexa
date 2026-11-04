@@ -11,8 +11,17 @@ import {
   ChevronRight,
   X,
   FileText,
+  Download,
+  MailCheck,
 } from 'lucide-react';
 import { Breadcrumbs } from '../../components/Breadcrumbs.js';
+import {
+  useBulkSelection,
+  SelectAllCheckbox,
+  RowCheckbox,
+  BulkActionToolbar,
+  BulkActionItem,
+} from '../../components/bulk/index.js';
 import { operationsApi } from '../../services/api.js';
 
 export const ParentNoticesPage: React.FC = () => {
@@ -26,6 +35,16 @@ export const ParentNoticesPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
 
   const [selectedNotice, setSelectedNotice] = useState<any>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Bulk Selection
+  const selection = useBulkSelection();
+  const [bulkActionLoading, setBulkActionLoading] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
 
   const loadData = async () => {
     try {
@@ -59,6 +78,81 @@ export const ParentNoticesPage: React.FC = () => {
     }
     return true;
   });
+
+  const handleBulkAction = async (action: string) => {
+    const targetIds = selection.isAllMatching
+      ? filteredNotices.map((n) => n.id)
+      : selection.getSelectedList();
+
+    if (targetIds.length === 0) {
+      showToast('Please select at least one notice.');
+      return;
+    }
+
+    setBulkActionLoading(action);
+    try {
+      const res = await operationsApi.bulkNoticeActions({
+        ids: targetIds,
+        action,
+      });
+
+      showToast(res.message || `Marked ${res.processedCount} notice(s) as read.`);
+      selection.clearSelection();
+      loadData();
+    } catch (err: any) {
+      showToast(err.message || `Failed to process bulk ${action.toLowerCase()}.`);
+    } finally {
+      setBulkActionLoading(null);
+    }
+  };
+
+  const handleBulkExportCsv = () => {
+    const exportTargets = selection.selectedCount > 0
+      ? filteredNotices.filter((n) => selection.isSelected(n.id))
+      : filteredNotices;
+
+    if (exportTargets.length === 0) {
+      showToast('No circulars to export.');
+      return;
+    }
+
+    const headers = ['Title', 'Audience', 'Published Date', 'Urgent', 'Content'];
+    const rows = exportTargets.map((n) => [
+      `"${n.title}"`,
+      `"${n.audience}"`,
+      new Date(n.publishedAt || n.createdAt).toLocaleDateString(),
+      n.isUrgent ? 'YES' : 'NO',
+      `"${(n.content || '').replace(/"/g, '""')}"`,
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `parent-notices-${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast(`Exported ${exportTargets.length} circulars to CSV.`);
+  };
+
+  const bulkActions: BulkActionItem[] = [
+    {
+      id: 'bulk-mark-read',
+      label: 'Mark as Read',
+      icon: <MailCheck size={14} />,
+      onClick: () => handleBulkAction('MARK_READ'),
+      loading: bulkActionLoading === 'MARK_READ',
+      variant: 'primary',
+    },
+    {
+      id: 'bulk-export-notices',
+      label: 'Export CSV',
+      icon: <Download size={14} />,
+      onClick: handleBulkExportCsv,
+      variant: 'outline',
+    },
+  ];
 
   return (
     <div className="ed-page">
@@ -148,6 +242,14 @@ export const ParentNoticesPage: React.FC = () => {
       {/* Notices View */}
       {activeTab === 'notices' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+          <BulkActionToolbar
+            selection={selection}
+            actions={bulkActions}
+            totalMatchingCount={filteredNotices.length}
+            currentPageIds={filteredNotices.map((n) => n.id)}
+            entityName="notices"
+          />
+
           {loading ? (
             <div className="ed-card" style={{ padding: '48px', textAlign: 'center', color: 'var(--text-muted)' }}>
               <RefreshCw size={24} className="animate-spin" style={{ margin: '0 auto 12px' }} />
@@ -170,27 +272,37 @@ export const ParentNoticesPage: React.FC = () => {
                     cursor: 'pointer',
                     transition: 'all 0.15s ease-in-out',
                     borderLeft: notice.isUrgent ? '4px solid var(--danger-solid)' : '1px solid var(--border-default)',
+                    backgroundColor: selection.isSelected(notice.id) ? 'var(--primary-50, rgba(26, 77, 46, 0.05))' : undefined,
                   }}
                   onClick={() => setSelectedNotice(notice)}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px', marginBottom: '8px' }}>
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
-                        {notice.isUrgent && (
-                          <span className="ed-badge ed-badge-danger" style={{ fontSize: '0.72rem' }}>
-                            URGENT ADVISORY
-                          </span>
-                        )}
-                        <span className="ed-badge ed-badge-neutral" style={{ fontSize: '0.72rem' }}>
-                          {notice.audience === 'PARENTS_ONLY' ? 'Parents Only' : 'All School Members'}
-                        </span>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                          <Clock size={12} /> {pubDate}
-                        </span>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                      <div onClick={(e) => e.stopPropagation()} style={{ paddingTop: '2px' }}>
+                        <RowCheckbox
+                          id={notice.id}
+                          checked={selection.isSelected(notice.id)}
+                          onToggle={selection.toggleSelect}
+                        />
                       </div>
-                      <h3 style={{ margin: '0 0 6px', fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                        {notice.title}
-                      </h3>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
+                          {notice.isUrgent && (
+                            <span className="ed-badge ed-badge-danger" style={{ fontSize: '0.72rem' }}>
+                              URGENT ADVISORY
+                            </span>
+                          )}
+                          <span className="ed-badge ed-badge-neutral" style={{ fontSize: '0.72rem' }}>
+                            {notice.audience === 'PARENTS_ONLY' ? 'Parents Only' : 'All School Members'}
+                          </span>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                            <Clock size={12} /> {pubDate}
+                          </span>
+                        </div>
+                        <h3 style={{ margin: '0 0 6px', fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                          {notice.title}
+                        </h3>
+                      </div>
                     </div>
                     <ChevronRight size={18} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
                   </div>
@@ -321,6 +433,30 @@ export const ParentNoticesPage: React.FC = () => {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Toast Alert */}
+      {toastMessage && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: '24px',
+            right: '24px',
+            backgroundColor: 'var(--ink-900)',
+            color: '#ffffff',
+            padding: '12px 18px',
+            borderRadius: 'var(--radius-md)',
+            boxShadow: 'var(--shadow-lg)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            zIndex: 9999,
+            fontSize: '0.86rem',
+          }}
+        >
+          <CheckCircle2 size={16} style={{ color: 'var(--success-solid, #10b981)' }} />
+          <span>{toastMessage}</span>
         </div>
       )}
     </div>

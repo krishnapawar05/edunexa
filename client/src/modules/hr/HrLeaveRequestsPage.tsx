@@ -13,10 +13,19 @@ import {
   User,
   Calendar,
   FileText,
+  Download,
 } from 'lucide-react';
 import { Badge } from '../../components/ui/Badge.js';
 import { Button } from '../../components/ui/Button.js';
 import { Modal } from '../../components/ui/Modal.js';
+import {
+  useBulkSelection,
+  SelectAllCheckbox,
+  RowCheckbox,
+  BulkActionToolbar,
+  BulkActionConfirmationDialog,
+  BulkActionItem,
+} from '../../components/bulk/index.js';
 import { useSchoolBranding } from '../../context/SchoolBrandingContext.js';
 import { academicApi } from '../../services/api.js';
 
@@ -52,6 +61,18 @@ export const HrLeaveRequestsPage: React.FC = () => {
   const [reviewNotes, setReviewNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Bulk Selection & Actions State
+  const selection = useBulkSelection();
+  const [bulkActionLoading, setBulkActionLoading] = useState<string | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    action: string;
+    title: string;
+    message: string;
+    confirmLabel: string;
+    variant: 'danger' | 'warning' | 'primary';
+  } | null>(null);
 
   // Apply Leave Form
   const [newLeave, setNewLeave] = useState({
@@ -168,6 +189,105 @@ export const HrLeaveRequestsPage: React.FC = () => {
       l.type.toLowerCase().includes(q);
     return matchesSearch;
   });
+
+  const handleBulkAction = async (action: 'APPROVE' | 'REJECT') => {
+    const targetIds = selection.isAllMatching
+      ? filteredLeaves.map((l) => l.id)
+      : selection.getSelectedList();
+
+    if (targetIds.length === 0) {
+      showToast('Please select at least one leave request.');
+      return;
+    }
+
+    setBulkActionLoading(action);
+    try {
+      const res = await academicApi.bulkReviewStaffLeaves({
+        ids: targetIds,
+        action,
+        params: {
+          reviewNotes: `Bulk processed by HR Leave Administrator as ${action}`,
+        },
+      });
+
+      showToast(res.message || `Processed ${res.processedCount} leave request(s).`);
+      selection.clearSelection();
+      loadLeaves();
+    } catch (err: any) {
+      showToast(err.message || `Failed to process bulk leave ${action.toLowerCase()}.`);
+    } finally {
+      setBulkActionLoading(null);
+      setConfirmDialog(null);
+    }
+  };
+
+  const handleBulkExportCsv = () => {
+    const exportTargets = selection.selectedCount > 0
+      ? filteredLeaves.filter((l) => selection.isSelected(l.id))
+      : filteredLeaves;
+
+    if (exportTargets.length === 0) {
+      showToast('No leave requests to export.');
+      return;
+    }
+
+    const headers = ['Staff Member', 'Employee ID', 'Leave Type', 'Duration', 'Start Date', 'End Date', 'Reason', 'Status'];
+    const rows = exportTargets.map((l) => [
+      `"${l.staffName}"`,
+      l.employeeId,
+      l.type,
+      `"${l.duration}"`,
+      l.startDate.slice(0, 10),
+      l.endDate.slice(0, 10),
+      `"${l.reason}"`,
+      l.status,
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `hr-leave-requests-${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast(`Exported ${exportTargets.length} leave records to CSV.`);
+  };
+
+  const bulkActions: BulkActionItem[] = [
+    {
+      id: 'bulk-approve-leaves',
+      label: 'Approve Leaves',
+      icon: <CheckCircle2 size={14} />,
+      onClick: () => handleBulkAction('APPROVE'),
+      loading: bulkActionLoading === 'APPROVE',
+      variant: 'primary',
+    },
+    {
+      id: 'bulk-reject-leaves',
+      label: 'Decline Leaves',
+      icon: <XCircle size={14} />,
+      onClick: () =>
+        setConfirmDialog({
+          isOpen: true,
+          action: 'REJECT',
+          title: 'Decline Leave Requests',
+          message:
+            'Are you sure you want to decline all selected staff leave applications? Staff members will be notified.',
+          confirmLabel: 'Decline Requests',
+          variant: 'danger',
+        }),
+      loading: bulkActionLoading === 'REJECT',
+      variant: 'danger',
+    },
+    {
+      id: 'bulk-export-leaves',
+      label: 'Export CSV',
+      icon: <Download size={14} />,
+      onClick: handleBulkExportCsv,
+      variant: 'outline',
+    },
+  ];
 
   const pendingCount = leaves.filter((l) => l.status === 'PENDING').length;
   const approvedCount = leaves.filter((l) => l.status === 'APPROVED').length;
@@ -335,6 +455,14 @@ export const HrLeaveRequestsPage: React.FC = () => {
         </div>
 
         {/* Table Content */}
+        <BulkActionToolbar
+          selection={selection}
+          actions={bulkActions}
+          totalMatchingCount={filteredLeaves.length}
+          currentPageIds={filteredLeaves.map((l) => l.id)}
+          entityName="leave requests"
+        />
+
         <div className="ed-table-container" style={{ border: 'none', borderRadius: 0 }}>
           {loading ? (
             <div style={{ padding: '48px', textAlign: 'center', color: 'var(--text-muted)' }}>
@@ -354,6 +482,9 @@ export const HrLeaveRequestsPage: React.FC = () => {
             <table className="ed-table">
               <thead>
                 <tr>
+                  <th style={{ width: '40px', textAlign: 'center' }}>
+                    <SelectAllCheckbox pageIds={filteredLeaves.map((l) => l.id)} selection={selection} />
+                  </th>
                   <th>Staff Member</th>
                   <th>Leave Type</th>
                   <th>Duration</th>
@@ -365,7 +496,19 @@ export const HrLeaveRequestsPage: React.FC = () => {
               </thead>
               <tbody>
                 {filteredLeaves.map((leave) => (
-                  <tr key={leave.id}>
+                  <tr
+                    key={leave.id}
+                    style={{
+                      backgroundColor: selection.isSelected(leave.id) ? 'var(--primary-50, rgba(26, 77, 46, 0.05))' : undefined,
+                    }}
+                  >
+                    <td style={{ width: '40px', textAlign: 'center' }}>
+                      <RowCheckbox
+                        id={leave.id}
+                        checked={selection.isSelected(leave.id)}
+                        onToggle={selection.toggleSelect}
+                      />
+                    </td>
                     <td>
                       <div>
                         <div style={{ fontWeight: 600 }}>{leave.staffName}</div>
@@ -535,6 +678,22 @@ export const HrLeaveRequestsPage: React.FC = () => {
           </div>
         </form>
       </Modal>
+
+      {/* Bulk Action Confirmation Dialog */}
+      {confirmDialog && (
+        <BulkActionConfirmationDialog
+          isOpen={confirmDialog.isOpen}
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          confirmLabel={confirmDialog.confirmLabel}
+          variant={confirmDialog.variant}
+          count={selection.isAllMatching ? filteredLeaves.length : selection.selectedCount}
+          entityName="leave requests"
+          isLoading={bulkActionLoading !== null}
+          onConfirm={() => handleBulkAction(confirmDialog.action as any)}
+          onClose={() => setConfirmDialog(null)}
+        />
+      )}
     </div>
   );
 };

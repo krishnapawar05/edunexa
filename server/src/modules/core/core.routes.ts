@@ -16,6 +16,7 @@ import {
   IdCardDeactivateSchema,
   AdmissionReviewSchema,
   UpdateAccountStatusSchema,
+  BulkActionRequestSchema,
 } from '@edunexa/shared';
 
 const router = Router();
@@ -149,6 +150,15 @@ router.post(
   }
 );
 
+router.post(
+  '/students/bulk-actions',
+  requireRole(PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.SUPER_ADMIN),
+  validateRequest({ body: BulkActionRequestSchema }),
+  (req, res, next) => {
+    coreSchoolController.bulkStudentActions(req, res, next);
+  }
+);
+
 router.get(
   '/students/:id',
   requireRole(
@@ -204,6 +214,15 @@ router.post(
   validateRequest({ body: CreateStaffSchema }),
   (req, res, next) => {
     coreSchoolController.createStaff(req, res, next);
+  }
+);
+
+router.post(
+  '/staff/bulk-actions',
+  requireRole(PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.HR_STAFF, PlatformRole.SUPER_ADMIN),
+  validateRequest({ body: BulkActionRequestSchema }),
+  (req, res, next) => {
+    coreSchoolController.bulkStaffActions(req, res, next);
   }
 );
 
@@ -279,6 +298,15 @@ router.patch(
   validateRequest({ body: AdmissionReviewSchema }),
   (req, res, next) => {
     coreSchoolController.reviewAdmission(req, res, next);
+  }
+);
+
+router.post(
+  '/admissions/bulk-review',
+  requireRole(PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.SUPER_ADMIN),
+  validateRequest({ body: BulkActionRequestSchema }),
+  (req, res, next) => {
+    coreSchoolController.bulkAdmissionsReview(req, res, next);
   }
 );
 

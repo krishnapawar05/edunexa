@@ -16,6 +16,9 @@ import {
   Building,
   CreditCard,
   UserCheck,
+  UserX,
+  Send,
+  Download,
   ChevronLeft,
   ChevronRight,
   Shield,
@@ -25,6 +28,14 @@ import {
 import { Badge } from '../../components/ui/Badge.js';
 import { Button } from '../../components/ui/Button.js';
 import { Modal } from '../../components/ui/Modal.js';
+import {
+  useBulkSelection,
+  SelectAllCheckbox,
+  RowCheckbox,
+  BulkActionToolbar,
+  BulkActionConfirmationDialog,
+  BulkActionItem,
+} from '../../components/bulk/index.js';
 import { useSchoolBranding } from '../../context/SchoolBrandingContext.js';
 import { coreApi } from '../../services/api.js';
 
@@ -69,6 +80,18 @@ export const HrStaffRecordsPage: React.FC = () => {
   const [showDeactivateModal, setShowDeactivateModal] = useState<StaffMember | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Bulk Selection & Actions State
+  const selection = useBulkSelection();
+  const [bulkActionLoading, setBulkActionLoading] = useState<string | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    action: string;
+    title: string;
+    message: string;
+    confirmLabel: string;
+    variant: 'danger' | 'warning' | 'primary';
+  } | null>(null);
 
   // Add Staff State
   const [newStaff, setNewStaff] = useState({
@@ -262,6 +285,113 @@ export const HrStaffRecordsPage: React.FC = () => {
     return s.employmentStatus === statusFilter;
   });
 
+  const handleBulkAction = async (action: string) => {
+    const targetIds = selection.isAllMatching
+      ? displayedStaff.map((s) => s.id)
+      : selection.getSelectedList();
+
+    if (targetIds.length === 0) {
+      showToast('Please select at least one staff record.');
+      return;
+    }
+
+    setBulkActionLoading(action);
+    try {
+      const res = await coreApi.bulkStaffActions({
+        ids: targetIds,
+        action: action as any,
+        params: {
+          note: `Bulk processed by HR Personnel Admin as ${action}`,
+        },
+      });
+
+      showToast(res.message || `Processed ${res.processedCount} staff records.`);
+      selection.clearSelection();
+      loadStaff();
+    } catch (err: any) {
+      showToast(err.message || `Failed to execute bulk ${action.toLowerCase()}.`);
+    } finally {
+      setBulkActionLoading(null);
+      setConfirmDialog(null);
+    }
+  };
+
+  const handleBulkExportSelectedCsv = () => {
+    const exportTargets = selection.selectedCount > 0
+      ? displayedStaff.filter((s) => selection.isSelected(s.id))
+      : displayedStaff;
+
+    if (exportTargets.length === 0) {
+      showToast('No staff personnel to export.');
+      return;
+    }
+
+    const headers = ['Employee ID', 'First Name', 'Last Name', 'Email', 'Phone', 'Department', 'Designation', 'Status', 'Joining Date'];
+    const rows = exportTargets.map((s) => [
+      s.employeeId,
+      `"${s.firstName}"`,
+      `"${s.lastName}"`,
+      `"${s.email}"`,
+      `"${s.phone || ''}"`,
+      `"${s.departmentName || ''}"`,
+      `"${s.designation || ''}"`,
+      s.employmentStatus,
+      s.joiningDate ? s.joiningDate.slice(0, 10) : '',
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `hr-staff-roster-${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast(`Exported ${exportTargets.length} staff records to CSV.`);
+  };
+
+  const bulkActions: BulkActionItem[] = [
+    {
+      id: 'bulk-activate',
+      label: 'Activate',
+      icon: <UserCheck size={14} />,
+      onClick: () => handleBulkAction('ACTIVATE'),
+      loading: bulkActionLoading === 'ACTIVATE',
+      variant: 'primary',
+    },
+    {
+      id: 'bulk-suspend',
+      label: 'Suspend / On Leave',
+      icon: <UserX size={14} />,
+      onClick: () =>
+        setConfirmDialog({
+          isOpen: true,
+          action: 'SUSPEND',
+          title: 'Suspend Staff Members',
+          message:
+            'Are you sure you want to suspend or place the selected staff records on leave? They will lose access to school administrative tools.',
+          confirmLabel: 'Suspend Staff',
+          variant: 'warning',
+        }),
+      loading: bulkActionLoading === 'SUSPEND',
+      variant: 'warning',
+    },
+    {
+      id: 'bulk-invite',
+      label: 'Send Invitations',
+      icon: <Send size={14} />,
+      onClick: () => handleBulkAction('SEND_INVITATION'),
+      loading: bulkActionLoading === 'SEND_INVITATION',
+      variant: 'secondary',
+    },
+    {
+      id: 'bulk-export',
+      label: 'Export CSV',
+      icon: <Download size={14} />,
+      onClick: handleBulkExportSelectedCsv,
+      variant: 'outline',
+    },
+  ];
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
       {/* Toast */}
@@ -398,6 +528,14 @@ export const HrStaffRecordsPage: React.FC = () => {
         </div>
 
         {/* Table Content */}
+        <BulkActionToolbar
+          selection={selection}
+          actions={bulkActions}
+          totalMatchingCount={totalStaff}
+          currentPageIds={displayedStaff.map((s) => s.id)}
+          entityName="staff"
+        />
+
         <div className="ed-table-container" style={{ border: 'none', borderRadius: 0 }}>
           {loading ? (
             <div style={{ padding: '48px', textAlign: 'center', color: 'var(--text-muted)' }}>
@@ -417,6 +555,9 @@ export const HrStaffRecordsPage: React.FC = () => {
             <table className="ed-table">
               <thead>
                 <tr>
+                  <th style={{ width: '40px', textAlign: 'center' }}>
+                    <SelectAllCheckbox pageIds={displayedStaff.map((s) => s.id)} selection={selection} />
+                  </th>
                   <th>Employee</th>
                   <th>ID Number</th>
                   <th>Department</th>
@@ -428,7 +569,19 @@ export const HrStaffRecordsPage: React.FC = () => {
               </thead>
               <tbody>
                 {displayedStaff.map((staff) => (
-                  <tr key={staff.id}>
+                  <tr
+                    key={staff.id}
+                    style={{
+                      backgroundColor: selection.isSelected(staff.id) ? 'var(--primary-50, rgba(26, 77, 46, 0.05))' : undefined,
+                    }}
+                  >
+                    <td style={{ width: '40px', textAlign: 'center' }}>
+                      <RowCheckbox
+                        id={staff.id}
+                        checked={selection.isSelected(staff.id)}
+                        onToggle={selection.toggleSelect}
+                      />
+                    </td>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
                         <div
@@ -864,6 +1017,22 @@ export const HrStaffRecordsPage: React.FC = () => {
             </div>
           </div>
         </Modal>
+      )}
+
+      {/* Bulk Action Confirmation Dialog */}
+      {confirmDialog && (
+        <BulkActionConfirmationDialog
+          isOpen={confirmDialog.isOpen}
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          confirmLabel={confirmDialog.confirmLabel}
+          variant={confirmDialog.variant}
+          count={selection.isAllMatching ? totalStaff : selection.selectedCount}
+          entityName="staff"
+          isLoading={bulkActionLoading !== null}
+          onConfirm={() => handleBulkAction(confirmDialog.action)}
+          onClose={() => setConfirmDialog(null)}
+        />
       )}
     </div>
   );

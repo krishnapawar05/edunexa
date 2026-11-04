@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { academicController } from './academic.controller.js';
 import { authenticateUser, requireRole, enforceStudentIsolation } from '../../middleware/auth.middleware.js';
-import { PlatformRole } from '@edunexa/shared';
+import { validateRequest } from '../../middleware/validate.js';
+import { PlatformRole, BulkActionRequestSchema } from '@edunexa/shared';
 
 const router = Router();
 
@@ -70,6 +71,13 @@ router.patch(
   '/attendance/staff/leave/:id/review',
   requireRole(PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.HR_STAFF),
   academicController.reviewStaffLeaveRequest
+);
+
+router.post(
+  '/attendance/staff/leave/bulk-review',
+  requireRole(PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.HR_STAFF),
+  validateRequest({ body: BulkActionRequestSchema }),
+  academicController.bulkReviewStaffLeaves
 );
 
 // ============================================================================

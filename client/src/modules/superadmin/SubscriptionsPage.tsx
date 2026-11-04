@@ -13,7 +13,18 @@ import {
   Users,
   Award,
   Info,
+  Download,
+  UserCheck,
+  Clock,
 } from 'lucide-react';
+import {
+  useBulkSelection,
+  SelectAllCheckbox,
+  RowCheckbox,
+  BulkActionToolbar,
+  BulkActionConfirmationDialog,
+  BulkActionItem,
+} from '../../components/bulk/index.js';
 import { superadminApi } from '../../services/api.js';
 
 export const SubscriptionsPage: React.FC = () => {
@@ -29,6 +40,24 @@ export const SubscriptionsPage: React.FC = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedSub, setSelectedSub] = useState<any | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Bulk Selection & Actions State
+  const selection = useBulkSelection();
+  const [bulkActionLoading, setBulkActionLoading] = useState<string | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    action: string;
+    title: string;
+    message: string;
+    confirmLabel: string;
+    variant: 'danger' | 'warning' | 'primary';
+  } | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
 
   const [editForm, setEditForm] = useState({
     planName: 'Pro Plan',
@@ -109,6 +138,105 @@ export const SubscriptionsPage: React.FC = () => {
     const diff = Math.ceil((end - now) / (1000 * 60 * 60 * 24));
     return diff;
   };
+
+  const handleBulkAction = async (action: 'ACTIVATE' | 'EXTEND' | 'REVIEW') => {
+    const targetIds = selection.isAllMatching
+      ? filteredSubs.map((s) => s.id)
+      : selection.getSelectedList();
+
+    if (targetIds.length === 0) {
+      showToast('Please select at least one subscription.');
+      return;
+    }
+
+    setBulkActionLoading(action);
+    try {
+      const res = await superadminApi.bulkSubscriptionActions({
+        ids: targetIds,
+        action,
+        params: {
+          extensionDays: 30,
+        },
+      });
+
+      showToast(res.message || `Processed ${res.processedCount} subscription record(s).`);
+      selection.clearSelection();
+      loadSubscriptions();
+    } catch (err: any) {
+      showToast(err.message || `Failed to execute bulk ${action.toLowerCase()}.`);
+    } finally {
+      setBulkActionLoading(null);
+      setConfirmDialog(null);
+    }
+  };
+
+  const handleBulkExportCsv = () => {
+    const exportTargets = selection.selectedCount > 0
+      ? filteredSubs.filter((s) => selection.isSelected(s.id))
+      : filteredSubs;
+
+    if (exportTargets.length === 0) {
+      showToast('No subscriptions to export.');
+      return;
+    }
+
+    const headers = ['School Name', 'Code', 'Plan Tier', 'Billing Cycle', 'Student Cap', 'Staff Cap', 'Status', 'End Date'];
+    const rows = exportTargets.map((s) => [
+      `"${s.school?.name || ''}"`,
+      s.school?.code || '',
+      `"${s.planName}"`,
+      s.billingCycle,
+      s.maxStudents,
+      s.maxStaff,
+      s.status,
+      s.endDate ? new Date(s.endDate).toISOString().slice(0, 10) : '—',
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `subscriptions-${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast(`Exported ${exportTargets.length} subscription records to CSV.`);
+  };
+
+  const bulkActions: BulkActionItem[] = [
+    {
+      id: 'bulk-extend-subs',
+      label: 'Extend Term (+30d)',
+      icon: <Clock size={14} />,
+      onClick: () =>
+        setConfirmDialog({
+          isOpen: true,
+          action: 'EXTEND',
+          title: 'Extend Subscription Term',
+          message:
+            'Are you sure you want to add 30 days of active service to the selected tenant subscriptions in PostgreSQL?',
+          confirmLabel: 'Extend Term',
+          variant: 'primary',
+        }),
+      loading: bulkActionLoading === 'EXTEND',
+      variant: 'primary',
+    },
+    {
+      id: 'bulk-activate-subs',
+      label: 'Activate Licenses',
+      icon: <UserCheck size={14} />,
+      onClick: () => handleBulkAction('ACTIVATE'),
+      loading: bulkActionLoading === 'ACTIVATE',
+      variant: 'secondary',
+    },
+    {
+      id: 'bulk-export-subs',
+      label: 'Export CSV',
+      icon: <Download size={14} />,
+      onClick: handleBulkExportCsv,
+      variant: 'outline',
+    },
+  ];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
@@ -304,9 +432,20 @@ export const SubscriptionsPage: React.FC = () => {
             </div>
           ) : (
             <div className="ed-table-responsive">
+              <BulkActionToolbar
+                selection={selection}
+                actions={bulkActions}
+                totalMatchingCount={filteredSubs.length}
+                currentPageIds={filteredSubs.map((s) => s.id)}
+                entityName="subscriptions"
+              />
+
               <table className="ed-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.84rem' }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--border-default)', textAlign: 'left', backgroundColor: 'var(--bg-subtle)' }}>
+                    <th style={{ width: '40px', padding: '12px 16px', textAlign: 'center' }}>
+                      <SelectAllCheckbox pageIds={filteredSubs.map((s) => s.id)} selection={selection} />
+                    </th>
                     <th style={{ padding: '12px 16px' }}>School Tenant</th>
                     <th style={{ padding: '12px 16px' }}>Allocated Plan</th>
                     <th style={{ padding: '12px 16px' }}>Billing Cycle</th>
@@ -323,7 +462,20 @@ export const SubscriptionsPage: React.FC = () => {
                     const isExpired = daysRemaining <= 0;
 
                     return (
-                      <tr key={sub.id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                      <tr
+                        key={sub.id}
+                        style={{
+                          borderBottom: '1px solid var(--border-subtle)',
+                          backgroundColor: selection.isSelected(sub.id) ? 'var(--primary-50, rgba(26, 77, 46, 0.05))' : undefined,
+                        }}
+                      >
+                        <td style={{ width: '40px', padding: '12px 16px', textAlign: 'center' }}>
+                          <RowCheckbox
+                            id={sub.id}
+                            checked={selection.isSelected(sub.id)}
+                            onToggle={selection.toggleSelect}
+                          />
+                        </td>
                         <td style={{ padding: '12px 16px' }}>
                           <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
                             {sub.school?.name || 'School Tenant'}
@@ -533,6 +685,46 @@ export const SubscriptionsPage: React.FC = () => {
               </div>
             </form>
           </div>
+        </div>
+      )}
+
+      {/* Bulk Action Confirmation Dialog */}
+      {confirmDialog && (
+        <BulkActionConfirmationDialog
+          isOpen={confirmDialog.isOpen}
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          confirmLabel={confirmDialog.confirmLabel}
+          variant={confirmDialog.variant}
+          count={selection.isAllMatching ? filteredSubs.length : selection.selectedCount}
+          entityName="subscriptions"
+          isLoading={bulkActionLoading !== null}
+          onConfirm={() => handleBulkAction(confirmDialog.action as any)}
+          onClose={() => setConfirmDialog(null)}
+        />
+      )}
+
+      {/* Toast Alert */}
+      {toastMessage && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: '24px',
+            right: '24px',
+            backgroundColor: 'var(--ink-900)',
+            color: '#ffffff',
+            padding: '12px 18px',
+            borderRadius: 'var(--radius-md)',
+            boxShadow: 'var(--shadow-lg)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            zIndex: 9999,
+            fontSize: '0.86rem',
+          }}
+        >
+          <CheckCircle2 size={16} style={{ color: 'var(--success-solid, #10b981)' }} />
+          <span>{toastMessage}</span>
         </div>
       )}
     </div>

@@ -17,9 +17,17 @@ import {
   ShieldCheck,
   X,
   BookOpen,
+  Download,
 } from 'lucide-react';
 import { Badge } from '../../components/ui/Badge.js';
 import { Button } from '../../components/ui/Button.js';
+import {
+  useBulkSelection,
+  SelectAllCheckbox,
+  RowCheckbox,
+  BulkActionToolbar,
+  BulkActionItem,
+} from '../../components/bulk/index.js';
 import { academicApi, coreApi } from '../../services/api.js';
 
 interface ExamScheduleItem {
@@ -56,6 +64,9 @@ export const ExamSchedulesPage: React.FC = () => {
   const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
+
+  // Bulk Selection State
+  const selection = useBulkSelection();
 
   // Form Fields
   const [formData, setFormData] = useState({
@@ -226,6 +237,52 @@ export const ExamSchedulesPage: React.FC = () => {
         return <Badge variant="neutral">{status}</Badge>;
     }
   };
+
+  const handleBulkExportCsv = () => {
+    const exportTargets = selection.selectedCount > 0
+      ? filteredSchedules.filter((s) => selection.isSelected(s.id))
+      : filteredSchedules;
+
+    if (exportTargets.length === 0) {
+      setErrorMsg('No exam schedules to export.');
+      return;
+    }
+
+    const headers = ['Exam Name', 'Class', 'Subject Code', 'Exam Type', 'Date', 'Start Time', 'Duration (Mins)', 'Max Marks', 'Pass Marks', 'Status'];
+    const rows = exportTargets.map((s) => [
+      `"${s.name}"`,
+      `"${s.className}"`,
+      s.subjectCode,
+      s.examType,
+      s.examDate,
+      s.startTime,
+      s.durationMinutes,
+      s.maxMarks,
+      s.passMarks,
+      s.status,
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `exam-schedules-${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setSuccessToast(`Exported ${exportTargets.length} exam schedule records to CSV.`);
+    setTimeout(() => setSuccessToast(null), 4000);
+  };
+
+  const bulkActions: BulkActionItem[] = [
+    {
+      id: 'bulk-export-schedules',
+      label: 'Export CSV',
+      icon: <Download size={14} />,
+      onClick: handleBulkExportCsv,
+      variant: 'outline',
+    },
+  ];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)', maxWidth: '100%' }}>
@@ -483,6 +540,14 @@ export const ExamSchedulesPage: React.FC = () => {
           overflow: 'hidden',
         }}
       >
+        <BulkActionToolbar
+          selection={selection}
+          actions={bulkActions}
+          totalMatchingCount={filteredSchedules.length}
+          currentPageIds={filteredSchedules.map((s) => s.id)}
+          entityName="exam schedules"
+        />
+
         {loading ? (
           <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }}>
             <Loader2 size={32} className="animate-spin" style={{ margin: '0 auto 12px auto' }} />
@@ -512,6 +577,9 @@ export const ExamSchedulesPage: React.FC = () => {
                     fontWeight: 600,
                   }}
                 >
+                  <th style={{ width: '40px', padding: '12px 16px', textAlign: 'center' }}>
+                    <SelectAllCheckbox pageIds={filteredSchedules.map((s) => s.id)} selection={selection} />
+                  </th>
                   <th style={{ padding: '12px 16px' }}>EXAMINATION NAME</th>
                   <th style={{ padding: '12px 16px' }}>CLASS / SUBJECT</th>
                   <th style={{ padding: '12px 16px' }}>EXAM DATE & TIME</th>
@@ -527,9 +595,17 @@ export const ExamSchedulesPage: React.FC = () => {
                     key={schedule.id}
                     style={{
                       borderBottom: '1px solid var(--border-primary)',
+                      backgroundColor: selection.isSelected(schedule.id) ? 'var(--primary-50, rgba(26, 77, 46, 0.05))' : undefined,
                       transition: 'background-color 0.15s',
                     }}
                   >
+                    <td style={{ width: '40px', padding: '14px 16px', textAlign: 'center' }}>
+                      <RowCheckbox
+                        id={schedule.id}
+                        checked={selection.isSelected(schedule.id)}
+                        onToggle={selection.toggleSelect}
+                      />
+                    </td>
                     <td style={{ padding: '14px 16px' }}>
                       <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{schedule.name}</div>
                       <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>

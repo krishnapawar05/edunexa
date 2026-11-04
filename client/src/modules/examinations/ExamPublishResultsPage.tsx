@@ -18,9 +18,18 @@ import {
   Clock,
   ArrowRight,
   ShieldCheck,
+  Download,
 } from 'lucide-react';
 import { Badge } from '../../components/ui/Badge.js';
 import { Button } from '../../components/ui/Button.js';
+import {
+  useBulkSelection,
+  SelectAllCheckbox,
+  RowCheckbox,
+  BulkActionToolbar,
+  BulkActionConfirmationDialog,
+  BulkActionItem,
+} from '../../components/bulk/index.js';
 import { academicApi, coreApi } from '../../services/api.js';
 
 interface ExamReadinessItem {
@@ -62,6 +71,18 @@ export const ExamPublishResultsPage: React.FC = () => {
   const [previewStudentId, setPreviewStudentId] = useState<string | null>(null);
   const [reportCardData, setReportCardData] = useState<any>(null);
   const [loadingReportCard, setLoadingReportCard] = useState(false);
+
+  // Bulk Selection & Actions State
+  const selection = useBulkSelection();
+  const [bulkActionLoading, setBulkActionLoading] = useState<string | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    action: string;
+    title: string;
+    message: string;
+    confirmLabel: string;
+    variant: 'danger' | 'warning' | 'primary';
+  } | null>(null);
 
   const loadAssessments = async () => {
     try {
@@ -176,6 +197,122 @@ export const ExamPublishResultsPage: React.FC = () => {
 
     return matchesSearch && matchesStatus;
   });
+
+  const handleBulkPublish = async (publish: boolean) => {
+    const targetIds = selection.isAllMatching
+      ? filteredItems.map((i) => i.id)
+      : selection.getSelectedList();
+
+    if (targetIds.length === 0) {
+      setErrorMsg('Please select at least one examination.');
+      return;
+    }
+
+    setBulkActionLoading(publish ? 'PUBLISH' : 'UNPUBLISH');
+    try {
+      let succeeded = 0;
+      for (const id of targetIds) {
+        try {
+          await academicApi.publishExamResults(id, publish);
+          succeeded++;
+        } catch (e) {
+          console.error(`Failed to toggle publish for exam ${id}`, e);
+        }
+      }
+
+      setSuccessToast(
+        publish
+          ? `Successfully published ${succeeded} assessment(s) to student dossiers and parent portals.`
+          : `Successfully unpublished / retracted ${succeeded} assessment(s).`
+      );
+      selection.clearSelection();
+      await loadAssessments();
+      setTimeout(() => setSuccessToast(null), 5000);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Bulk publication operation failed.');
+    } finally {
+      setBulkActionLoading(null);
+      setConfirmDialog(null);
+    }
+  };
+
+  const handleBulkExportCsv = () => {
+    const exportTargets = selection.selectedCount > 0
+      ? filteredItems.filter((i) => selection.isSelected(i.id))
+      : filteredItems;
+
+    if (exportTargets.length === 0) {
+      setErrorMsg('No assessments to export.');
+      return;
+    }
+
+    const headers = ['Assessment Name', 'Class', 'Subject Code', 'Exam Date', 'Total Students', 'Marks Entered', 'Pending Marks', 'Status'];
+    const rows = exportTargets.map((i) => [
+      `"${i.name}"`,
+      `"${i.className}"`,
+      i.subjectCode,
+      i.examDate,
+      i.totalStudents,
+      i.marksEnteredCount,
+      i.pendingCount,
+      i.status,
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `exam-readiness-${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setSuccessToast(`Exported ${exportTargets.length} exam records to CSV.`);
+    setTimeout(() => setSuccessToast(null), 4000);
+  };
+
+  const bulkActions: BulkActionItem[] = [
+    {
+      id: 'bulk-publish',
+      label: 'Publish Results',
+      icon: <CheckCircle2 size={14} />,
+      onClick: () =>
+        setConfirmDialog({
+          isOpen: true,
+          action: 'PUBLISH',
+          title: 'Publish Results to Portals',
+          message:
+            'Are you sure you want to publish final grades and report cards for the selected exams? Students and parents will gain access immediately.',
+          confirmLabel: 'Publish Results',
+          variant: 'primary',
+        }),
+      loading: bulkActionLoading === 'PUBLISH',
+      variant: 'primary',
+    },
+    {
+      id: 'bulk-unpublish',
+      label: 'Unpublish Results',
+      icon: <Lock size={14} />,
+      onClick: () =>
+        setConfirmDialog({
+          isOpen: true,
+          action: 'UNPUBLISH',
+          title: 'Unpublish / Conceal Results',
+          message:
+            'Are you sure you want to unpublish selected exams? Grade summaries will be sealed from student and guardian views.',
+          confirmLabel: 'Unpublish Results',
+          variant: 'warning',
+        }),
+      loading: bulkActionLoading === 'UNPUBLISH',
+      variant: 'warning',
+    },
+    {
+      id: 'bulk-export-exams',
+      label: 'Export CSV',
+      icon: <Download size={14} />,
+      onClick: handleBulkExportCsv,
+      variant: 'outline',
+    },
+  ];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)', maxWidth: '100%' }}>
@@ -410,6 +547,14 @@ export const ExamPublishResultsPage: React.FC = () => {
           overflow: 'hidden',
         }}
       >
+        <BulkActionToolbar
+          selection={selection}
+          actions={bulkActions}
+          totalMatchingCount={filteredItems.length}
+          currentPageIds={filteredItems.map((i) => i.id)}
+          entityName="assessments"
+        />
+
         {loading ? (
           <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }}>
             <Loader2 size={32} className="animate-spin" style={{ margin: '0 auto 12px auto' }} />
@@ -437,6 +582,9 @@ export const ExamPublishResultsPage: React.FC = () => {
                     fontWeight: 600,
                   }}
                 >
+                  <th style={{ width: '40px', padding: '12px 16px', textAlign: 'center' }}>
+                    <SelectAllCheckbox pageIds={filteredItems.map((i) => i.id)} selection={selection} />
+                  </th>
                   <th style={{ padding: '12px 16px' }}>ASSESSMENT</th>
                   <th style={{ padding: '12px 16px' }}>CLASS / SUBJECT</th>
                   <th style={{ padding: '12px 16px' }}>EXAM DATE</th>
@@ -453,9 +601,17 @@ export const ExamPublishResultsPage: React.FC = () => {
                       key={item.id}
                       style={{
                         borderBottom: '1px solid var(--border-primary)',
+                        backgroundColor: selection.isSelected(item.id) ? 'var(--primary-50, rgba(26, 77, 46, 0.05))' : undefined,
                         transition: 'background-color 0.15s',
                       }}
                     >
+                      <td style={{ width: '40px', padding: '14px 16px', textAlign: 'center' }}>
+                        <RowCheckbox
+                          id={item.id}
+                          checked={selection.isSelected(item.id)}
+                          onToggle={selection.toggleSelect}
+                        />
+                      </td>
                       <td style={{ padding: '14px 16px' }}>
                         <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{item.name}</div>
                         <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
@@ -623,6 +779,22 @@ export const ExamPublishResultsPage: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Bulk Action Confirmation Dialog */}
+      {confirmDialog && (
+        <BulkActionConfirmationDialog
+          isOpen={confirmDialog.isOpen}
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          confirmLabel={confirmDialog.confirmLabel}
+          variant={confirmDialog.variant}
+          count={selection.isAllMatching ? filteredItems.length : selection.selectedCount}
+          entityName="assessments"
+          isLoading={bulkActionLoading !== null}
+          onConfirm={() => handleBulkPublish(confirmDialog.action === 'PUBLISH')}
+          onClose={() => setConfirmDialog(null)}
+        />
       )}
     </div>
   );

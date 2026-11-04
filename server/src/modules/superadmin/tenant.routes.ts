@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { tenantController } from './tenant.controller.js';
 import { authenticateUser, requireRole } from '../../middleware/auth.middleware.js';
 import { validateRequest } from '../../middleware/validate.js';
-import { PlatformRole, SchoolOnboardingSchema } from '@edunexa/shared';
+import { PlatformRole, SchoolOnboardingSchema, BulkActionRequestSchema } from '@edunexa/shared';
 
 const router = Router();
 
@@ -32,9 +32,17 @@ router.patch('/schools/:id', (req, res, next) => {
   tenantController.updateSchool(req, res, next);
 });
 
+router.post('/schools/bulk-actions', validateRequest({ body: BulkActionRequestSchema }), (req, res, next) => {
+  tenantController.bulkSchoolActions(req, res, next);
+});
+
 // 3. Subscriptions & Plans
 router.get('/subscriptions', (req, res, next) => {
   tenantController.listSubscriptions(req, res, next);
+});
+
+router.post('/subscriptions/bulk-actions', validateRequest({ body: BulkActionRequestSchema }), (req, res, next) => {
+  tenantController.bulkSubscriptionActions(req, res, next);
 });
 
 router.patch('/subscriptions/:id', (req, res, next) => {

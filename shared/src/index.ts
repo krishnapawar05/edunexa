@@ -849,5 +849,39 @@ export interface ConceptTutorAnswerResponse {
   isAiGenerated: boolean;
 }
 
+// ============================================================================
+// UNIVERSAL BULK ACTIONS CONTRACTS
+// ============================================================================
+
+export const BulkActionRequestSchema = z.object({
+  ids: z.array(z.string().min(1)).min(1, 'At least one record ID must be selected').max(500, 'Cannot exceed 500 records per batch'),
+  action: z.string().min(1, 'Action type is required'),
+  params: z.record(z.any()).optional(),
+});
+
+export type BulkActionRequestDTO = z.infer<typeof BulkActionRequestSchema>;
+
+export interface BulkItemResult {
+  id: string;
+  success: boolean;
+  message?: string;
+  data?: any;
+}
+
+export interface BulkActionResponse {
+  success: boolean;
+  action: string;
+  processedCount: number;
+  failedCount: number;
+  totalRequested: number;
+  results: BulkItemResult[];
+  message?: string;
+  summary?: {
+    succeeded: number;
+    failed: number;
+  };
+}
+
+
 
 

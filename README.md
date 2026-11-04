@@ -77,6 +77,7 @@ Every feature listed below has been verified against the local source code, data
 | **Public Online Admissions 2026–2027** | End-to-end prospective student admission application. | Multi-step public application form with dynamic class selection, emergency contacts, parent linking, and automated admission queue review with student roster enrollment. | **Implemented** |
 | **School Identity & Branding** | Multi-tenant school customization and white-labeling. | Centralized in Super Admin Platform Settings; enables configuring institution name, monogram, affiliation code, primary/accent colors, and contact info persisted in PostgreSQL. | **Implemented** |
 | **Institutional Theme & A11y** | Forest-green institutional UI design system. | Accessible high-contrast institutional light theme by default, with seamless dark mode and system theme toggle, fixing all dark-on-dark contrast issues across public and ERP views. | **Implemented** |
+| **Universal Multi-Select & Bulk Actions** | Consistent, context-aware batch operations across all roles. | Reusable `useBulkSelection` hook, indeterminate `SelectAllCheckbox`, `RowCheckbox`, `BulkActionToolbar`, and confirmation modals across 10 directories (Student Directory, Admissions Queue, Faculty HR, HR Staff Records, Staff Leave, Teacher Classes, Exam Publishing, Accounts Invoices, Tenant Subscriptions, and Audit Logs). | **Implemented** |
 
 ---
 

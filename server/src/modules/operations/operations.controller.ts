@@ -208,6 +208,18 @@ export class OperationsController {
     }
   }
 
+  async bulkNoticeActions(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { ids, action } = req.body;
+      const schoolId = req.user!.schoolId!;
+      const userId = req.user!.userId;
+      const result = await operationsService.bulkNoticeActions(schoolId, action, ids, userId);
+      res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async createSchoolEvent(req: Request, res: Response, next: NextFunction) {
     try {
       const parsed = CreateSchoolEventSchema.parse(req.body);

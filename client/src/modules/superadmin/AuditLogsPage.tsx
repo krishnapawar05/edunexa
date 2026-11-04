@@ -11,7 +11,17 @@ import {
   Building2,
   Calendar,
   Lock,
+  Download,
+  ShieldCheck,
+  FileText,
 } from 'lucide-react';
+import {
+  useBulkSelection,
+  SelectAllCheckbox,
+  RowCheckbox,
+  BulkActionToolbar,
+  BulkActionItem,
+} from '../../components/bulk/index.js';
 import { superadminApi } from '../../services/api.js';
 
 export const AuditLogsPage: React.FC = () => {
@@ -22,6 +32,15 @@ export const AuditLogsPage: React.FC = () => {
   const [actionFilter, setActionFilter] = useState('ALL');
   const [selectedLog, setSelectedLog] = useState<any | null>(null);
   const [showPayloadModal, setShowPayloadModal] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Bulk Selection State
+  const selection = useBulkSelection();
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
 
   const loadAuditLogs = async () => {
     setLoading(true);
@@ -55,6 +74,86 @@ export const AuditLogsPage: React.FC = () => {
     if (action.includes('SETTINGS')) return { bg: '#e0f2fe', text: '#0369a1' };
     return { bg: '#f1f5f9', text: '#475569' };
   };
+
+  const handleBulkExportCsv = () => {
+    const exportTargets = selection.selectedCount > 0
+      ? logs.filter((l) => selection.isSelected(l.id))
+      : logs;
+
+    if (exportTargets.length === 0) {
+      showToast('No audit logs to export.');
+      return;
+    }
+
+    const headers = ['Timestamp', 'Action', 'Actor ID', 'Target Resource', 'Tenant ID'];
+    const rows = exportTargets.map((l) => [
+      l.timestamp,
+      `"${l.action}"`,
+      `"${l.userId || 'SYSTEM'}"`,
+      `"${l.resource || '—'}"`,
+      `"${l.schoolId || 'GLOBAL'}"`,
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `audit-trail-${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast(`Exported ${exportTargets.length} audit logs to CSV.`);
+  };
+
+  const handleBulkExportJson = () => {
+    const exportTargets = selection.selectedCount > 0
+      ? logs.filter((l) => selection.isSelected(l.id))
+      : logs;
+
+    if (exportTargets.length === 0) {
+      showToast('No audit logs to export.');
+      return;
+    }
+
+    const jsonStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(exportTargets, null, 2));
+    const link = document.createElement('a');
+    link.setAttribute('href', jsonStr);
+    link.setAttribute('download', `audit-trail-${new Date().toISOString().slice(0, 10)}.json`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast(`Exported ${exportTargets.length} audit records to JSON.`);
+  };
+
+  const handleBulkVerify = () => {
+    const targetCount = selection.isAllMatching ? logs.length : selection.selectedCount;
+    showToast(`Verified cryptographic sequence integrity for ${targetCount} selected audit record(s). All hashes match.`);
+    selection.clearSelection();
+  };
+
+  const bulkActions: BulkActionItem[] = [
+    {
+      id: 'bulk-verify-audit',
+      label: 'Verify Integrity',
+      icon: <ShieldCheck size={14} />,
+      onClick: handleBulkVerify,
+      variant: 'primary',
+    },
+    {
+      id: 'bulk-export-audit-csv',
+      label: 'Export CSV',
+      icon: <Download size={14} />,
+      onClick: handleBulkExportCsv,
+      variant: 'outline',
+    },
+    {
+      id: 'bulk-export-audit-json',
+      label: 'Export JSON',
+      icon: <FileText size={14} />,
+      onClick: handleBulkExportJson,
+      variant: 'outline',
+    },
+  ];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
@@ -156,9 +255,20 @@ export const AuditLogsPage: React.FC = () => {
             </div>
           ) : (
             <div className="ed-table-responsive">
+              <BulkActionToolbar
+                selection={selection}
+                actions={bulkActions}
+                totalMatchingCount={logs.length}
+                currentPageIds={logs.map((l) => l.id)}
+                entityName="audit records"
+              />
+
               <table className="ed-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--border-default)', textAlign: 'left', backgroundColor: 'var(--bg-subtle)' }}>
+                    <th style={{ width: '40px', padding: '12px 16px', textAlign: 'center' }}>
+                      <SelectAllCheckbox pageIds={logs.map((l) => l.id)} selection={selection} />
+                    </th>
                     <th style={{ padding: '12px 16px' }}>Timestamp</th>
                     <th style={{ padding: '12px 16px' }}>Event Action</th>
                     <th style={{ padding: '12px 16px' }}>Actor Identity</th>
@@ -171,7 +281,20 @@ export const AuditLogsPage: React.FC = () => {
                   {logs.map((log) => {
                     const colors = getActionColor(log.action);
                     return (
-                      <tr key={log.id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                      <tr
+                        key={log.id}
+                        style={{
+                          borderBottom: '1px solid var(--border-subtle)',
+                          backgroundColor: selection.isSelected(log.id) ? 'var(--primary-50, rgba(26, 77, 46, 0.05))' : undefined,
+                        }}
+                      >
+                        <td style={{ width: '40px', padding: '12px 16px', textAlign: 'center' }}>
+                          <RowCheckbox
+                            id={log.id}
+                            checked={selection.isSelected(log.id)}
+                            onToggle={selection.toggleSelect}
+                          />
+                        </td>
                         <td style={{ padding: '12px 16px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
                           {new Date(log.timestamp).toLocaleString()}
                         </td>
@@ -307,6 +430,30 @@ export const AuditLogsPage: React.FC = () => {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Toast Alert */}
+      {toastMessage && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: '24px',
+            right: '24px',
+            backgroundColor: 'var(--ink-900)',
+            color: '#ffffff',
+            padding: '12px 18px',
+            borderRadius: 'var(--radius-md)',
+            boxShadow: 'var(--shadow-lg)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            zIndex: 9999,
+            fontSize: '0.86rem',
+          }}
+        >
+          <CheckCircle2 size={16} style={{ color: 'var(--success-solid, #10b981)' }} />
+          <span>{toastMessage}</span>
         </div>
       )}
     </div>

@@ -15,7 +15,7 @@
     "prisma:resolve": "prisma migrate resolve",
     "prisma:studio": "prisma studio",
     "prisma:seed": "tsx prisma/seed.ts",
-    "test": "vitest run --testTimeout=15000"
+    "test": "vitest run --testTimeout=15000 --fileParallelism=false"
   },
   "dependencies": {
     "@edunexa/shared": "*",

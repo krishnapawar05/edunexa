@@ -20,6 +20,8 @@ import {
   StudentReportCard,
   SubjectResultEntry,
   PlatformRole,
+  BulkActionResponse,
+  BulkItemResult,
 } from '@edunexa/shared';
 import { prisma } from '../../config/db.js';
 
@@ -724,6 +726,41 @@ export class AcademicService {
       status: updated.status,
       reviewedByUserId,
       reviewedAt: updated.approvedAt?.toISOString(),
+    };
+  }
+
+  async bulkReviewStaffLeaves(
+    schoolIdOrIdentifier: string,
+    action: string,
+    ids: string[],
+    reviewedByUserId: string
+  ): Promise<BulkActionResponse> {
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    const targetSchoolId = school ? school.id : schoolIdOrIdentifier;
+
+    const results: BulkItemResult[] = [];
+    let processedCount = 0;
+    let failedCount = 0;
+    const normalized = action.toUpperCase() === 'APPROVE' ? 'APPROVED' : 'REJECTED';
+
+    for (const leaveId of ids) {
+      try {
+        await this.reviewStaffLeaveRequest(targetSchoolId, leaveId, reviewedByUserId, normalized);
+        results.push({ id: leaveId, success: true, message: `Leave request ${normalized.toLowerCase()}.` });
+        processedCount++;
+      } catch (err: any) {
+        results.push({ id: leaveId, success: false, message: err.message || 'Failed to review leave.' });
+        failedCount++;
+      }
+    }
+
+    return {
+      success: failedCount === 0 || processedCount > 0,
+      action,
+      processedCount,
+      failedCount,
+      totalRequested: ids.length,
+      results,
     };
   }
 

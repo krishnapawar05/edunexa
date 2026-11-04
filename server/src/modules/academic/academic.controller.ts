@@ -183,6 +183,18 @@ export class AcademicController {
     }
   }
 
+  async bulkReviewStaffLeaves(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { ids, action } = req.body;
+      const schoolId = req.user!.schoolId!;
+      const reviewedByUserId = req.user!.userId;
+      const result = await academicService.bulkReviewStaffLeaves(schoolId, action, ids, reviewedByUserId);
+      res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async listStaffLeaveRequests(req: Request, res: Response, next: NextFunction) {
     try {
       const schoolId = req.user!.schoolId!;

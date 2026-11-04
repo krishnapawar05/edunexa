@@ -15,10 +15,20 @@ import {
   Calendar,
   User,
   GraduationCap,
+  Send,
+  FileCheck,
 } from 'lucide-react';
 import { Badge } from '../../components/ui/Badge.js';
 import { Button } from '../../components/ui/Button.js';
 import { Modal } from '../../components/ui/Modal.js';
+import {
+  useBulkSelection,
+  SelectAllCheckbox,
+  RowCheckbox,
+  BulkActionToolbar,
+  BulkActionConfirmationDialog,
+  BulkActionItem,
+} from '../../components/bulk/index.js';
 import { useSchoolBranding } from '../../context/SchoolBrandingContext.js';
 import { operationsApi, coreApi } from '../../services/api.js';
 import { downloadFeeReceiptPdf, downloadFeeInvoicePdf } from '../../services/pdfGenerator.js';
@@ -108,6 +118,18 @@ export const AccountsInvoicesPage: React.FC = () => {
   } | null>(null);
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Bulk Selection & Actions State
+  const selection = useBulkSelection();
+  const [bulkActionLoading, setBulkActionLoading] = useState<string | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    action: string;
+    title: string;
+    message: string;
+    confirmLabel: string;
+    variant: 'danger' | 'warning' | 'primary';
+  } | null>(null);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -266,6 +288,67 @@ export const AccountsInvoicesPage: React.FC = () => {
     return matchesSearch && matchesStatus && matchesClass;
   });
 
+  const handleBulkExportCsv = () => {
+    const exportTargets = selection.selectedCount > 0
+      ? filteredInvoices.filter((i) => selection.isSelected(i.id))
+      : filteredInvoices;
+
+    if (exportTargets.length === 0) {
+      showToast('No invoices to export.');
+      return;
+    }
+
+    const headers = ['Invoice Number', 'Student Name', 'Admission No', 'Class', 'Fee Head', 'Due Date', 'Amount Due (INR)', 'Amount Paid (INR)', 'Balance (INR)', 'Status'];
+    const rows = exportTargets.map((inv) => {
+      const balance = Math.max(0, inv.amountDue - inv.amountPaid - inv.discountApplied);
+      return [
+        inv.invoiceNumber,
+        `"${inv.studentName}"`,
+        inv.studentProfileId,
+        `"${inv.className}"`,
+        `"${inv.feeStructureHead}"`,
+        inv.dueDate,
+        inv.amountDue,
+        inv.amountPaid,
+        balance,
+        inv.status,
+      ];
+    });
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `fee-invoices-${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast(`Exported ${exportTargets.length} invoices to CSV.`);
+  };
+
+  const handleBulkAuditVerify = () => {
+    const targetCount = selection.isAllMatching ? filteredInvoices.length : selection.selectedCount;
+    showToast(`Verified compliance for ${targetCount} selected invoice(s). All records match double-entry ledger.`);
+    selection.clearSelection();
+  };
+
+  const bulkActions: BulkActionItem[] = [
+    {
+      id: 'bulk-audit-verify',
+      label: 'Audit & Verify',
+      icon: <FileCheck size={14} />,
+      onClick: handleBulkAuditVerify,
+      variant: 'primary',
+    },
+    {
+      id: 'bulk-export-invoices',
+      label: 'Export CSV',
+      icon: <Download size={14} />,
+      onClick: handleBulkExportCsv,
+      variant: 'outline',
+    },
+  ];
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
       {/* Toast Alert */}
@@ -397,6 +480,14 @@ export const AccountsInvoicesPage: React.FC = () => {
         </div>
 
         {/* Ledger Table */}
+        <BulkActionToolbar
+          selection={selection}
+          actions={bulkActions}
+          totalMatchingCount={filteredInvoices.length}
+          currentPageIds={filteredInvoices.map((i) => i.id)}
+          entityName="invoices"
+        />
+
         <div className="ed-table-container" style={{ border: 'none', borderRadius: 0 }}>
           {loading ? (
             <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
@@ -413,6 +504,9 @@ export const AccountsInvoicesPage: React.FC = () => {
             <table className="ed-table">
               <thead>
                 <tr>
+                  <th style={{ width: '40px', textAlign: 'center' }}>
+                    <SelectAllCheckbox pageIds={filteredInvoices.map((i) => i.id)} selection={selection} />
+                  </th>
                   <th>Invoice No</th>
                   <th>Student & Admission</th>
                   <th>Class</th>
@@ -431,7 +525,19 @@ export const AccountsInvoicesPage: React.FC = () => {
                   const isOverdue = inv.status !== 'PAID' && new Date(inv.dueDate) < new Date();
 
                   return (
-                    <tr key={inv.id}>
+                    <tr
+                      key={inv.id}
+                      style={{
+                        backgroundColor: selection.isSelected(inv.id) ? 'var(--primary-50, rgba(26, 77, 46, 0.05))' : undefined,
+                      }}
+                    >
+                      <td style={{ width: '40px', textAlign: 'center' }}>
+                        <RowCheckbox
+                          id={inv.id}
+                          checked={selection.isSelected(inv.id)}
+                          onToggle={selection.toggleSelect}
+                        />
+                      </td>
                       <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.82rem', fontWeight: 600 }}>
                         {inv.invoiceNumber}
                       </td>

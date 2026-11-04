@@ -6,6 +6,7 @@ import {
   GraduationCap,
   CalendarCheck,
   CheckCircle2,
+  XCircle,
   AlertTriangle,
   RefreshCw,
   Eye,
@@ -16,7 +17,16 @@ import {
   ShieldCheck,
   Award,
   Layers,
+  Download,
 } from 'lucide-react';
+import {
+  useBulkSelection,
+  SelectAllCheckbox,
+  RowCheckbox,
+  BulkActionToolbar,
+  BulkActionConfirmationDialog,
+  BulkActionItem,
+} from '../../components/bulk/index.js';
 import { coreApi, academicApi, getStoredUser } from '../../services/api.js';
 
 interface StudentProfile {
@@ -55,6 +65,24 @@ export const TeacherClassesPage: React.FC = () => {
     attendancePercentage: number;
   } | null>(null);
   const [classAttendanceRate, setClassAttendanceRate] = useState<string>('—');
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Bulk Selection & Actions State
+  const selection = useBulkSelection();
+  const [bulkActionLoading, setBulkActionLoading] = useState<string | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    action: string;
+    title: string;
+    message: string;
+    confirmLabel: string;
+    variant: 'danger' | 'warning' | 'primary';
+  } | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
 
   const user = getStoredUser();
 
@@ -119,6 +147,100 @@ export const TeacherClassesPage: React.FC = () => {
       (s.admissionNumber && s.admissionNumber.toLowerCase().includes(query))
     );
   });
+
+  const handleBulkAttendance = async (status: 'PRESENT' | 'ABSENT' | 'LATE') => {
+    const targetIds = selection.isAllMatching
+      ? filteredStudents.map((s) => s.id)
+      : selection.getSelectedList();
+
+    if (targetIds.length === 0) {
+      showToast('Please select at least one student.');
+      return;
+    }
+
+    setBulkActionLoading(status);
+    try {
+      const todayStr = new Date().toISOString().split('T')[0];
+      await academicApi.recordStudentAttendance({
+        className: selectedClass,
+        sectionName: selectedSection,
+        date: todayStr,
+        records: targetIds.map((studentProfileId) => ({
+          studentProfileId,
+          status,
+          remarks: `Bulk marked as ${status} by Class Teacher on ${todayStr}`,
+        })),
+      });
+
+      showToast(`Marked ${targetIds.length} student(s) as ${status}.`);
+      selection.clearSelection();
+      loadStudents();
+    } catch (err: any) {
+      showToast(err.message || `Failed to record attendance as ${status}.`);
+    } finally {
+      setBulkActionLoading(null);
+    }
+  };
+
+  const handleBulkExportCsv = () => {
+    const exportTargets = selection.selectedCount > 0
+      ? filteredStudents.filter((s) => selection.isSelected(s.id))
+      : filteredStudents;
+
+    if (exportTargets.length === 0) {
+      showToast('No students to export.');
+      return;
+    }
+
+    const headers = ['Roll No', 'First Name', 'Last Name', 'Admission No', 'Class', 'Section', 'Gender', 'Status', 'Parent Contact'];
+    const rows = exportTargets.map((s) => [
+      s.rollNumber || '',
+      `"${s.firstName}"`,
+      `"${s.lastName}"`,
+      s.admissionNumber || '',
+      `"${s.className || selectedClass}"`,
+      `"${s.sectionName || selectedSection}"`,
+      s.gender || '',
+      s.status || 'ACTIVE',
+      `"${s.parentContact || s.emergencyContact || ''}"`,
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `class-${selectedClass}-${selectedSection}-${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast(`Exported ${exportTargets.length} student records to CSV.`);
+  };
+
+  const bulkActions: BulkActionItem[] = [
+    {
+      id: 'bulk-present',
+      label: 'Mark Present',
+      icon: <CheckCircle2 size={14} />,
+      onClick: () => handleBulkAttendance('PRESENT'),
+      loading: bulkActionLoading === 'PRESENT',
+      variant: 'primary',
+    },
+    {
+      id: 'bulk-absent',
+      label: 'Mark Absent',
+      icon: <XCircle size={14} />,
+      onClick: () => handleBulkAttendance('ABSENT'),
+      loading: bulkActionLoading === 'ABSENT',
+      variant: 'danger',
+    },
+    {
+      id: 'bulk-export-roster',
+      label: 'Export Class List',
+      icon: <Download size={14} />,
+      onClick: handleBulkExportCsv,
+      variant: 'outline',
+    },
+  ];
 
   return (
     <div style={{ padding: 'var(--space-6)', maxWidth: '1400px', margin: '0 auto' }}>
@@ -384,6 +506,14 @@ export const TeacherClassesPage: React.FC = () => {
           overflow: 'hidden',
         }}
       >
+        <BulkActionToolbar
+          selection={selection}
+          actions={bulkActions}
+          totalMatchingCount={filteredStudents.length}
+          currentPageIds={filteredStudents.map((s) => s.id)}
+          entityName="students"
+        />
+
         {loading ? (
           <div style={{ padding: 'var(--space-12)', textAlign: 'center', color: 'var(--text-secondary)' }}>
             <RefreshCw size={28} className="spin" style={{ margin: '0 auto var(--space-3)' }} />
@@ -402,6 +532,9 @@ export const TeacherClassesPage: React.FC = () => {
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.875rem' }}>
               <thead>
                 <tr style={{ backgroundColor: 'var(--bg-primary)', borderBottom: '1px solid var(--border-color)' }}>
+                  <th style={{ width: '40px', padding: 'var(--space-3) var(--space-4)', textAlign: 'center' }}>
+                    <SelectAllCheckbox pageIds={filteredStudents.map((s) => s.id)} selection={selection} />
+                  </th>
                   <th style={{ padding: 'var(--space-3) var(--space-4)', width: '70px' }}>Roll</th>
                   <th style={{ padding: 'var(--space-3) var(--space-4)' }}>Student Name</th>
                   <th style={{ padding: 'var(--space-3) var(--space-4)' }}>Admission No</th>
@@ -416,9 +549,17 @@ export const TeacherClassesPage: React.FC = () => {
                     key={st.id}
                     style={{
                       borderBottom: '1px solid var(--border-color)',
+                      backgroundColor: selection.isSelected(st.id) ? 'var(--primary-50, rgba(26, 77, 46, 0.05))' : undefined,
                       transition: 'background-color 0.15s ease',
                     }}
                   >
+                    <td style={{ width: '40px', padding: 'var(--space-3) var(--space-4)', textAlign: 'center' }}>
+                      <RowCheckbox
+                        id={st.id}
+                        checked={selection.isSelected(st.id)}
+                        onToggle={selection.toggleSelect}
+                      />
+                    </td>
                     <td style={{ padding: 'var(--space-3) var(--space-4)', fontWeight: 700, color: 'var(--text-secondary)' }}>
                       {st.rollNumber || '—'}
                     </td>
@@ -634,6 +775,30 @@ export const TeacherClassesPage: React.FC = () => {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Toast Alert */}
+      {toastMessage && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: '24px',
+            right: '24px',
+            backgroundColor: 'var(--ink-900)',
+            color: '#ffffff',
+            padding: '12px 18px',
+            borderRadius: 'var(--radius-md)',
+            boxShadow: 'var(--shadow-lg)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            zIndex: 9999,
+            fontSize: '0.86rem',
+          }}
+        >
+          <CheckCircle2 size={16} style={{ color: 'var(--success-solid, #10b981)' }} />
+          <span>{toastMessage}</span>
         </div>
       )}
     </div>

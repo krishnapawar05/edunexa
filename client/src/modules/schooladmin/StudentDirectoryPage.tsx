@@ -18,10 +18,23 @@ import {
   Phone,
   ShieldAlert,
   Download,
+  UserCheck,
+  UserX,
+  Send,
+  KeyRound,
+  FileCheck,
 } from 'lucide-react';
 import { Badge } from '../../components/ui/Badge.js';
 import { Button } from '../../components/ui/Button.js';
 import { Modal } from '../../components/ui/Modal.js';
+import {
+  useBulkSelection,
+  SelectAllCheckbox,
+  RowCheckbox,
+  BulkActionToolbar,
+  BulkActionConfirmationDialog,
+  BulkActionItem,
+} from '../../components/bulk/index.js';
 import { useSchoolBranding } from '../../context/SchoolBrandingContext.js';
 import { coreApi } from '../../services/api.js';
 
@@ -99,6 +112,151 @@ export const StudentDirectoryPage: React.FC = () => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
   };
+
+  // Universal Multi-Select & Bulk Operations
+  const selection = useBulkSelection();
+  const [bulkActionLoading, setBulkActionLoading] = useState<string | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    action: string;
+    title: string;
+    message: string;
+    confirmLabel: string;
+    variant: 'danger' | 'warning' | 'primary';
+  } | null>(null);
+
+  const handleBulkAction = async (action: string, params?: any) => {
+    const ids = selection.getSelectedList();
+    if (ids.length === 0) {
+      showToast('No students selected.');
+      return;
+    }
+    setBulkActionLoading(action);
+    try {
+      const res = await coreApi.bulkStudentActions(ids, action, params);
+      showToast(
+        `Bulk ${action.toLowerCase()} complete: ${res.processedCount} processed, ${res.failedCount} skipped.`
+      );
+      selection.clearSelection();
+      loadStudents();
+    } catch (err: any) {
+      showToast(err.message || `Failed to process bulk ${action.toLowerCase()}.`);
+    } finally {
+      setBulkActionLoading(null);
+      setConfirmDialog(null);
+    }
+  };
+
+  const handleBulkExportCsv = () => {
+    const exportTargets = selection.selectedCount > 0
+      ? students.filter((s) => selection.isSelected(s.id))
+      : students;
+
+    if (exportTargets.length === 0) {
+      showToast('No students available to export.');
+      return;
+    }
+
+    const headers = ['Admission Number', 'First Name', 'Last Name', 'Class', 'Section', 'Roll No', 'Gender', 'Blood Group', 'Status', 'Emergency Phone'];
+    const rows = exportTargets.map((s) => [
+      s.admissionNumber,
+      `"${s.firstName}"`,
+      `"${s.lastName}"`,
+      `"${s.className}"`,
+      `"${s.sectionName || 'A'}"`,
+      s.rollNumber || '',
+      s.gender,
+      s.bloodGroup || '',
+      s.status,
+      `"${s.emergencyPhone || ''}"`,
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `edunexa-students-${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast(`Exported ${exportTargets.length} student records to CSV.`);
+  };
+
+  const bulkActions: BulkActionItem[] = [
+    {
+      id: 'bulk-review',
+      label: 'Review',
+      icon: <FileCheck size={14} />,
+      onClick: () => handleBulkAction('REVIEW'),
+      loading: bulkActionLoading === 'REVIEW',
+      variant: 'secondary',
+    },
+    {
+      id: 'bulk-activate',
+      label: 'Activate',
+      icon: <UserCheck size={14} />,
+      onClick: () => handleBulkAction('ACTIVATE'),
+      loading: bulkActionLoading === 'ACTIVATE',
+      variant: 'primary',
+    },
+    {
+      id: 'bulk-suspend',
+      label: 'Suspend',
+      icon: <UserX size={14} />,
+      onClick: () =>
+        setConfirmDialog({
+          isOpen: true,
+          action: 'SUSPEND',
+          title: 'Suspend Selected Students',
+          message:
+            'Are you sure you want to suspend access for the selected student accounts? Suspended students will not be able to log in until reactivated.',
+          confirmLabel: 'Suspend Students',
+          variant: 'warning',
+        }),
+      loading: bulkActionLoading === 'SUSPEND',
+      variant: 'warning',
+    },
+    {
+      id: 'bulk-invite',
+      label: 'Send Invitations',
+      icon: <Send size={14} />,
+      onClick: () => handleBulkAction('INVITE'),
+      loading: bulkActionLoading === 'INVITE',
+      variant: 'secondary',
+    },
+    {
+      id: 'bulk-reset-password',
+      label: 'Reset Passwords',
+      icon: <KeyRound size={14} />,
+      onClick: () => handleBulkAction('RESET_PASSWORD'),
+      loading: bulkActionLoading === 'RESET_PASSWORD',
+      variant: 'secondary',
+    },
+    {
+      id: 'bulk-export',
+      label: 'Export Selected',
+      icon: <Download size={14} />,
+      onClick: handleBulkExportCsv,
+      variant: 'outline',
+    },
+    {
+      id: 'bulk-delete',
+      label: 'Delete / Archive',
+      icon: <Trash2 size={14} />,
+      onClick: () =>
+        setConfirmDialog({
+          isOpen: true,
+          action: 'DELETE',
+          title: 'Delete or Archive Selected Students',
+          message:
+            'Are you sure you want to delete these students? Students with existing historical records (attendance, exams, fees) will be safely archived as INACTIVE to protect audit integrity.',
+          confirmLabel: 'Delete / Archive',
+          variant: 'danger',
+        }),
+      loading: bulkActionLoading === 'DELETE',
+      variant: 'danger',
+      isDestructive: true,
+    },
+  ];
 
   const loadStudents = async () => {
     setLoading(true);
@@ -469,10 +627,21 @@ export const StudentDirectoryPage: React.FC = () => {
           overflow: 'hidden',
         }}
       >
+        <BulkActionToolbar
+          selection={selection}
+          actions={bulkActions}
+          totalMatchingCount={totalCount}
+          currentPageIds={students.map((s) => s.id)}
+          entityName="students"
+        />
+
         <div style={{ overflowX: 'auto' }}>
           <table className="ed-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.84rem' }}>
             <thead>
               <tr style={{ backgroundColor: 'var(--bg-subtle)', borderBottom: '1px solid var(--border-default)', textAlign: 'left' }}>
+                <th style={{ width: '40px', padding: '12px 16px', textAlign: 'center' }}>
+                  <SelectAllCheckbox pageIds={students.map((s) => s.id)} selection={selection} />
+                </th>
                 <th style={{ padding: '12px 16px', fontWeight: 600, color: 'var(--text-muted)' }}>Student</th>
                 <th style={{ padding: '12px 16px', fontWeight: 600, color: 'var(--text-muted)' }}>Admission No.</th>
                 <th style={{ padding: '12px 16px', fontWeight: 600, color: 'var(--text-muted)' }}>Class & Section</th>
@@ -485,13 +654,13 @@ export const StudentDirectoryPage: React.FC = () => {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={7} style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                  <td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
                     Loading student directory from PostgreSQL...
                   </td>
                 </tr>
               ) : students.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                  <td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
                     No student records found matching your filters.
                   </td>
                 </tr>
@@ -501,8 +670,19 @@ export const StudentDirectoryPage: React.FC = () => {
                   return (
                     <tr
                       key={s.id}
-                      style={{ borderBottom: '1px solid var(--border-default)', transition: 'background-color 0.1s ease' }}
+                      style={{
+                        borderBottom: '1px solid var(--border-default)',
+                        backgroundColor: selection.isSelected(s.id) ? 'var(--primary-50, rgba(26, 77, 46, 0.05))' : undefined,
+                        transition: 'background-color 0.1s ease',
+                      }}
                     >
+                      <td style={{ width: '40px', padding: '12px 16px', textAlign: 'center' }}>
+                        <RowCheckbox
+                          id={s.id}
+                          checked={selection.isSelected(s.id)}
+                          onToggle={selection.toggleSelect}
+                        />
+                      </td>
                       <td style={{ padding: '12px 16px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                           <div
@@ -962,6 +1142,22 @@ export const StudentDirectoryPage: React.FC = () => {
             </div>
           </div>
         </Modal>
+      )}
+
+      {/* Reusable Bulk Action Confirmation Dialog */}
+      {confirmDialog && (
+        <BulkActionConfirmationDialog
+          isOpen={confirmDialog.isOpen}
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          confirmLabel={confirmDialog.confirmLabel}
+          variant={confirmDialog.variant}
+          count={selection.isAllMatching ? totalCount : selection.selectedCount}
+          entityName="students"
+          isLoading={bulkActionLoading !== null}
+          onConfirm={() => handleBulkAction(confirmDialog.action)}
+          onClose={() => setConfirmDialog(null)}
+        />
       )}
     </div>
   );

@@ -13,7 +13,19 @@ import {
   ShieldCheck,
   Eye,
   ExternalLink,
+  Download,
+  UserCheck,
+  UserX,
+  FileCheck,
 } from 'lucide-react';
+import {
+  useBulkSelection,
+  SelectAllCheckbox,
+  RowCheckbox,
+  BulkActionToolbar,
+  BulkActionConfirmationDialog,
+  BulkActionItem,
+} from '../../components/bulk/index.js';
 import { superadminApi } from '../../services/api.js';
 
 export const SchoolTenantsPage: React.FC = () => {
@@ -34,6 +46,24 @@ export const SchoolTenantsPage: React.FC = () => {
   const [targetStatus, setTargetStatus] = useState<string>('SUSPENDED');
   const [statusReason, setStatusReason] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Bulk Selection & Actions State
+  const selection = useBulkSelection();
+  const [bulkActionLoading, setBulkActionLoading] = useState<string | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    action: string;
+    title: string;
+    message: string;
+    confirmLabel: string;
+    variant: 'danger' | 'warning' | 'primary';
+  } | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
 
   // New School Form State
   const [newSchool, setNewSchool] = useState({
@@ -173,6 +203,114 @@ export const SchoolTenantsPage: React.FC = () => {
     }
   };
 
+  const handleBulkAction = async (action: 'ACTIVATE' | 'SUSPEND' | 'REVIEW') => {
+    const targetIds = selection.isAllMatching
+      ? schools.map((s) => s.id)
+      : selection.getSelectedList();
+
+    if (targetIds.length === 0) {
+      showToast('Please select at least one school tenant.');
+      return;
+    }
+
+    setBulkActionLoading(action);
+    try {
+      const res = await superadminApi.bulkSchoolActions({
+        ids: targetIds,
+        action,
+        params: {
+          reason: `Bulk execution from Super Admin Tenants ledger: ${action}`,
+        },
+      });
+
+      showToast(res.message || `Processed ${res.processedCount} school tenant(s).`);
+      selection.clearSelection();
+      loadSchools();
+    } catch (err: any) {
+      showToast(err.message || `Failed to process bulk ${action.toLowerCase()}.`);
+    } finally {
+      setBulkActionLoading(null);
+      setConfirmDialog(null);
+    }
+  };
+
+  const handleBulkExportCsv = () => {
+    const exportTargets = selection.selectedCount > 0
+      ? schools.filter((s) => selection.isSelected(s.id))
+      : schools;
+
+    if (exportTargets.length === 0) {
+      showToast('No school tenants to export.');
+      return;
+    }
+
+    const headers = ['School Name', 'Code', 'Slug', 'Email', 'City', 'State', 'Status', 'Plan', 'Memberships'];
+    const rows = exportTargets.map((s) => [
+      `"${s.name}"`,
+      s.code,
+      s.slug,
+      `"${s.email}"`,
+      `"${s.city || ''}"`,
+      `"${s.state || ''}"`,
+      s.status,
+      s.subscriptions?.[0]?.planName || s.subscriptionPlan || 'Standard',
+      s._count?.memberships || 0,
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `school-tenants-${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast(`Exported ${exportTargets.length} tenant records to CSV.`);
+  };
+
+  const bulkActions: BulkActionItem[] = [
+    {
+      id: 'bulk-activate-schools',
+      label: 'Activate Tenants',
+      icon: <UserCheck size={14} />,
+      onClick: () => handleBulkAction('ACTIVATE'),
+      loading: bulkActionLoading === 'ACTIVATE',
+      variant: 'primary',
+    },
+    {
+      id: 'bulk-suspend-schools',
+      label: 'Suspend Tenants',
+      icon: <UserX size={14} />,
+      onClick: () =>
+        setConfirmDialog({
+          isOpen: true,
+          action: 'SUSPEND',
+          title: 'Suspend School Tenants',
+          message:
+            'Are you sure you want to suspend access for the selected school tenants? All portal access for users within these schools will be locked.',
+          confirmLabel: 'Suspend Tenants',
+          variant: 'danger',
+        }),
+      loading: bulkActionLoading === 'SUSPEND',
+      variant: 'danger',
+    },
+    {
+      id: 'bulk-review-schools',
+      label: 'Review Compliance',
+      icon: <FileCheck size={14} />,
+      onClick: () => handleBulkAction('REVIEW'),
+      loading: bulkActionLoading === 'REVIEW',
+      variant: 'secondary',
+    },
+    {
+      id: 'bulk-export-schools',
+      label: 'Export CSV',
+      icon: <Download size={14} />,
+      onClick: handleBulkExportCsv,
+      variant: 'outline',
+    },
+  ];
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
       {/* Top Header */}
@@ -298,9 +436,20 @@ export const SchoolTenantsPage: React.FC = () => {
             </div>
           ) : (
             <div className="ed-table-responsive">
+              <BulkActionToolbar
+                selection={selection}
+                actions={bulkActions}
+                totalMatchingCount={schools.length}
+                currentPageIds={schools.map((s) => s.id)}
+                entityName="tenants"
+              />
+
               <table className="ed-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.84rem' }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--border-default)', textAlign: 'left', backgroundColor: 'var(--bg-subtle)' }}>
+                    <th style={{ width: '40px', padding: '12px 16px', textAlign: 'center' }}>
+                      <SelectAllCheckbox pageIds={schools.map((s) => s.id)} selection={selection} />
+                    </th>
                     <th style={{ padding: '12px 16px' }}>School Identity</th>
                     <th style={{ padding: '12px 16px' }}>Code / Slug</th>
                     <th style={{ padding: '12px 16px' }}>Location</th>
@@ -316,7 +465,20 @@ export const SchoolTenantsPage: React.FC = () => {
                     const isSuspended = school.status === 'SUSPENDED';
 
                     return (
-                      <tr key={school.id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                      <tr
+                        key={school.id}
+                        style={{
+                          borderBottom: '1px solid var(--border-subtle)',
+                          backgroundColor: selection.isSelected(school.id) ? 'var(--primary-50, rgba(26, 77, 46, 0.05))' : undefined,
+                        }}
+                      >
+                        <td style={{ width: '40px', padding: '12px 16px', textAlign: 'center' }}>
+                          <RowCheckbox
+                            id={school.id}
+                            checked={selection.isSelected(school.id)}
+                            onToggle={selection.toggleSelect}
+                          />
+                        </td>
                         <td style={{ padding: '12px 16px' }}>
                           <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{school.name}</div>
                           <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>{school.email}</div>
@@ -830,6 +992,46 @@ export const SchoolTenantsPage: React.FC = () => {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Bulk Action Confirmation Dialog */}
+      {confirmDialog && (
+        <BulkActionConfirmationDialog
+          isOpen={confirmDialog.isOpen}
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          confirmLabel={confirmDialog.confirmLabel}
+          variant={confirmDialog.variant}
+          count={selection.isAllMatching ? schools.length : selection.selectedCount}
+          entityName="school tenants"
+          isLoading={bulkActionLoading !== null}
+          onConfirm={() => handleBulkAction(confirmDialog.action as any)}
+          onClose={() => setConfirmDialog(null)}
+        />
+      )}
+
+      {/* Toast Alert */}
+      {toastMessage && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: '24px',
+            right: '24px',
+            backgroundColor: 'var(--ink-900)',
+            color: '#ffffff',
+            padding: '12px 18px',
+            borderRadius: 'var(--radius-md)',
+            boxShadow: 'var(--shadow-lg)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            zIndex: 9999,
+            fontSize: '0.86rem',
+          }}
+        >
+          <CheckCircle2 size={16} style={{ color: 'var(--success-solid, #10b981)' }} />
+          <span>{toastMessage}</span>
         </div>
       )}
     </div>
