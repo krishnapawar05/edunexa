@@ -367,6 +367,58 @@ describe('STAGE 4: Core School Management Test Suite', () => {
     expect(res.body.data.enrolledStudent.admissionNumber).toMatch(/^ADM-2026-\d{4}$/);
   });
 
+  it('10c. Public online admission submission succeeds end-to-end with frontend payload structure', async () => {
+    const res = await request(app)
+      .post('/api/v1/core/admissions/apply')
+      .send({
+        schoolIdentifier: 'apex-academy',
+        firstName: 'Ananya',
+        lastName: 'Sharma',
+        applyingGrade: 'Grade 10',
+        guardianName: 'Dr. Vivek Sharma',
+        guardianEmail: 'vivek.sharma.test@gmail.com',
+        guardianPhone: '+91 98451 12345',
+        previousSchool: 'Delhi Public School, Bangalore',
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data).toHaveProperty('id');
+    expect(res.body.data.status).toBe('SUBMITTED');
+    expect(res.body.data.studentFirstName).toBe('Ananya');
+    expect(res.body.data.studentLastName).toBe('Sharma');
+    expect(res.body.data.applicationNumber).toMatch(/^APP-2026-\d{4,6}$/);
+  });
+
+  it('10d. Public online admission rejects missing applicant name or invalid email', async () => {
+    const resMissingName = await request(app)
+      .post('/api/v1/core/admissions/apply')
+      .send({
+        schoolIdentifier: 'apex-academy',
+        firstName: '',
+        applyingGrade: 'Grade 10',
+        guardianEmail: 'parent@example.com',
+        guardianPhone: '+91 98450 00000',
+      });
+
+    expect(resMissingName.status).toBe(400);
+    expect(resMissingName.body.success).toBe(false);
+
+    const resInvalidEmail = await request(app)
+      .post('/api/v1/core/admissions/apply')
+      .send({
+        schoolIdentifier: 'apex-academy',
+        firstName: 'Rahul',
+        lastName: 'Kumar',
+        applyingGrade: 'Grade 9',
+        guardianEmail: 'invalid-email-format',
+        guardianPhone: '+91 98450 00000',
+      });
+
+    expect(resInvalidEmail.status).toBe(400);
+    expect(resInvalidEmail.body.success).toBe(false);
+  });
+
   // --------------------------------------------------------------------------
   // 11. Role Authorization Enforcement on Core Operations
   // --------------------------------------------------------------------------

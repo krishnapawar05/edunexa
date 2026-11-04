@@ -22,30 +22,52 @@ export const AdmissionsPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.studentName.trim() || !formData.email.trim()) return;
+    const studentName = formData.studentName.trim();
+    const email = formData.email.trim();
+    const phone = formData.phone.trim();
+
+    if (!studentName) {
+      setErrorMessage('Please provide the applicant student full name.');
+      return;
+    }
+    if (!email || !email.includes('@')) {
+      setErrorMessage('Please provide a valid parent/guardian email address.');
+      return;
+    }
+    if (!phone || phone.length < 8) {
+      setErrorMessage('Please provide a valid contact telephone number.');
+      return;
+    }
 
     try {
       setIsSubmitting(true);
       setErrorMessage(null);
 
-      const parts = formData.studentName.trim().split(' ');
+      const parts = studentName.split(/\s+/);
       const firstName = parts[0];
       const lastName = parts.slice(1).join(' ') || 'Applicant';
 
       const res = await coreApi.submitPublicAdmission({
         schoolIdentifier: 'apex-academy',
+        studentFirstName: firstName,
+        studentLastName: lastName,
         firstName,
         lastName,
+        applyingClass: formData.applyingGrade,
         applyingGrade: formData.applyingGrade,
-        guardianName: formData.parentName || 'Guardian',
-        guardianEmail: formData.email,
-        guardianPhone: formData.phone || undefined,
-        previousSchool: formData.prevSchool || undefined,
+        guardianName: formData.parentName.trim() || 'Parent / Guardian',
+        parentName: formData.parentName.trim() || 'Parent / Guardian',
+        guardianEmail: email,
+        email,
+        guardianPhone: phone,
+        phone,
+        previousSchool: formData.prevSchool.trim() || undefined,
+        residentialAddress: formData.city?.trim() || 'Bangalore Campus Applicant',
       });
 
-      setSubmittedAppNo(res.applicationNumber || `ADM-APP-${Math.floor(1000 + Math.random() * 9000)}`);
+      setSubmittedAppNo(res.data?.applicationNumber || res.applicationNumber || `APP-2026-${Math.floor(1000 + Math.random() * 9000)}`);
     } catch (err: any) {
-      setErrorMessage(err.message || 'Failed to submit admission application to database.');
+      setErrorMessage(err.message || 'Failed to submit admission application to admissions desk.');
     } finally {
       setIsSubmitting(false);
     }
@@ -65,6 +87,36 @@ export const AdmissionsPage: React.FC = () => {
       <div className="ed-responsive-split">
         {/* Left Column: Guidelines & Criteria */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+          {/* Real Campus Banner */}
+          <div className="ed-card" style={{ overflow: 'hidden', padding: 0 }}>
+            <div style={{ position: 'relative', height: '180px', overflow: 'hidden' }}>
+              <img
+                src="/images/school/campus_building.jpg"
+                alt="School Campus Building"
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  background: 'linear-gradient(to top, rgba(17, 36, 26, 0.85) 0%, rgba(17, 36, 26, 0.2) 60%, transparent 100%)',
+                  display: 'flex',
+                  alignItems: 'flex-end',
+                  padding: 'var(--space-3) var(--space-4)',
+                }}
+              >
+                <div style={{ color: '#FFFFFF' }}>
+                  <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.08em', opacity: 0.9 }}>
+                    Admissions Desk & Counseling Office
+                  </div>
+                  <div style={{ fontSize: '1.05rem', fontWeight: 700, fontFamily: 'var(--font-crest)' }}>
+                    Apex Academy Academic Complex
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div className="ed-card ed-card-body">
             <h3 style={{ fontSize: '1.1rem', marginBottom: 'var(--space-3)' }}>Admission Process Steps</h3>
             <ol style={{ paddingLeft: '20px', fontSize: '0.86rem', color: 'var(--text-secondary)', lineHeight: 1.8 }}>

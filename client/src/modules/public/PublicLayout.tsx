@@ -82,28 +82,50 @@ export const PublicLayout: React.FC = () => {
 
   const handleAdmissionSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.studentName.trim() || !formData.email.trim()) return;
+    const studentName = formData.studentName.trim();
+    const email = formData.email.trim();
+    const phone = formData.phone.trim();
+
+    if (!studentName) {
+      setAdmissionError('Please provide the applicant student full name.');
+      return;
+    }
+    if (!email || !email.includes('@')) {
+      setAdmissionError('Please provide a valid parent/guardian email address.');
+      return;
+    }
+    if (!phone || phone.length < 8) {
+      setAdmissionError('Please provide a valid contact telephone number.');
+      return;
+    }
 
     try {
       setIsSubmitting(true);
       setAdmissionError(null);
 
-      const parts = formData.studentName.trim().split(' ');
+      const parts = studentName.split(/\s+/);
       const firstName = parts[0];
       const lastName = parts.slice(1).join(' ') || 'Applicant';
 
       const res = await coreApi.submitPublicAdmission({
         schoolIdentifier: 'apex-academy',
+        studentFirstName: firstName,
+        studentLastName: lastName,
         firstName,
         lastName,
+        applyingClass: formData.applyingGrade,
         applyingGrade: formData.applyingGrade,
-        guardianName: formData.parentName || 'Guardian',
-        guardianEmail: formData.email,
-        guardianPhone: formData.phone || undefined,
-        previousSchool: formData.prevSchool || undefined,
+        guardianName: formData.parentName.trim() || 'Parent / Guardian',
+        parentName: formData.parentName.trim() || 'Parent / Guardian',
+        guardianEmail: email,
+        email,
+        guardianPhone: phone,
+        phone,
+        previousSchool: formData.prevSchool.trim() || undefined,
+        residentialAddress: 'Bangalore Campus Applicant',
       });
 
-      setSubmittedAppNo(res.applicationNumber || `APP-2026-${Math.floor(1000 + Math.random() * 9000)}`);
+      setSubmittedAppNo(res.data?.applicationNumber || res.applicationNumber || `APP-2026-${Math.floor(1000 + Math.random() * 9000)}`);
       setAdmissionSubmitted(true);
     } catch (err: any) {
       setAdmissionError(err.message || 'Failed to submit application to admissions desk.');

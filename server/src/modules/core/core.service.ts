@@ -1148,35 +1148,83 @@ export class CoreSchoolService {
    * Submit Online Admission Application (Public or Administrative)
    */
   async submitAdmissionApplication(schoolIdOrIdentifier: string, data: {
-    studentFirstName: string;
-    studentLastName: string;
+    studentFirstName?: string;
+    studentLastName?: string;
+    firstName?: string;
+    lastName?: string;
     dateOfBirth?: string;
     gender?: string;
-    applyingClass: string;
-    guardianName: string;
-    guardianEmail: string;
-    guardianPhone: string;
+    applyingClass?: string;
+    applyingGrade?: string;
+    guardianName?: string;
+    parentName?: string;
+    guardianEmail?: string;
+    email?: string;
+    guardianPhone?: string;
+    phone?: string;
     residentialAddress?: string;
+    address?: string;
+    city?: string;
+    previousSchool?: string;
+    prevSchool?: string;
+    guardianRelationship?: string;
   }) {
-    const school = await resolveSchool(schoolIdOrIdentifier);
-    const targetSchoolId = school ? school.id : '92318ca5-473c-4436-a7cd-6b6eaadac413';
+    let school = await resolveSchool(schoolIdOrIdentifier);
+    if (!school) {
+      school = await prisma.school.findFirst({ where: { status: 'ACTIVE' } });
+    }
+    if (!school) {
+      school = await prisma.school.findFirst();
+    }
+    if (!school) {
+      throw new AppError('No active school tenant found to accept admission applications.', 404, 'TENANT_NOT_FOUND');
+    }
 
-    const applicationNumber = `APP-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+    const studentFirstName = (data.studentFirstName || data.firstName || '').trim();
+    const studentLastName = (data.studentLastName || data.lastName || '').trim() || 'Applicant';
+    const applyingClass = (data.applyingClass || data.applyingGrade || 'Grade 10').trim();
+    const guardianName = (data.guardianName || data.parentName || 'Parent / Guardian').trim();
+    const guardianEmail = (data.guardianEmail || data.email || '').trim().toLowerCase();
+    const guardianPhone = (data.guardianPhone || data.phone || '+91 98000 00000').trim();
+    const residentialAddress = (data.residentialAddress || data.address || data.city || 'Bangalore').trim();
+    const guardianRelationship = (data.guardianRelationship || 'Parent').trim();
+    const previousSchool = (data.previousSchool || data.prevSchool || undefined);
+
+    // Validation
+    if (!studentFirstName) {
+      throw new AppError('Applicant full name is required.', 400, 'VALIDATION_ERROR');
+    }
+    if (!guardianEmail || !guardianEmail.includes('@')) {
+      throw new AppError('A valid parent/guardian email address is required.', 400, 'VALIDATION_ERROR');
+    }
+    if (!guardianPhone || guardianPhone.length < 7) {
+      throw new AppError('A valid guardian phone number is required.', 400, 'VALIDATION_ERROR');
+    }
+    if (!applyingClass) {
+      throw new AppError('Applying class/grade is required.', 400, 'VALIDATION_ERROR');
+    }
+
+    let applicationNumber = `APP-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+    const collision = await prisma.admissionApplication.findUnique({ where: { applicationNumber } });
+    if (collision) {
+      applicationNumber = `APP-2026-${Date.now().toString().slice(-4)}${Math.floor(10 + Math.random() * 90)}`;
+    }
 
     const app = await prisma.admissionApplication.create({
       data: {
-        schoolId: targetSchoolId,
+        schoolId: school.id,
         applicationNumber,
-        studentFirstName: data.studentFirstName,
-        studentLastName: data.studentLastName,
+        studentFirstName,
+        studentLastName,
         dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : new Date('2011-01-01'),
-        gender: data.gender || 'Unknown',
-        applyingClass: data.applyingClass,
-        guardianName: data.guardianName,
-        guardianRelationship: (data as any).guardianRelationship || 'Parent',
-        guardianEmail: data.guardianEmail,
-        guardianPhone: data.guardianPhone,
-        residentialAddress: data.residentialAddress || 'Campus Applicant',
+        gender: data.gender || 'Not Specified',
+        applyingClass,
+        guardianName,
+        guardianRelationship,
+        guardianEmail,
+        guardianPhone,
+        residentialAddress,
+        previousSchool,
         status: ApplicationStatus.SUBMITTED,
       },
     });
