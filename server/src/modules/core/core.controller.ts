@@ -187,6 +187,46 @@ export class CoreSchoolController {
     }
   }
 
+  async getPublicFaculty(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const schoolIdentifier = (req.query.schoolIdentifier as string) || 'apex-academy';
+      const faculty = await coreSchoolService.getPublicFaculty(schoolIdentifier);
+      res.status(200).json({ success: true, data: faculty });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async getPublicEvents(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const schoolIdentifier = (req.query.schoolIdentifier as string) || 'apex-academy';
+      const events = await coreSchoolService.getPublicEvents(schoolIdentifier);
+      res.status(200).json({ success: true, data: events });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async getPublicNotices(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const schoolIdentifier = (req.query.schoolIdentifier as string) || 'apex-academy';
+      const notices = await coreSchoolService.getPublicNotices(schoolIdentifier);
+      res.status(200).json({ success: true, data: notices });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async getPublicDepartments(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const schoolIdentifier = (req.query.schoolIdentifier as string) || 'apex-academy';
+      const departments = await coreSchoolService.getPublicDepartments(schoolIdentifier);
+      res.status(200).json({ success: true, data: departments });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   async getSchoolOverviewStats(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const stats = await coreSchoolService.getSchoolOverviewStats(req.schoolId!);

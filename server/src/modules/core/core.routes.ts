@@ -38,6 +38,25 @@ router.post('/admissions/apply', (req, res, next) => {
   coreSchoolController.submitAdmission(req, res, next);
 });
 
+/**
+ * Public School Information Endpoints (Database-Driven)
+ */
+router.get('/public/faculty', (req, res, next) => {
+  coreSchoolController.getPublicFaculty(req, res, next);
+});
+
+router.get('/public/events', (req, res, next) => {
+  coreSchoolController.getPublicEvents(req, res, next);
+});
+
+router.get('/public/notices', (req, res, next) => {
+  coreSchoolController.getPublicNotices(req, res, next);
+});
+
+router.get('/public/departments', (req, res, next) => {
+  coreSchoolController.getPublicDepartments(req, res, next);
+});
+
 // ============================================================================
 // 2. AUTHENTICATED & TENANT-ISOLATED ENDPOINTS
 // ============================================================================

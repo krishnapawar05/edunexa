@@ -1,11 +1,39 @@
-import React from 'react';
-import { Award, Mail, Phone, BookOpen, GraduationCap, ShieldCheck } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Award, Mail, Phone, BookOpen, GraduationCap, ShieldCheck, RefreshCw } from 'lucide-react';
 import { useSchoolBranding } from '../../../context/SchoolBrandingContext.js';
+import { coreApi } from '../../../services/api.js';
 
 export const FacultyPage: React.FC = () => {
   const { branding } = useSchoolBranding();
+  const [facultyMembers, setFacultyMembers] = useState<any[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
 
-  const facultyMembers = [
+  useEffect(() => {
+    let isMounted = true;
+    const fetchFaculty = async () => {
+      try {
+        setLoading(true);
+        const data = await coreApi.getPublicFaculty('apex-academy');
+        if (isMounted && Array.isArray(data) && data.length > 0) {
+          setFacultyMembers(data);
+        } else if (isMounted) {
+          setFacultyMembers(defaultFaculty);
+        }
+      } catch {
+        if (isMounted) {
+          setFacultyMembers(defaultFaculty);
+        }
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+    fetchFaculty();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const defaultFaculty = [
     {
       name: 'Dr. Alistair Thorne',
       degrees: 'Ph.D. in Applied Physics (IISc)',
@@ -79,7 +107,7 @@ export const FacultyPage: React.FC = () => {
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: 'var(--space-3)' }}>
                 <div style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: 'var(--primary-100)', color: 'var(--primary-800)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '1.05rem' }}>
-                  {fac.name.split(' ').map((n) => n[0]).join('').slice(0, 2)}
+                  {(fac.name || 'Faculty').split(' ').map((n: string) => n[0]).join('').slice(0, 2)}
                 </div>
                 <div>
                   <h4 style={{ margin: 0, fontSize: '0.98rem' }}>{fac.name}</h4>

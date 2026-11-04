@@ -419,6 +419,31 @@ describe('STAGE 4: Core School Management Test Suite', () => {
     expect(resInvalidEmail.body.success).toBe(false);
   });
 
+  it('10e. Public endpoints return dynamic faculty, events, notices, and departments without authentication', async () => {
+    const resFaculty = await request(app).get('/api/v1/core/public/faculty?schoolIdentifier=apex-academy');
+    expect(resFaculty.status).toBe(200);
+    expect(resFaculty.body.success).toBe(true);
+    expect(Array.isArray(resFaculty.body.data)).toBe(true);
+    expect(resFaculty.body.data.length).toBeGreaterThanOrEqual(1);
+    expect(resFaculty.body.data[0]).toHaveProperty('name');
+    expect(resFaculty.body.data[0]).toHaveProperty('designation');
+
+    const resEvents = await request(app).get('/api/v1/core/public/events?schoolIdentifier=apex-academy');
+    expect(resEvents.status).toBe(200);
+    expect(resEvents.body.success).toBe(true);
+    expect(Array.isArray(resEvents.body.data)).toBe(true);
+
+    const resNotices = await request(app).get('/api/v1/core/public/notices?schoolIdentifier=apex-academy');
+    expect(resNotices.status).toBe(200);
+    expect(resNotices.body.success).toBe(true);
+    expect(Array.isArray(resNotices.body.data)).toBe(true);
+
+    const resDepts = await request(app).get('/api/v1/core/public/departments?schoolIdentifier=apex-academy');
+    expect(resDepts.status).toBe(200);
+    expect(resDepts.body.success).toBe(true);
+    expect(Array.isArray(resDepts.body.data)).toBe(true);
+  });
+
   // --------------------------------------------------------------------------
   // 11. Role Authorization Enforcement on Core Operations
   // --------------------------------------------------------------------------

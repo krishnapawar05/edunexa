@@ -1241,6 +1241,160 @@ export class CoreSchoolService {
   }
 
   /**
+   * Public Faculty Directory
+   */
+  async getPublicFaculty(schoolIdentifier?: string) {
+    let school = await resolveSchool(schoolIdentifier || 'apex-academy');
+    if (!school) {
+      school = await prisma.school.findFirst({ where: { status: 'ACTIVE' } });
+    }
+    if (!school) {
+      school = await prisma.school.findFirst();
+    }
+    if (!school) return [];
+
+    const staff = await prisma.staffProfile.findMany({
+      where: {
+        membership: { schoolId: school.id },
+        employmentStatus: EmploymentStatus.ACTIVE,
+      },
+      include: {
+        membership: { include: { user: true } },
+        department: true,
+        teacherAssignments: {
+          include: {
+            subject: { include: { class: true } },
+          },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    return staff.map((s) => ({
+      id: s.id,
+      name: `${s.membership.user.firstName} ${s.membership.user.lastName}`.trim(),
+      firstName: s.membership.user.firstName,
+      lastName: s.membership.user.lastName,
+      employeeId: s.employeeId,
+      designation: s.designation,
+      department: s.department?.name || 'Department of Physical Sciences',
+      email: s.membership.user.email,
+      phone: s.membership.user.phone || '+91 11 2659 1000',
+      assignments: s.teacherAssignments.map((a) => `${a.subject.name} (${a.subject.class.name})`),
+      degrees: s.designation.includes('Principal') || s.designation.includes('Senior')
+        ? 'Ph.D. / M.Sc. Advanced Pedagogical Studies'
+        : 'M.Sc. / B.Ed. Certified Instructor',
+      experience: '12+ Years Teaching & Academic Excellence',
+    }));
+  }
+
+  /**
+   * Public School Events
+   */
+  async getPublicEvents(schoolIdentifier?: string) {
+    let school = await resolveSchool(schoolIdentifier || 'apex-academy');
+    if (!school) {
+      school = await prisma.school.findFirst({ where: { status: 'ACTIVE' } });
+    }
+    if (!school) {
+      school = await prisma.school.findFirst();
+    }
+    if (!school) return [];
+
+    const events = await prisma.schoolEvent.findMany({
+      where: {
+        schoolId: school.id,
+      },
+      orderBy: { startDate: 'asc' },
+    });
+
+    return events.map((e) => ({
+      id: e.id,
+      title: e.title,
+      description: e.description,
+      venue: e.venue || 'Campus Central Auditorium',
+      startDate: e.startDate.toISOString(),
+      endDate: e.endDate.toISOString(),
+      dateFormatted: e.startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      category: e.audience === 'ALL' ? 'Campus Event' : e.audience,
+    }));
+  }
+
+  /**
+   * Public Notices & Circulars
+   */
+  async getPublicNotices(schoolIdentifier?: string) {
+    let school = await resolveSchool(schoolIdentifier || 'apex-academy');
+    if (!school) {
+      school = await prisma.school.findFirst({ where: { status: 'ACTIVE' } });
+    }
+    if (!school) {
+      school = await prisma.school.findFirst();
+    }
+    if (!school) return [];
+
+    const notices = await prisma.notice.findMany({
+      where: {
+        schoolId: school.id,
+        audience: 'ALL',
+      },
+      orderBy: { publishedAt: 'desc' },
+      take: 20,
+    });
+
+    return notices.map((n) => ({
+      id: n.id,
+      title: n.title,
+      summary: n.content,
+      content: n.content,
+      badge: n.isUrgent ? 'Urgent Circular' : 'Official Notice',
+      isUrgent: n.isUrgent,
+      publishedAt: n.publishedAt.toISOString(),
+      dateFormatted: n.publishedAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+    }));
+  }
+
+  /**
+   * Public Departments & Academic Disciplines
+   */
+  async getPublicDepartments(schoolIdentifier?: string) {
+    let school = await resolveSchool(schoolIdentifier || 'apex-academy');
+    if (!school) {
+      school = await prisma.school.findFirst({ where: { status: 'ACTIVE' } });
+    }
+    if (!school) {
+      school = await prisma.school.findFirst();
+    }
+    if (!school) return [];
+
+    const departments = await prisma.department.findMany({
+      where: { schoolId: school.id },
+      include: {
+        staff: {
+          include: {
+            membership: { include: { user: true } },
+          },
+        },
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    return departments.map((d) => {
+      const headStaff = d.staff[0];
+      const headName = headStaff
+        ? `${headStaff.membership.user.firstName} ${headStaff.membership.user.lastName}`
+        : 'Faculty Chair';
+      return {
+        id: d.id,
+        name: d.name,
+        description: d.description || `Academic department overseeing pedagogy, laboratories, and curriculum standards for ${d.name}.`,
+        head: headName,
+        facultyCount: d.staff.length,
+      };
+    });
+  }
+
+  /**
    * List Admissions Applications
    */
   async listAdmissions(schoolIdOrIdentifier: string, status?: string) {

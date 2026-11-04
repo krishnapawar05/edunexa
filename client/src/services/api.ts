@@ -317,6 +317,18 @@ export const coreApi = {
       body: JSON.stringify(data),
     }),
 
+  getPublicFaculty: (schoolIdentifier = 'apex-academy') =>
+    apiRequest<any[]>(`/api/v1/core/public/faculty?schoolIdentifier=${encodeURIComponent(schoolIdentifier)}`),
+
+  getPublicEvents: (schoolIdentifier = 'apex-academy') =>
+    apiRequest<any[]>(`/api/v1/core/public/events?schoolIdentifier=${encodeURIComponent(schoolIdentifier)}`),
+
+  getPublicNotices: (schoolIdentifier = 'apex-academy') =>
+    apiRequest<any[]>(`/api/v1/core/public/notices?schoolIdentifier=${encodeURIComponent(schoolIdentifier)}`),
+
+  getPublicDepartments: (schoolIdentifier = 'apex-academy') =>
+    apiRequest<any[]>(`/api/v1/core/public/departments?schoolIdentifier=${encodeURIComponent(schoolIdentifier)}`),
+
   getSchoolOverviewStats: () =>
     apiRequest<{
       schoolId: string;

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Award,
@@ -24,11 +24,42 @@ import {
   Check,
   Clock,
   Phone,
+  Bell,
+  Calendar,
 } from 'lucide-react';
 import { useSchoolBranding } from '../../../context/SchoolBrandingContext.js';
+import { coreApi } from '../../../services/api.js';
 
 export const HomePage: React.FC = () => {
   const { branding } = useSchoolBranding();
+  const [liveEvents, setLiveEvents] = useState<any[]>([]);
+  const [liveNotices, setLiveNotices] = useState<any[]>([]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchPublicData = async () => {
+      try {
+        const [evs, nots] = await Promise.allSettled([
+          coreApi.getPublicEvents('apex-academy'),
+          coreApi.getPublicNotices('apex-academy'),
+        ]);
+        if (isMounted) {
+          if (evs.status === 'fulfilled' && Array.isArray(evs.value)) {
+            setLiveEvents(evs.value.slice(0, 3));
+          }
+          if (nots.status === 'fulfilled' && Array.isArray(nots.value)) {
+            setLiveNotices(nots.value.slice(0, 3));
+          }
+        }
+      } catch {
+        // Fallbacks preserved
+      }
+    };
+    fetchPublicData();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Realistic Image-Led Facilities inspired by St. Joseph's Public School
   const facilitiesWithPhotos = [
@@ -520,6 +551,90 @@ export const HomePage: React.FC = () => {
           </div>
         </div>
       </section>
+
+      {/* =========================================================================
+          SECTION: LIVE CAMPUS NOTICES & UPCOMING EVENTS (PostgreSQL-Driven)
+          ========================================================================= */}
+      {(liveNotices.length > 0 || liveEvents.length > 0) && (
+        <section style={{ padding: 'clamp(2.5rem, 5vw, 4rem) 0', backgroundColor: 'var(--academic-cream)' }}>
+          <div className="ed-public-container">
+            <div className="ed-section-heading">
+              <span className="ed-section-eyebrow">Institutional Updates</span>
+              <h2 className="ed-section-title">Notices & Campus Calendar</h2>
+              <div className="ed-section-rule" />
+              <p className="ed-section-subtitle">
+                Official circulars, parent notices, and upcoming academic events live from the {branding.schoolName} administration desk.
+              </p>
+            </div>
+
+            <div className="ed-responsive-split">
+              {/* Left Column: Official Notices */}
+              <div className="ed-card ed-card-body" style={{ height: 'fit-content' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-3)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Bell size={20} style={{ color: 'var(--color-primary)' }} />
+                    <h3 style={{ fontSize: '1.05rem', margin: 0, fontFamily: 'var(--font-crest)' }}>Official Circulars</h3>
+                  </div>
+                  <Link to="/news" style={{ fontSize: '0.82rem', color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none' }}>
+                    All Circulars →
+                  </Link>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {liveNotices.map((n) => (
+                    <div key={n.id} style={{ borderBottom: '1px solid var(--border-default)', paddingBottom: '10px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                        <span className={`ed-badge ${n.isUrgent ? 'ed-badge-danger' : 'ed-badge-neutral'}`} style={{ fontSize: '0.68rem', padding: '1px 6px' }}>
+                          {n.badge}
+                        </span>
+                        <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>{n.dateFormatted}</span>
+                      </div>
+                      <div style={{ fontSize: '0.92rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                        {n.title}
+                      </div>
+                      <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                        {n.summary}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Right Column: Key Upcoming Events */}
+              <div className="ed-card ed-card-body" style={{ height: 'fit-content' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-3)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Calendar size={20} style={{ color: 'var(--color-primary)' }} />
+                    <h3 style={{ fontSize: '1.05rem', margin: 0, fontFamily: 'var(--font-crest)' }}>Campus Events Calendar</h3>
+                  </div>
+                  <Link to="/events" style={{ fontSize: '0.82rem', color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none' }}>
+                    Full Calendar →
+                  </Link>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {liveEvents.map((ev) => (
+                    <div key={ev.id} style={{ borderBottom: '1px solid var(--border-default)', paddingBottom: '10px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                        <span className="ed-badge ed-badge-info" style={{ fontSize: '0.68rem', padding: '1px 6px' }}>
+                          {ev.category}
+                        </span>
+                        <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>{ev.dateFormatted}</span>
+                      </div>
+                      <div style={{ fontSize: '0.92rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                        {ev.title}
+                      </div>
+                      <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                        {ev.description}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* =========================================================================
           SECTION 9: ADMISSIONS CALLOUT BANNER

@@ -1,11 +1,45 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Bell, Award, CheckCircle2, Calendar, FileText, ArrowRight } from 'lucide-react';
 import { useSchoolBranding } from '../../../context/SchoolBrandingContext.js';
+import { coreApi } from '../../../services/api.js';
 
 export const NewsPage: React.FC = () => {
   const { branding } = useSchoolBranding();
+  const [newsItems, setNewsItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
 
-  const newsItems = [
+  useEffect(() => {
+    let isMounted = true;
+    const fetchNotices = async () => {
+      try {
+        setLoading(true);
+        const data = await coreApi.getPublicNotices('apex-academy');
+        if (isMounted && Array.isArray(data) && data.length > 0) {
+          const mapped = data.map((d: any) => ({
+            title: d.title,
+            date: d.dateFormatted || new Date(d.publishedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+            badge: d.badge || (d.isUrgent ? 'Urgent Circular' : 'Official Notice'),
+            summary: d.summary || d.content,
+          }));
+          setNewsItems(mapped);
+        } else if (isMounted) {
+          setNewsItems(defaultNews);
+        }
+      } catch {
+        if (isMounted) {
+          setNewsItems(defaultNews);
+        }
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+    fetchNotices();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const defaultNews = [
     {
       title: 'Apex Academy Achieves 100% Distinction in CBSE Senior Board Results',
       date: 'Oct 12, 2026',

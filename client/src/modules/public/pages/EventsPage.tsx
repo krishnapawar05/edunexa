@@ -1,11 +1,47 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, MapPin, Award, Users, ArrowRight } from 'lucide-react';
 import { useSchoolBranding } from '../../../context/SchoolBrandingContext.js';
+import { coreApi } from '../../../services/api.js';
 
 export const EventsPage: React.FC = () => {
   const { branding } = useSchoolBranding();
+  const [events, setEvents] = useState<any[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
 
-  const events = [
+  useEffect(() => {
+    let isMounted = true;
+    const fetchEvents = async () => {
+      try {
+        setLoading(true);
+        const data = await coreApi.getPublicEvents('apex-academy');
+        if (isMounted && Array.isArray(data) && data.length > 0) {
+          const mapped = data.map((d: any) => ({
+            title: d.title,
+            date: d.dateFormatted || new Date(d.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+            time: '09:00 AM – 04:30 PM',
+            venue: d.venue || 'Campus Main Auditorium',
+            category: d.category || 'Institutional Event',
+            description: d.description,
+          }));
+          setEvents(mapped);
+        } else if (isMounted) {
+          setEvents(defaultEvents);
+        }
+      } catch {
+        if (isMounted) {
+          setEvents(defaultEvents);
+        }
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+    fetchEvents();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const defaultEvents = [
     {
       title: 'Inter-School STEM & Robotics Symposium 2026',
       date: 'Oct 28, 2026',

@@ -1,11 +1,23 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Cpu, Atom, Calculator, Globe, Palette, Dumbbell } from 'lucide-react';
 import { useSchoolBranding } from '../../../context/SchoolBrandingContext.js';
+import { coreApi } from '../../../services/api.js';
 
 export const DepartmentsPage: React.FC = () => {
   const { branding } = useSchoolBranding();
+  const [departments, setDepartments] = useState<any[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
 
-  const departments = [
+  const iconMap: Record<string, any> = {
+    'Department of Physical Sciences': Atom,
+    'Department of Mathematical Sciences': Calculator,
+    'Department of Computer Science & AI': Cpu,
+    'Department of Humanities & Social Sciences': Globe,
+    'Department of Languages & Literature': Palette,
+    'Department of Athletics & Physical Wellbeing': Dumbbell,
+  };
+
+  const defaultDepartments = [
     {
       name: 'Department of Physical Sciences',
       head: 'Dr. Julian Thorne, Ph.D.',
@@ -56,6 +68,42 @@ export const DepartmentsPage: React.FC = () => {
     },
   ];
 
+  useEffect(() => {
+    let isMounted = true;
+    const fetchDepartments = async () => {
+      try {
+        setLoading(true);
+        const data = await coreApi.getPublicDepartments('apex-academy');
+        if (isMounted && Array.isArray(data) && data.length > 0) {
+          const mapped = data.map((d: any, idx: number) => {
+            const fallback = defaultDepartments.find((def) => def.name.toLowerCase() === d.name.toLowerCase()) || defaultDepartments[idx % defaultDepartments.length];
+            return {
+              name: d.name,
+              head: d.head || fallback.head,
+              icon: iconMap[d.name] || fallback.icon,
+              color: fallback.color || 'var(--primary-600)',
+              description: d.description || fallback.description,
+              courses: fallback.courses || ['Core Curriculum & Laboratory Inquiry'],
+            };
+          });
+          setDepartments(mapped);
+        } else if (isMounted) {
+          setDepartments(defaultDepartments);
+        }
+      } catch {
+        if (isMounted) {
+          setDepartments(defaultDepartments);
+        }
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+    fetchDepartments();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   return (
     <div className="ed-public-container" style={{ padding: 'var(--space-8) 0' }}>
       {/* Title */}
@@ -91,7 +139,7 @@ export const DepartmentsPage: React.FC = () => {
               <div style={{ marginTop: 'var(--space-4)', borderTop: '1px solid var(--border-default)', paddingTop: 'var(--space-3)' }}>
                 <div style={{ fontSize: '0.74rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px' }}>KEY COURSES OFFERED:</div>
                 <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                  {dept.courses.map((course, cIdx) => (
+                  {(dept.courses || []).map((course: string, cIdx: number) => (
                     <span key={cIdx} className="ed-badge ed-badge-neutral" style={{ fontSize: '0.74rem' }}>
                       {course}
                     </span>
