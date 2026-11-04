@@ -3,9 +3,15 @@ import {
   Search,
   Bell,
   Menu,
+  KeyRound,
+  Lock,
+  CheckCircle2,
+  AlertCircle,
+  X,
+  ShieldCheck,
 } from 'lucide-react';
 import { HealthCheckData } from '@edunexa/shared';
-import { operationsApi, getStoredUser } from '../services/api.js';
+import { operationsApi, getStoredUser, changePasswordApi } from '../services/api.js';
 import { ThemeSwitcher } from './ThemeSwitcher.js';
 
 interface HeaderProps {
@@ -24,6 +30,54 @@ export const Header: React.FC<HeaderProps> = ({
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState<number>(0);
+
+  // Change password modal state
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [submittingPassword, setSubmittingPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
+
+  // Password rules
+  const hasMinLength = newPassword.length >= 8;
+  const hasUppercase = /[A-Z]/.test(newPassword);
+  const hasLowercase = /[a-z]/.test(newPassword);
+  const hasNumber = /[0-9]/.test(newPassword);
+  const hasSpecial = /[^A-Za-z0-9]/.test(newPassword);
+  const passwordsMatch = newPassword.length > 0 && newPassword === confirmPassword;
+  const isFormValid =
+    currentPassword.length > 0 &&
+    hasMinLength &&
+    hasUppercase &&
+    hasLowercase &&
+    hasNumber &&
+    hasSpecial &&
+    passwordsMatch;
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isFormValid) return;
+    setSubmittingPassword(true);
+    setPasswordError(null);
+    setPasswordSuccess(null);
+    try {
+      const res = await changePasswordApi(currentPassword, newPassword);
+      setPasswordSuccess(res.message || 'Password changed successfully.');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setTimeout(() => {
+        setShowChangePasswordModal(false);
+        setPasswordSuccess(null);
+      }, 2000);
+    } catch (err: any) {
+      setPasswordError(err.message || 'Failed to change password. Please verify current password.');
+    } finally {
+      setSubmittingPassword(false);
+    }
+  };
 
   const user = getStoredUser();
   const activeRole = user?.role || currentRole;
@@ -204,9 +258,242 @@ export const Header: React.FC<HeaderProps> = ({
           )}
         </div>
 
+        {/* Change Password Button */}
+        <button
+          onClick={() => {
+            setShowChangePasswordModal(true);
+            setPasswordError(null);
+            setPasswordSuccess(null);
+          }}
+          className="ed-btn-icon"
+          title="Account Security & Password"
+          aria-label="Change Password"
+          style={{ position: 'relative' }}
+        >
+          <KeyRound size={18} />
+        </button>
+
         {/* Global Light / Dark / System Theme Switcher */}
         <ThemeSwitcher />
       </div>
+
+      {/* Change Password Modal */}
+      {showChangePasswordModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.65)',
+            backdropFilter: 'blur(3px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '16px',
+          }}
+        >
+          <div
+            className="ed-card"
+            style={{
+              width: '100%',
+              maxWidth: '460px',
+              backgroundColor: 'var(--bg-surface)',
+              boxShadow: 'var(--shadow-xl)',
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--border-default)',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '16px 20px',
+                borderBottom: '1px solid var(--border-default)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <KeyRound size={20} style={{ color: 'var(--primary-600)' }} />
+                <h3 style={{ margin: 0, fontSize: '1.05rem', color: 'var(--text-primary)' }}>
+                  Change Account Password
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowChangePasswordModal(false)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  display: 'flex',
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ padding: '20px' }}>
+              {passwordSuccess ? (
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    padding: '14px',
+                    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                    border: '1px solid rgba(34, 197, 94, 0.3)',
+                    borderRadius: 'var(--radius-sm)',
+                    color: 'var(--text-primary)',
+                    fontSize: '0.90rem',
+                  }}
+                >
+                  <CheckCircle2 size={22} style={{ color: '#16a34a', flexShrink: 0 }} />
+                  <span>{passwordSuccess}</span>
+                </div>
+              ) : (
+                <form onSubmit={handleChangePassword}>
+                  <div className="ed-input-group" style={{ marginBottom: '14px' }}>
+                    <label className="ed-label">Current Password</label>
+                    <div style={{ position: 'relative' }}>
+                      <Lock
+                        size={16}
+                        style={{ position: 'absolute', left: '10px', top: '10px', color: 'var(--text-muted)' }}
+                      />
+                      <input
+                        required
+                        type="password"
+                        className="ed-input"
+                        style={{ paddingLeft: '34px' }}
+                        placeholder="Enter current password"
+                        value={currentPassword}
+                        onChange={(e) => setCurrentPassword(e.target.value)}
+                        autoComplete="current-password"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="ed-input-group" style={{ marginBottom: '14px' }}>
+                    <label className="ed-label">New Password</label>
+                    <div style={{ position: 'relative' }}>
+                      <Lock
+                        size={16}
+                        style={{ position: 'absolute', left: '10px', top: '10px', color: 'var(--text-muted)' }}
+                      />
+                      <input
+                        required
+                        type="password"
+                        className="ed-input"
+                        style={{ paddingLeft: '34px' }}
+                        placeholder="Enter new password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        autoComplete="new-password"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="ed-input-group" style={{ marginBottom: '16px' }}>
+                    <label className="ed-label">Confirm New Password</label>
+                    <div style={{ position: 'relative' }}>
+                      <Lock
+                        size={16}
+                        style={{ position: 'absolute', left: '10px', top: '10px', color: 'var(--text-muted)' }}
+                      />
+                      <input
+                        required
+                        type="password"
+                        className="ed-input"
+                        style={{ paddingLeft: '34px' }}
+                        placeholder="Confirm new password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        autoComplete="new-password"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Checklist */}
+                  <div
+                    style={{
+                      padding: '12px',
+                      backgroundColor: 'var(--bg-subtle)',
+                      borderRadius: 'var(--radius-sm)',
+                      marginBottom: '16px',
+                      fontSize: '0.78rem',
+                    }}
+                  >
+                    <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px' }}>
+                      Requirements:
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
+                      <span style={{ color: hasMinLength ? '#16a34a' : 'var(--text-muted)' }}>
+                        {hasMinLength ? '✓' : '○'} 8+ Characters
+                      </span>
+                      <span style={{ color: hasUppercase ? '#16a34a' : 'var(--text-muted)' }}>
+                        {hasUppercase ? '✓' : '○'} Uppercase
+                      </span>
+                      <span style={{ color: hasLowercase ? '#16a34a' : 'var(--text-muted)' }}>
+                        {hasLowercase ? '✓' : '○'} Lowercase
+                      </span>
+                      <span style={{ color: hasNumber ? '#16a34a' : 'var(--text-muted)' }}>
+                        {hasNumber ? '✓' : '○'} Number
+                      </span>
+                      <span style={{ color: hasSpecial ? '#16a34a' : 'var(--text-muted)' }}>
+                        {hasSpecial ? '✓' : '○'} Special Char
+                      </span>
+                      <span style={{ color: passwordsMatch ? '#16a34a' : 'var(--text-muted)' }}>
+                        {passwordsMatch ? '✓' : '○'} Match
+                      </span>
+                    </div>
+                  </div>
+
+                  {passwordError && (
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        marginBottom: '16px',
+                        padding: '8px 12px',
+                        backgroundColor: 'var(--danger-bg)',
+                        border: '1px solid var(--danger-border)',
+                        borderRadius: 'var(--radius-sm)',
+                        color: 'var(--danger-text)',
+                        fontSize: '0.82rem',
+                      }}
+                    >
+                      <AlertCircle size={16} style={{ flexShrink: 0 }} />
+                      <span>{passwordError}</span>
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                    <button
+                      type="button"
+                      onClick={() => setShowChangePasswordModal(false)}
+                      className="ed-btn ed-btn-outline"
+                      style={{ padding: '8px 16px' }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={!isFormValid || submittingPassword}
+                      className="ed-btn ed-btn-primary"
+                      style={{ padding: '8px 18px' }}
+                    >
+                      {submittingPassword ? 'Updating...' : 'Update Password'}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   );
 };

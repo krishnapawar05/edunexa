@@ -16,11 +16,23 @@ import {
   Loader2,
   AlertTriangle,
   Building2,
+  KeyRound,
+  Send,
+  UserCheck,
+  UserX,
+  RefreshCw,
+  Sparkles,
+  Clock,
 } from 'lucide-react';
 import { Badge } from '../../components/ui/Badge.js';
 import { Button } from '../../components/ui/Button.js';
 import { useSchoolBranding } from '../../context/SchoolBrandingContext.js';
-import { coreApi } from '../../services/api.js';
+import {
+  coreApi,
+  triggerUserPasswordResetApi,
+  updateUserAccountStatusApi,
+  resendInvitationApi,
+} from '../../services/api.js';
 
 export const StudentDossierPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -64,6 +76,64 @@ export const StudentDossierPage: React.FC = () => {
       setTimeout(() => setSuccessToast(null), 3500);
     } catch (err: any) {
       alert(`ID Card Generation Failed: ${err.message}`);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleTriggerPasswordReset = async () => {
+    if (!student?.account?.userId) return;
+    if (!window.confirm(`Send an official password reset link to ${student.account.email}?`)) {
+      return;
+    }
+    setActionLoading(true);
+    try {
+      const res = await triggerUserPasswordResetApi(student.account.userId);
+      setSuccessToast(res.message || 'Password reset link sent to student email.');
+      await fetchStudent();
+      setTimeout(() => setSuccessToast(null), 4000);
+    } catch (err: any) {
+      alert(`Failed to trigger password reset: ${err.message}`);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleToggleAccountStatus = async () => {
+    if (!student?.account?.userId) return;
+    const isCurrentlyActive = Boolean(student.account.isActive);
+    const actionWord = isCurrentlyActive ? 'suspend' : 'reactivate';
+    if (!window.confirm(`Are you sure you want to ${actionWord} this student's account access?`)) {
+      return;
+    }
+    setActionLoading(true);
+    try {
+      await updateUserAccountStatusApi(
+        student.account.userId,
+        !isCurrentlyActive,
+        `${isCurrentlyActive ? 'Suspended' : 'Reactivated'} via Student Dossier`
+      );
+      setSuccessToast(`Student account successfully ${isCurrentlyActive ? 'suspended' : 'reactivated'}.`);
+      await fetchStudent();
+      setTimeout(() => setSuccessToast(null), 3500);
+    } catch (err: any) {
+      alert(`Status Update Failed: ${err.message}`);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleResendInvitation = async () => {
+    const invId = student?.account?.invitation?.id;
+    if (!invId) return;
+    setActionLoading(true);
+    try {
+      await resendInvitationApi(invId);
+      setSuccessToast('Fresh activation invitation dispatched to student email.');
+      await fetchStudent();
+      setTimeout(() => setSuccessToast(null), 3500);
+    } catch (err: any) {
+      alert(`Failed to resend invitation: ${err.message}`);
     } finally {
       setActionLoading(false);
     }
@@ -242,6 +312,134 @@ export const StudentDossierPage: React.FC = () => {
             ))
           ) : (
             <p style={{ color: 'var(--text-muted)', fontSize: '0.84rem' }}>No linked guardian information found.</p>
+          )}
+        </div>
+
+        {/* Student Account & Credentials Management */}
+        <div className="ed-card" style={{ padding: 'var(--space-5)', backgroundColor: 'var(--bg-surface)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)' }}>
+            <h3 style={{ fontSize: '0.98rem', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <KeyRound size={16} style={{ color: 'var(--primary-600)' }} /> Account & ERP Access
+            </h3>
+            {student.account && (
+              <Badge variant={student.account.isActive ? 'success' : 'danger'}>
+                {student.account.isActive ? 'ACCOUNT ACTIVE' : 'SUSPENDED'}
+              </Badge>
+            )}
+          </div>
+
+          {student.account ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '0.86rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '6px' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Username</span>
+                <strong style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
+                  {student.account.username || student.admissionNumber}
+                </strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '6px' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Primary Email</span>
+                <span style={{ fontWeight: 600 }}>{student.account.email}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '6px' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Assigned Role</span>
+                <span style={{ fontWeight: 600 }}>Student Portal</span>
+              </div>
+
+              {student.account.invitation && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '6px' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Invitation Status</span>
+                  <Badge variant={student.account.invitation.status === 'ACCEPTED' ? 'success' : 'warning'}>
+                    {student.account.invitation.status}
+                  </Badge>
+                </div>
+              )}
+
+              {student.account.invitation?.assistedCode && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '6px' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Assisted Code</span>
+                  <code style={{ backgroundColor: 'var(--bg-subtle)', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                    {student.account.invitation.assistedCode}
+                  </code>
+                </div>
+              )}
+
+              {student.account.lastLoginAt && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '6px' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Last Activity</span>
+                  <span>{new Date(student.account.lastLoginAt).toLocaleDateString()}</span>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    disabled={actionLoading}
+                    onClick={handleTriggerPasswordReset}
+                    className="ed-btn ed-btn-outline ed-btn-sm"
+                    style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '0.80rem' }}
+                    title="Send password reset link to student email"
+                  >
+                    <Send size={13} /> Send Reset Link
+                  </button>
+
+                  {student.account.invitation && student.account.invitation.status !== 'ACCEPTED' && (
+                    <button
+                      type="button"
+                      disabled={actionLoading}
+                      onClick={handleResendInvitation}
+                      className="ed-btn ed-btn-outline ed-btn-sm"
+                      style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '0.80rem' }}
+                      title="Dispatch a fresh invitation token"
+                    >
+                      <RefreshCw size={13} /> Resend Invite
+                    </button>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  disabled={actionLoading}
+                  onClick={handleToggleAccountStatus}
+                  className={`ed-btn ed-btn-sm ${student.account.isActive ? 'ed-btn-outline' : 'ed-btn-primary'}`}
+                  style={{
+                    width: '100%',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    fontSize: '0.80rem',
+                    color: student.account.isActive ? 'var(--danger-text)' : undefined,
+                    borderColor: student.account.isActive ? 'var(--danger-border)' : undefined,
+                  }}
+                >
+                  {student.account.isActive ? (
+                    <>
+                      <UserX size={13} /> Suspend Student Account
+                    </>
+                  ) : (
+                    <>
+                      <UserCheck size={13} /> Reactivate Student Account
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div style={{ padding: '16px', textAlign: 'center', backgroundColor: 'var(--bg-subtle)', borderRadius: 'var(--radius-sm)' }}>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.84rem', margin: '0 0 12px 0' }}>
+                No active portal account linked to this admission record.
+              </p>
+              <button
+                type="button"
+                disabled={actionLoading}
+                onClick={handleTriggerPasswordReset}
+                className="ed-btn ed-btn-primary ed-btn-sm"
+              >
+                Provision & Send Credentials
+              </button>
+            </div>
           )}
         </div>
 

@@ -16,6 +16,7 @@ import {
 } from '@prisma/client';
 import { prisma, checkDatabaseConnection } from '../../config/db.js';
 import { accountProvisioningService } from './provisioning.service.js';
+import { authService } from '../auth/auth.service.js';
 
 /**
  * Resolves a school ID, slug, or test fixture identifier to a real PostgreSQL School record.
@@ -88,6 +89,7 @@ async function resolveStaffProfile(schoolId: string, staffProfileIdOrIdentifier:
     },
     include: {
       membership: { include: { user: true } },
+      department: true,
       teacherAssignments: { include: { subject: { include: { class: true } } } },
     },
   });
@@ -669,6 +671,36 @@ export class CoreSchoolService {
       });
     }
 
+    const latestInvitation = await prisma.accountInvitation.findFirst({
+      where: {
+        userId: student.membership.user.id,
+        schoolId: targetSchoolId,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const account = {
+      userId: student.membership.user.id,
+      username: student.membership.user.username || student.membership.user.email.split('@')[0],
+      email: student.membership.user.email,
+      role: student.membership.role,
+      isActive: student.membership.user.isActive && student.membership.isActive,
+      mustChangePassword: student.membership.user.mustChangePassword,
+      lastLoginAt: student.membership.user.updatedAt ? student.membership.user.updatedAt.toISOString() : null,
+      invitation: latestInvitation
+        ? {
+            id: latestInvitation.id,
+            status: latestInvitation.status,
+            deliveryStatus: latestInvitation.deliveryStatus,
+            expiresAt: latestInvitation.expiresAt.toISOString(),
+            sentAt: latestInvitation.sentAt?.toISOString() || null,
+            acceptedAt: latestInvitation.acceptedAt?.toISOString() || null,
+            isAssisted: latestInvitation.isAssisted,
+            assistedCode: latestInvitation.assistedCode,
+          }
+        : null,
+    };
+
     return {
       id: student.id,
       schoolId: schoolIdOrIdentifier,
@@ -686,6 +718,7 @@ export class CoreSchoolService {
       rollNumber: activeEnrollment?.rollNumber || 1,
       status: student.status,
       guardians,
+      account,
       idCard: student.virtualIdCard
         ? {
             id: student.virtualIdCard.id,
@@ -811,29 +844,23 @@ export class CoreSchoolService {
       );
     }
 
-    return prisma.$transaction(async (tx) => {
-      let user = await tx.user.findUnique({ where: { email: data.email } });
-      if (!user) {
-        user = await tx.user.create({
-          data: {
-            email: data.email,
-            firstName: data.firstName,
-            lastName: data.lastName,
-            phone: data.phone,
-            passwordHash: '$2a$10$wT3wK.sXFjDgnnLd8mY3xebvOQ6B18qTq8u20eSgb/rZeqm5zD78m',
-          },
-        });
-      }
+    const targetRole = (data.role as any) || PlatformRole.TEACHER;
 
-      const membership = await tx.userMembership.create({
-        data: {
-          userId: user.id,
-          schoolId: school.id,
-          role: PlatformRole.TEACHER,
-          isPrimary: true,
-          isActive: true,
-        },
+    return prisma.$transaction(async (tx) => {
+      const provisioned = await accountProvisioningService.provisionAccount(tx, {
+        schoolId: school.id,
+        email: data.email,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        phone: data.phone,
+        role: targetRole,
+        actingUserRole: PlatformRole.SCHOOL_ADMIN,
+        sendInvitation: data.sendInvitation !== false,
+        schoolName: school.name,
       });
+
+      const user = provisioned.user;
+      const membership = provisioned.membership;
 
       let department = await tx.department.findFirst({
         where: {
@@ -887,9 +914,156 @@ export class CoreSchoolService {
         employmentStatus: data.employmentStatus,
         phone: data.phone,
         assignments: [],
+        invitation: provisioned.invitation,
         createdAt: staff.createdAt.toISOString(),
       };
     });
+  }
+
+  /**
+   * Get Staff Profile & Account Dossier (Scoped by Tenant)
+   */
+  async getStaffById(schoolIdOrIdentifier: string, staffId: string) {
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    const targetSchoolId = school ? school.id : schoolIdOrIdentifier;
+
+    const staff = await resolveStaffProfile(targetSchoolId, staffId);
+    if (!staff) {
+      throw new AppError(`Staff record '${staffId}' not found in this school.`, 404, 'RECORD_NOT_FOUND');
+    }
+
+    const latestInvitation = await prisma.accountInvitation.findFirst({
+      where: {
+        userId: staff.membership.user.id,
+        schoolId: targetSchoolId,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const account = {
+      userId: staff.membership.user.id,
+      username: staff.membership.user.username || staff.membership.user.email.split('@')[0],
+      email: staff.membership.user.email,
+      role: staff.membership.role,
+      isActive: staff.membership.user.isActive && staff.membership.isActive,
+      mustChangePassword: staff.membership.user.mustChangePassword,
+      lastLoginAt: staff.membership.user.updatedAt ? staff.membership.user.updatedAt.toISOString() : null,
+      invitation: latestInvitation
+        ? {
+            id: latestInvitation.id,
+            status: latestInvitation.status,
+            deliveryStatus: latestInvitation.deliveryStatus,
+            expiresAt: latestInvitation.expiresAt.toISOString(),
+            sentAt: latestInvitation.sentAt?.toISOString() || null,
+            acceptedAt: latestInvitation.acceptedAt?.toISOString() || null,
+            isAssisted: latestInvitation.isAssisted,
+            assistedCode: latestInvitation.assistedCode,
+          }
+        : null,
+    };
+
+    return {
+      id: staff.id,
+      schoolId: targetSchoolId,
+      employeeId: staff.employeeId,
+      firstName: staff.membership.user.firstName,
+      lastName: staff.membership.user.lastName,
+      email: staff.membership.user.email,
+      departmentName: staff.department?.name || 'General',
+      designation: staff.designation,
+      joiningDate: staff.joiningDate.toISOString().split('T')[0],
+      employmentStatus: staff.employmentStatus,
+      phone: staff.membership.user.phone || '',
+      assignments: staff.teacherAssignments.map((a) => ({
+        className: a.subject.class.name,
+        sectionName: 'A',
+        subjectCode: a.subject.code,
+        isLeadTeacher: a.isLeadTeacher,
+      })),
+      account,
+      createdAt: staff.createdAt.toISOString(),
+    };
+  }
+
+  /**
+   * School Administrator triggers a secure password reset link for a tenant user
+   */
+  async triggerUserPasswordReset(schoolIdOrIdentifier: string, userId: string, actingUserId: string) {
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    const targetSchoolId = school ? school.id : schoolIdOrIdentifier;
+
+    const membership = await prisma.userMembership.findFirst({
+      where: {
+        userId,
+        schoolId: targetSchoolId,
+      },
+      include: {
+        user: true,
+      },
+    });
+
+    if (!membership) {
+      throw new AppError('User not found within this school tenant.', 404, 'USER_NOT_FOUND');
+    }
+
+    if (membership.role === PlatformRole.SUPER_ADMIN) {
+      throw new AppError('School administrators cannot trigger password resets for platform Super Admins.', 403, 'FORBIDDEN_OPERATION');
+    }
+
+    const resetResult = await authService.forgotPassword(membership.user.email, school?.slug);
+
+    await prisma.auditLog.create({
+      data: {
+        schoolId: targetSchoolId,
+        userId: actingUserId,
+        action: 'ADMIN_TRIGGERED_PASSWORD_RESET',
+        entityType: 'USER_ACCOUNT',
+        entityId: userId,
+        details: {
+          targetEmail: membership.user.email,
+          targetRole: membership.role,
+        },
+      },
+    });
+
+    return {
+      success: true,
+      message: `Password reset instructions have been sent to ${membership.user.email}.`,
+      devToken: resetResult.devToken,
+    };
+  }
+
+  /**
+   * School Administrator suspends or reactivates an account
+   */
+  async updateUserAccountStatus(
+    schoolIdOrIdentifier: string,
+    userId: string,
+    isActive: boolean,
+    actingUserId: string,
+    reason?: string
+  ) {
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    const targetSchoolId = school ? school.id : schoolIdOrIdentifier;
+    return accountProvisioningService.updateAccountStatus(targetSchoolId, userId, isActive, actingUserId, reason);
+  }
+
+  /**
+   * School Administrator resends an invitation with a fresh token
+   */
+  async resendInvitation(schoolIdOrIdentifier: string, invitationId: string, actingUserId: string) {
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    const targetSchoolId = school ? school.id : schoolIdOrIdentifier;
+    return accountProvisioningService.resendInvitation(targetSchoolId, invitationId, actingUserId);
+  }
+
+  /**
+   * School Administrator revokes an outstanding invitation
+   */
+  async revokeInvitation(schoolIdOrIdentifier: string, invitationId: string, actingUserId: string, reason?: string) {
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    const targetSchoolId = school ? school.id : schoolIdOrIdentifier;
+    return accountProvisioningService.revokeInvitation(targetSchoolId, invitationId, actingUserId, reason);
   }
 
   /**

@@ -17,11 +17,12 @@ import {
   Edit2,
   Calendar,
   Download,
+  KeyRound,
 } from 'lucide-react';
 import { Badge } from '../../components/ui/Badge.js';
 import { Button } from '../../components/ui/Button.js';
 import { Modal } from '../../components/ui/Modal.js';
-import { coreApi } from '../../services/api.js';
+import { coreApi, triggerUserPasswordResetApi } from '../../services/api.js';
 
 interface StaffRecord {
   id: string;
@@ -542,6 +543,22 @@ export const FacultyHrPage: React.FC = () => {
                           title="Change Employment Status"
                         >
                           <Edit2 size={13} />
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (window.confirm(`Send an official password reset link to ${s.firstName} ${s.lastName} (${s.email})?`)) {
+                              try {
+                                await triggerUserPasswordResetApi(s.id);
+                                alert(`Password reset instructions have been sent to ${s.email}`);
+                              } catch (err: any) {
+                                alert(`Failed to trigger reset: ${err.message}`);
+                              }
+                            }
+                          }}
+                          className="ed-btn ed-btn-sm ed-btn-secondary"
+                          title="Send Password Reset Link"
+                        >
+                          <KeyRound size={13} />
                         </button>
                       </div>
                     </td>

@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { Lock, Mail, ArrowRight, ShieldCheck } from 'lucide-react';
+import { Lock, Mail, ArrowRight, ShieldCheck, KeyRound, CheckCircle2, AlertCircle, X } from 'lucide-react';
 import { useSchoolBranding } from '../../context/SchoolBrandingContext.js';
-import { getApiUrl, setAuthSession } from '../../services/api.js';
+import { getApiUrl, setAuthSession, forgotPasswordApi } from '../../services/api.js';
 import { ThemeSwitcher } from '../../components/ThemeSwitcher.js';
 
 interface LoginPageProps {
@@ -19,6 +19,34 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGoToPubl
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Forgot password modal state
+  const [showForgotModal, setShowForgotModal] = useState(false);
+  const [forgotInput, setForgotInput] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotSuccessMessage, setForgotSuccessMessage] = useState<string | null>(null);
+  const [forgotDevToken, setForgotDevToken] = useState<string | null>(null);
+  const [forgotError, setForgotError] = useState<string | null>(null);
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotInput.trim()) return;
+    setForgotLoading(true);
+    setForgotError(null);
+    setForgotSuccessMessage(null);
+    setForgotDevToken(null);
+    try {
+      const res = await forgotPasswordApi(forgotInput.trim(), branding.code);
+      setForgotSuccessMessage(res.message || 'If an account exists with this email or username, password reset instructions have been sent.');
+      if ((res as any).devToken) {
+        setForgotDevToken((res as any).devToken);
+      }
+    } catch (err: any) {
+      setForgotError(err.message || 'Failed to submit reset request.');
+    } finally {
+      setForgotLoading(false);
+    }
+  };
 
   const roleToRouteMap: Record<string, string> = {
     SUPER_ADMIN: '/superadmin',
@@ -142,7 +170,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGoToPubl
 
           <form onSubmit={handleFormSubmit}>
             <div className="ed-input-group">
-              <label className="ed-label">Institutional Email</label>
+              <label className="ed-label">Institutional Email or Username</label>
               <div style={{ position: 'relative' }}>
                 <Mail
                   size={16}
@@ -150,10 +178,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGoToPubl
                 />
                 <input
                   required
-                  type="email"
+                  type="text"
                   className="ed-input"
                   style={{ paddingLeft: '34px' }}
-                  placeholder="name@school.edu"
+                  placeholder="name@school.edu or username"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   autoComplete="username"
@@ -193,9 +221,27 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGoToPubl
               <label style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-muted)', cursor: 'pointer' }}>
                 <input type="checkbox" defaultChecked /> Remember terminal session
               </label>
-              <a href="#reset" onClick={(e) => e.preventDefault()} style={{ fontSize: '0.78rem', color: 'var(--primary-600)' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowForgotModal(true);
+                  setForgotInput(email);
+                  setForgotError(null);
+                  setForgotSuccessMessage(null);
+                  setForgotDevToken(null);
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  fontSize: '0.78rem',
+                  color: 'var(--primary-600)',
+                  cursor: 'pointer',
+                  textDecoration: 'underline',
+                }}
+              >
                 Forgot Password?
-              </a>
+              </button>
             </div>
 
             {errorMessage && (
@@ -334,6 +380,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGoToPubl
           )}
 
           <div style={{ fontSize: '0.80rem', color: 'var(--text-muted)' }}>
+            Received an account invitation or code?{' '}
+            <Link to="/activate" style={{ color: 'var(--primary-600)', fontWeight: 600, textDecoration: 'none' }}>
+              Activate Your Account
+            </Link>
+          </div>
+
+          <div style={{ fontSize: '0.80rem', color: 'var(--text-muted)' }}>
             Need to register a new school tenant?{' '}
             <Link to="/register" style={{ color: 'var(--primary-600)', fontWeight: 600, textDecoration: 'none' }}>
               Register Here
@@ -341,6 +394,195 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGoToPubl
           </div>
         </div>
       </div>
+
+      {/* Forgot Password Modal */}
+      {showForgotModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.65)',
+            backdropFilter: 'blur(3px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '16px',
+          }}
+        >
+          <div
+            className="ed-card"
+            style={{
+              width: '100%',
+              maxWidth: '460px',
+              backgroundColor: 'var(--bg-surface)',
+              boxShadow: 'var(--shadow-xl)',
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--border-default)',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '16px 20px',
+                borderBottom: '1px solid var(--border-default)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <KeyRound size={20} style={{ color: 'var(--primary-600)' }} />
+                <h3 style={{ margin: 0, fontSize: '1.05rem', color: 'var(--text-primary)' }}>
+                  Password Recovery
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowForgotModal(false)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  display: 'flex',
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ padding: '20px' }}>
+              {forgotSuccessMessage ? (
+                <div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: '10px',
+                      padding: '12px 14px',
+                      backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                      border: '1px solid rgba(34, 197, 94, 0.3)',
+                      borderRadius: 'var(--radius-sm)',
+                      color: 'var(--text-primary)',
+                      fontSize: '0.88rem',
+                      lineHeight: 1.5,
+                      marginBottom: '16px',
+                    }}
+                  >
+                    <CheckCircle2 size={20} style={{ color: '#16a34a', flexShrink: 0, marginTop: '2px' }} />
+                    <div>
+                      <strong>Request Sent:</strong>
+                      <p style={{ margin: '4px 0 0 0', color: 'var(--text-secondary)' }}>
+                        {forgotSuccessMessage}
+                      </p>
+                    </div>
+                  </div>
+
+                  {forgotDevToken && (
+                    <div
+                      style={{
+                        padding: '12px',
+                        backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                        border: '1px solid rgba(245, 158, 11, 0.3)',
+                        borderRadius: 'var(--radius-sm)',
+                        fontSize: '0.82rem',
+                        marginBottom: '16px',
+                      }}
+                    >
+                      <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                        🛠️ Development Mode Reset Link:
+                      </div>
+                      <Link
+                        to={`/reset-password?token=${forgotDevToken}`}
+                        onClick={() => setShowForgotModal(false)}
+                        style={{ color: 'var(--primary-600)', wordBreak: 'break-all', fontWeight: 600 }}
+                      >
+                        Click here to reset password directly
+                      </Link>
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => setShowForgotModal(false)}
+                    className="ed-btn ed-btn-primary"
+                    style={{ width: '100%', padding: '10px' }}
+                  >
+                    Return to Login
+                  </button>
+                </div>
+              ) : (
+                <form onSubmit={handleForgotPassword}>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: 0, marginBottom: '16px', lineHeight: 1.5 }}>
+                    Enter your institutional email address or username. If your account is registered, you will receive a secure single-use password reset link.
+                  </p>
+
+                  <div className="ed-input-group" style={{ marginBottom: '16px' }}>
+                    <label className="ed-label">Institutional Email or Username</label>
+                    <div style={{ position: 'relative' }}>
+                      <Mail
+                        size={16}
+                        style={{ position: 'absolute', left: '10px', top: '10px', color: 'var(--text-muted)' }}
+                      />
+                      <input
+                        required
+                        type="text"
+                        className="ed-input"
+                        style={{ paddingLeft: '34px' }}
+                        placeholder="e.g. name@school.edu or aarav.sharma"
+                        value={forgotInput}
+                        onChange={(e) => setForgotInput(e.target.value)}
+                        autoFocus
+                      />
+                    </div>
+                  </div>
+
+                  {forgotError && (
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        marginBottom: '16px',
+                        padding: '8px 12px',
+                        backgroundColor: 'var(--danger-bg)',
+                        border: '1px solid var(--danger-border)',
+                        borderRadius: 'var(--radius-sm)',
+                        color: 'var(--danger-text)',
+                        fontSize: '0.82rem',
+                      }}
+                    >
+                      <AlertCircle size={16} style={{ flexShrink: 0 }} />
+                      <span>{forgotError}</span>
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                    <button
+                      type="button"
+                      onClick={() => setShowForgotModal(false)}
+                      className="ed-btn ed-btn-outline"
+                      style={{ padding: '8px 16px' }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={forgotLoading}
+                      className="ed-btn ed-btn-primary"
+                      style={{ padding: '8px 18px' }}
+                    >
+                      {forgotLoading ? 'Sending...' : 'Send Reset Link'}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

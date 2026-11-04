@@ -499,4 +499,178 @@ describe('STAGE 3: Authentication and Multi-Tenant Security Test Suite', () => {
     expect(res.body.success).toBe(true);
     expect(res.body.data.platformName).toBe('EduNexa Multi-Tenant School ERP Updated');
   });
+
+  // --------------------------------------------------------------------------
+  // SECTION 13: PASSWORD RECOVERY & CREDENTIAL LIFECYCLE
+  // --------------------------------------------------------------------------
+  let testResetToken: string | undefined;
+
+  it('13a. Forgot Password returns 200 with generic message and issues single-use token', async () => {
+    const res = await request(app)
+      .post('/api/v1/auth/forgot-password')
+      .send({ email: 'admin@apexacademy.edu' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.message).toContain('If an account exists');
+    testResetToken = res.body.data.devToken;
+    expect(testResetToken).toBeDefined();
+  });
+
+  it('13b. Forgot Password protects against user enumeration for non-existent email', async () => {
+    const res = await request(app)
+      .post('/api/v1/auth/forgot-password')
+      .send({ email: 'nonexistent-ghost-user-99@nowhere.com' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.message).toContain('If an account exists');
+  });
+
+  it('13c. Verify Password Reset Token validates valid token', async () => {
+    if (!testResetToken) return;
+    const res = await request(app)
+      .get(`/api/v1/auth/reset-password/verify/${testResetToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.valid).toBe(true);
+    expect(res.body.data.email).toBe('admin@apexacademy.edu');
+  });
+
+  it('13d. Verify Password Reset Token rejects invalid or forged token with 400', async () => {
+    const res = await request(app)
+      .get('/api/v1/auth/reset-password/verify/forged-invalid-token-1234567890abcdef');
+
+    expect(res.status).toBe(400);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error.code).toBe('INVALID_RESET_TOKEN');
+  });
+
+  it('13e. Reset Password rejects weak password with 422 or 400', async () => {
+    if (!testResetToken) return;
+    const res = await request(app)
+      .post('/api/v1/auth/reset-password')
+      .send({
+        token: testResetToken,
+        password: 'weak',
+      });
+
+    expect([400, 422]).toContain(res.status);
+  });
+
+  it('13f. Reset Password successfully updates password and marks token used', async () => {
+    if (!testResetToken) return;
+    const res = await request(app)
+      .post('/api/v1/auth/reset-password')
+      .send({
+        token: testResetToken,
+        password: 'NewSecurePassword2026!',
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+
+    // Verifying token again must now fail because it was already used
+    const verifyAgain = await request(app)
+      .get(`/api/v1/auth/reset-password/verify/${testResetToken}`);
+    expect(verifyAgain.status).toBe(400);
+
+    // Verify login with new password succeeds
+    const loginRes = await request(app)
+      .post('/api/v1/auth/login')
+      .send({
+        email: 'admin@apexacademy.edu',
+        password: 'NewSecurePassword2026!',
+      });
+    expect(loginRes.status).toBe(200);
+  });
+
+  it('13g. Authenticated user can change password', async () => {
+    const res = await request(app)
+      .post('/api/v1/auth/change-password')
+      .set('Authorization', `Bearer ${schoolAdminTokenSchoolA}`)
+      .send({
+        currentPassword: 'NewSecurePassword2026!',
+        newPassword: 'DemoPass2026!',
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+  });
+
+  it('13h. Change password rejects incorrect current password', async () => {
+    const res = await request(app)
+      .post('/api/v1/auth/change-password')
+      .set('Authorization', `Bearer ${schoolAdminTokenSchoolA}`)
+      .send({
+        currentPassword: 'WrongCurrentPassword!',
+        newPassword: 'AnotherPassword2026!',
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('INCORRECT_PASSWORD');
+  });
+
+  it('13i. Change password rejects same password', async () => {
+    const res = await request(app)
+      .post('/api/v1/auth/change-password')
+      .set('Authorization', `Bearer ${schoolAdminTokenSchoolA}`)
+      .send({
+        currentPassword: 'DemoPass2026!',
+        newPassword: 'DemoPass2026!',
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('SAME_PASSWORD');
+  });
+
+  // --------------------------------------------------------------------------
+  // SECTION 14: SCHOOL ADMIN CREDENTIAL MANAGEMENT & TENANT BOUNDARIES
+  // --------------------------------------------------------------------------
+  it('14a. Student Dossier includes student account details with username and role', async () => {
+    const res = await request(app)
+      .get('/api/v1/core/students/stu-aarav-01')
+      .set('Authorization', `Bearer ${schoolAdminTokenSchoolA}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data).toHaveProperty('account');
+    expect(res.body.data.account).toHaveProperty('username');
+    expect(res.body.data.account.role).toBe(PlatformRole.STUDENT);
+  });
+
+  it('14b. School Admin cannot trigger password reset for Super Admin (forbidden)', async () => {
+    const res = await request(app)
+      .post('/api/v1/core/accounts/usr-superadmin-01/reset-password')
+      .set('Authorization', `Bearer ${schoolAdminTokenSchoolA}`);
+
+    expect(res.status).toBe(404); // User not in school tenant
+  });
+
+  it('14c. School Admin can suspend and reactivate a student user account', async () => {
+    const studentDossier = await request(app)
+      .get('/api/v1/core/students/stu-aarav-01')
+      .set('Authorization', `Bearer ${schoolAdminTokenSchoolA}`);
+
+    const studentUserId = studentDossier.body.data.account.userId;
+
+    // Suspend
+    const suspendRes = await request(app)
+      .patch(`/api/v1/core/accounts/${studentUserId}/status`)
+      .set('Authorization', `Bearer ${schoolAdminTokenSchoolA}`)
+      .send({ isActive: false, reason: 'Temporary suspension for testing' });
+
+    expect(suspendRes.status).toBe(200);
+    expect(suspendRes.body.data.isActive).toBe(false);
+
+    // Reactivate
+    const reactivateRes = await request(app)
+      .patch(`/api/v1/core/accounts/${studentUserId}/status`)
+      .set('Authorization', `Bearer ${schoolAdminTokenSchoolA}`)
+      .send({ isActive: true, reason: 'Reactivated by administrator' });
+
+    expect(reactivateRes.status).toBe(200);
+    expect(reactivateRes.body.data.isActive).toBe(true);
+  });
 });

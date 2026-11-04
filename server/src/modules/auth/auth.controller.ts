@@ -1,6 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
 import { authService } from './auth.service.js';
-import { ApiSuccessResponse, ActivateAccountSchema } from '@edunexa/shared';
+import {
+  ApiSuccessResponse,
+  ActivateAccountSchema,
+  ForgotPasswordSchema,
+  ResetPasswordSchema,
+  ChangePasswordSchema,
+} from '@edunexa/shared';
 import { accountProvisioningService } from '../core/provisioning.service.js';
 
 export class AuthController {
@@ -22,6 +28,63 @@ export class AuthController {
         success: true,
         data: result,
         message: 'Account activated successfully. You can now log in with your credentials.',
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async forgotPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const parsed = ForgotPasswordSchema.parse(req.body);
+      const result = await authService.forgotPassword(parsed.email, parsed.schoolSlug);
+      res.status(200).json({
+        success: true,
+        data: result,
+        message: result.message,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async verifyResetToken(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { token } = req.params;
+      const details = await authService.verifyPasswordResetToken(token);
+      res.status(200).json({ success: true, data: details });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async resetPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const parsed = ResetPasswordSchema.parse(req.body);
+      const result = await authService.resetPassword(parsed.token, parsed.password);
+      res.status(200).json({
+        success: true,
+        data: result,
+        message: result.message,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async changePassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const parsed = ChangePasswordSchema.parse(req.body);
+      const result = await authService.changePassword(
+        req.user!.userId,
+        parsed.currentPassword,
+        parsed.newPassword,
+        req.user?.email
+      );
+      res.status(200).json({
+        success: true,
+        data: result,
+        message: result.message,
       });
     } catch (err) {
       next(err);

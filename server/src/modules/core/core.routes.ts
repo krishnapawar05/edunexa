@@ -15,6 +15,7 @@ import {
   IdCardGenerateSchema,
   IdCardDeactivateSchema,
   AdmissionReviewSchema,
+  UpdateAccountStatusSchema,
 } from '@edunexa/shared';
 
 const router = Router();
@@ -214,6 +215,19 @@ router.patch(
   }
 );
 
+router.get(
+  '/staff/:id',
+  requireRole(
+    PlatformRole.SCHOOL_ADMIN,
+    PlatformRole.PRINCIPAL,
+    PlatformRole.HR_STAFF,
+    PlatformRole.SUPER_ADMIN
+  ),
+  (req, res, next) => {
+    coreSchoolController.getStaffById(req, res, next);
+  }
+);
+
 router.patch(
   '/staff/:id',
   requireRole(PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.HR_STAFF, PlatformRole.SUPER_ADMIN),
@@ -283,6 +297,48 @@ router.get(
   requireRole(PlatformRole.PARENT, PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.SUPER_ADMIN),
   (req, res, next) => {
     coreSchoolController.getParentChildren(req, res, next);
+  }
+);
+
+// Account Provisioning, Credential Management & Recovery Administration
+router.get(
+  '/invitations',
+  requireRole(PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.SUPER_ADMIN),
+  (req, res, next) => {
+    coreSchoolController.listInvitations(req, res, next);
+  }
+);
+
+router.post(
+  '/invitations/:invitationId/resend',
+  requireRole(PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.SUPER_ADMIN),
+  (req, res, next) => {
+    coreSchoolController.resendInvitation(req, res, next);
+  }
+);
+
+router.post(
+  '/invitations/:invitationId/revoke',
+  requireRole(PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.SUPER_ADMIN),
+  (req, res, next) => {
+    coreSchoolController.revokeInvitation(req, res, next);
+  }
+);
+
+router.post(
+  '/accounts/:userId/reset-password',
+  requireRole(PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.SUPER_ADMIN),
+  (req, res, next) => {
+    coreSchoolController.triggerUserPasswordReset(req, res, next);
+  }
+);
+
+router.patch(
+  '/accounts/:userId/status',
+  requireRole(PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.SUPER_ADMIN),
+  validateRequest({ body: UpdateAccountStatusSchema }),
+  (req, res, next) => {
+    coreSchoolController.updateUserAccountStatus(req, res, next);
   }
 );
 

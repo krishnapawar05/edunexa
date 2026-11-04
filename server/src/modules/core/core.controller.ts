@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { coreSchoolService } from './core.service.js';
+import { accountProvisioningService } from './provisioning.service.js';
 import { ApiSuccessResponse } from '@edunexa/shared';
 
 export class CoreSchoolController {
@@ -290,6 +291,86 @@ export class CoreSchoolController {
     try {
       const children = await coreSchoolService.getParentChildren(req.schoolId!, req.user!.userId);
       res.status(200).json({ success: true, data: children });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async getStaffById(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const staff = await coreSchoolService.getStaffById(req.schoolId!, req.params.id);
+      res.status(200).json({ success: true, data: staff });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async triggerUserPasswordReset(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { userId } = req.params;
+      const result = await coreSchoolService.triggerUserPasswordReset(
+        req.schoolId!,
+        userId,
+        req.user!.userId
+      );
+      res.status(200).json({ success: true, data: result });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async updateUserAccountStatus(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { userId } = req.params;
+      const { isActive, reason } = req.body;
+      const result = await coreSchoolService.updateUserAccountStatus(
+        req.schoolId!,
+        userId,
+        isActive,
+        req.user!.userId,
+        reason
+      );
+      res.status(200).json({ success: true, data: result });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async resendInvitation(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { invitationId } = req.params;
+      const result = await coreSchoolService.resendInvitation(
+        req.schoolId!,
+        invitationId,
+        req.user!.userId
+      );
+      res.status(200).json({ success: true, data: result });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async revokeInvitation(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { invitationId } = req.params;
+      const { reason } = req.body;
+      const result = await coreSchoolService.revokeInvitation(
+        req.schoolId!,
+        invitationId,
+        req.user!.userId,
+        reason
+      );
+      res.status(200).json({ success: true, data: result });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async listInvitations(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const status = req.query.status as string | undefined;
+      const result = await accountProvisioningService.listInvitations(req.schoolId!, status);
+      res.status(200).json({ success: true, data: result });
     } catch (err) {
       next(err);
     }

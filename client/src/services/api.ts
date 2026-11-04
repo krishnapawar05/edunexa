@@ -949,3 +949,87 @@ export async function reviewQuizDraftApi(draftId: string, reviews: any[], token:
     };
   }
 }
+
+
+// ============================================================================
+// ACCOUNT PROVISIONING & PASSWORD RECOVERY APIS
+// ============================================================================
+
+export async function forgotPasswordApi(email: string, schoolSlug?: string): Promise<{ success: boolean; message: string; data?: any }> {
+  return apiRequest('/api/v1/auth/forgot-password', {
+    method: 'POST',
+    body: JSON.stringify({ email, schoolSlug }),
+  });
+}
+
+export async function verifyResetTokenApi(token: string): Promise<{ valid: boolean; email: string; recipientName: string }> {
+  return apiRequest(`/api/v1/auth/reset-password/verify/${encodeURIComponent(token)}`, {
+    method: 'GET',
+  });
+}
+
+export async function resetPasswordApi(token: string, password: string): Promise<{ success: boolean; message: string }> {
+  return apiRequest('/api/v1/auth/reset-password', {
+    method: 'POST',
+    body: JSON.stringify({ token, password }),
+  });
+}
+
+export async function changePasswordApi(currentPassword: string, newPassword: string): Promise<{ success: boolean; message: string }> {
+  return apiRequest('/api/v1/auth/change-password', {
+    method: 'POST',
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+}
+
+export async function verifyActivationTokenApi(token: string): Promise<{ valid: boolean; email: string; recipientName: string; role: string; schoolName: string; isAssisted: boolean }> {
+  return apiRequest(`/api/v1/auth/invitations/verify/${encodeURIComponent(token)}`, {
+    method: 'GET',
+  });
+}
+
+export async function activateAccountApi(token: string, password: string): Promise<{ success: boolean; data: any; message: string }> {
+  return apiRequest('/api/v1/auth/invitations/activate', {
+    method: 'POST',
+    body: JSON.stringify({ token, password }),
+  });
+}
+
+export async function triggerUserPasswordResetApi(userId: string): Promise<{ success: boolean; message: string }> {
+  return apiRequest(`/api/v1/core/accounts/${encodeURIComponent(userId)}/reset-password`, {
+    method: 'POST',
+  });
+}
+
+export async function updateUserAccountStatusApi(userId: string, isActive: boolean, reason?: string): Promise<{ userId: string; schoolId: string; isActive: boolean; role: string }> {
+  return apiRequest(`/api/v1/core/accounts/${encodeURIComponent(userId)}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ isActive, reason }),
+  });
+}
+
+export async function resendInvitationApi(invitationId: string): Promise<any> {
+  return apiRequest(`/api/v1/core/invitations/${encodeURIComponent(invitationId)}/resend`, {
+    method: 'POST',
+  });
+}
+
+export async function revokeInvitationApi(invitationId: string, reason?: string): Promise<any> {
+  return apiRequest(`/api/v1/core/invitations/${encodeURIComponent(invitationId)}/revoke`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export async function listInvitationsApi(status?: string): Promise<any[]> {
+  const query = status && status !== 'ALL' ? `?status=${encodeURIComponent(status)}` : '';
+  return apiRequest(`/api/v1/core/invitations${query}`, {
+    method: 'GET',
+  });
+}
+
+export async function fetchStaffMemberApi(staffId: string): Promise<any> {
+  return apiRequest(`/api/v1/core/staff/${encodeURIComponent(staffId)}`, {
+    method: 'GET',
+  });
+}

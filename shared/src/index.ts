@@ -103,7 +103,7 @@ export interface HealthCheckData {
 // ============================================================================
 
 export const LoginRequestSchema = z.object({
-  email: z.string().email('Please provide a valid institutional email address'),
+  email: z.string().min(3, 'Please provide a valid institutional email or username'),
   password: z.string().min(8, 'Password must be at least 8 characters long'),
   schoolSlug: z.string().optional(),
 });
@@ -213,6 +213,32 @@ export const UpdateAccountStatusSchema = z.object({
   isActive: z.boolean(),
   reason: z.string().optional(),
 });
+
+export const ForgotPasswordSchema = z.object({
+  email: z.string().min(3, 'Email or username is required'),
+  schoolSlug: z.string().optional(),
+});
+export type ForgotPasswordDTO = z.infer<typeof ForgotPasswordSchema>;
+
+export const ResetPasswordSchema = z.object({
+  token: z.string().min(16, 'Valid password reset token is required'),
+  password: z.string().min(8, 'Password must be at least 8 characters long')
+    .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
+    .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
+    .regex(/[0-9]/, 'Password must contain at least one number')
+    .regex(/[^A-Za-z0-9]/, 'Password must contain at least one special character'),
+});
+export type ResetPasswordDTO = z.infer<typeof ResetPasswordSchema>;
+
+export const ChangePasswordSchema = z.object({
+  currentPassword: z.string().min(1, 'Current password is required'),
+  newPassword: z.string().min(8, 'New password must be at least 8 characters long')
+    .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
+    .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
+    .regex(/[0-9]/, 'Password must contain at least one number')
+    .regex(/[^A-Za-z0-9]/, 'Password must contain at least one special character'),
+});
+export type ChangePasswordDTO = z.infer<typeof ChangePasswordSchema>;
 export type UpdateAccountStatusDTO = z.infer<typeof UpdateAccountStatusSchema>;
 
 export const TeacherAssignmentSchema = z.object({

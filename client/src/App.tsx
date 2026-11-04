@@ -10,6 +10,8 @@ import { NotFoundPage } from './components/NotFoundPage.js';
 // Standalone Public & Auth Pages
 import { LoginPage } from './modules/auth/LoginPage.js';
 import { RegisterPage } from './modules/auth/RegisterPage.js';
+import { ResetPasswordPage } from './modules/auth/ResetPasswordPage.js';
+import { AccountActivationPage } from './modules/auth/AccountActivationPage.js';
 import { PublicIdCardVerification } from './modules/public/PublicIdCardVerification.js';
 
 // Public School Website Subpages
@@ -112,6 +114,8 @@ export const App: React.FC = () => {
         {/* ================================================================ */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/activate" element={<AccountActivationPage />} />
         <Route path="/verify-id" element={<PublicIdCardVerification />} />
         <Route path="/verify-id/:token" element={<PublicIdCardVerification />} />
 

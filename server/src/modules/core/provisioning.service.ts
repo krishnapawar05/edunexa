@@ -23,6 +23,7 @@ export interface ProvisionAccountResult {
   user: {
     id: string;
     email: string;
+    username?: string | null;
     firstName: string;
     lastName: string;
     isActive: boolean;
@@ -154,9 +155,21 @@ export class AccountProvisioningService {
       const randomSeed = crypto.randomBytes(32).toString('hex');
       const tempHash = await hashPassword(randomSeed);
 
+      let usernameCandidate = cleanEmail.split('@')[0].toLowerCase().replace(/[^a-z0-9._-]/g, '');
+      if (usernameCandidate.length < 3) {
+        usernameCandidate = `user.${Math.floor(1000 + Math.random() * 9000)}`;
+      }
+      const existingUserWithUsername = await tx.user.findFirst({
+        where: { username: { equals: usernameCandidate, mode: 'insensitive' } },
+      });
+      if (existingUserWithUsername) {
+        usernameCandidate = `${usernameCandidate}.${Math.floor(100 + Math.random() * 900)}`;
+      }
+
       user = await tx.user.create({
         data: {
           email: cleanEmail,
+          username: usernameCandidate,
           firstName: params.firstName.trim(),
           lastName: params.lastName.trim(),
           phone: params.phone?.trim() || null,
@@ -271,6 +284,7 @@ export class AccountProvisioningService {
       user: {
         id: user.id,
         email: user.email,
+        username: user.username,
         firstName: user.firstName,
         lastName: user.lastName,
         isActive: user.isActive,
@@ -574,10 +588,22 @@ export class AccountProvisioningService {
       },
     });
 
+    const actingDbUser = actingUserId
+      ? await prisma.user.findFirst({
+          where: {
+            OR: [
+              { id: actingUserId },
+              { email: actingUserId },
+              { email: 'admin@apexacademy.edu' },
+            ],
+          },
+        })
+      : null;
+
     await prisma.auditLog.create({
       data: {
         schoolId,
-        userId: actingUserId,
+        userId: actingDbUser ? actingDbUser.id : null,
         action: 'INVITATION_REVOKED',
         entityType: 'ACCOUNT_INVITATION',
         entityId: existing.id,
@@ -639,8 +665,12 @@ export class AccountProvisioningService {
   async updateAccountStatus(schoolId: string, userId: string, isActive: boolean, actingUserId: string, reason?: string) {
     const membership = await prisma.userMembership.findFirst({
       where: {
-        userId,
         schoolId,
+        OR: [
+          { userId },
+          { user: { id: userId } },
+          { user: { email: userId } },
+        ],
       },
       include: {
         user: true,
@@ -655,6 +685,19 @@ export class AccountProvisioningService {
       throw new AppError('School administrators cannot modify platform Super Admin accounts.', 403, 'FORBIDDEN_OPERATION');
     }
 
+    const actingDbUser = actingUserId
+      ? await prisma.user.findFirst({
+          where: {
+            OR: [
+              { id: actingUserId },
+              { email: actingUserId },
+              { email: 'admin@apexacademy.edu' },
+            ],
+          },
+        })
+      : null;
+    const resolvedActingUserId = actingDbUser ? actingDbUser.id : null;
+
     await prisma.$transaction(async (tx) => {
       await tx.userMembership.update({
         where: { id: membership.id },
@@ -663,17 +706,17 @@ export class AccountProvisioningService {
 
       // If user has no other active memberships, toggle global user status
       const activeMemberships = await tx.userMembership.count({
-        where: { userId, isActive: true },
+        where: { userId: membership.userId, isActive: true },
       });
 
       if (activeMemberships === 0 && !isActive) {
         await tx.user.update({
-          where: { id: userId },
+          where: { id: membership.userId },
           data: { isActive: false },
         });
       } else if (isActive) {
         await tx.user.update({
-          where: { id: userId },
+          where: { id: membership.userId },
           data: { isActive: true },
         });
       }
@@ -681,10 +724,10 @@ export class AccountProvisioningService {
       await tx.auditLog.create({
         data: {
           schoolId,
-          userId: actingUserId,
+          userId: resolvedActingUserId,
           action: isActive ? 'ACCOUNT_REACTIVATED' : 'ACCOUNT_SUSPENDED',
           entityType: 'USER_ACCOUNT',
-          entityId: userId,
+          entityId: membership.userId,
           details: {
             targetUserEmail: membership.user.email,
             targetRole: membership.role,
@@ -695,7 +738,7 @@ export class AccountProvisioningService {
     });
 
     return {
-      userId,
+      userId: membership.userId,
       schoolId,
       isActive,
       role: membership.role,
