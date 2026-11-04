@@ -187,6 +187,68 @@ export class TenantController {
       next(err);
     }
   }
+
+  async listSchoolInvitations(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { id } = req.params;
+      const invitations = await tenantService.listSchoolInvitations(id);
+      const response: ApiSuccessResponse<typeof invitations> = {
+        success: true,
+        data: invitations,
+      };
+      res.status(200).json(response);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async sendSchoolAdminInvitation(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { id } = req.params;
+      const adminUserId = req.user?.userId || 'system-admin';
+      const result = await tenantService.sendSchoolAdminInvitation(id, req.body, adminUserId);
+      const response: ApiSuccessResponse<typeof result> = {
+        success: true,
+        data: result,
+      };
+      res.status(201).json(response);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async resendSchoolAdminInvitation(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { id, invitationId } = req.params;
+      const invId = invitationId || req.body?.invitationId;
+      const adminUserId = req.user?.userId || 'system-admin';
+      const result = await tenantService.resendSchoolAdminInvitation(id, invId, adminUserId);
+      const response: ApiSuccessResponse<typeof result> = {
+        success: true,
+        data: result,
+      };
+      res.status(200).json(response);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async revokeSchoolAdminInvitation(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { id, invitationId } = req.params;
+      const invId = invitationId || req.body?.invitationId;
+      const reason = req.body?.reason;
+      const adminUserId = req.user?.userId || 'system-admin';
+      const result = await tenantService.revokeSchoolAdminInvitation(id, invId, adminUserId, reason);
+      const response: ApiSuccessResponse<typeof result> = {
+        success: true,
+        data: result,
+      };
+      res.status(200).json(response);
+    } catch (err) {
+      next(err);
+    }
+  }
 }
 
 export const tenantController = new TenantController();

@@ -219,6 +219,25 @@ export const superadminApi = {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
+  listSchoolInvitations: (schoolId: string) =>
+    apiRequest<any[]>(`/api/v1/superadmin/schools/${schoolId}/invitations`),
+  sendSchoolAdminInvitation: (
+    schoolId: string,
+    data: { adminFullName: string; adminEmail: string; adminPhone?: string; sendInvitation?: boolean }
+  ) =>
+    apiRequest<any>(`/api/v1/superadmin/schools/${schoolId}/invitations/send`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  resendSchoolAdminInvitation: (schoolId: string, invitationId: string) =>
+    apiRequest<any>(`/api/v1/superadmin/schools/${schoolId}/invitations/${invitationId}/resend`, {
+      method: 'POST',
+    }),
+  revokeSchoolAdminInvitation: (schoolId: string, invitationId: string, reason?: string) =>
+    apiRequest<any>(`/api/v1/superadmin/schools/${schoolId}/invitations/${invitationId}/revoke`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
 };
 
 // ============================================================================

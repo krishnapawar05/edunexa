@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { prisma, checkDatabaseConnection } from '../../config/db.js';
 import { AppError } from '../../middleware/errorHandler.js';
 import {
@@ -7,7 +8,100 @@ import {
   PlatformRoleType,
   BulkActionResponse,
   BulkItemResult,
+  SendSchoolAdminInvitationDTO,
 } from '@edunexa/shared';
+import { accountProvisioningService } from '../core/provisioning.service.js';
+
+interface MemorySchoolAdminInvitation {
+  id: string;
+  schoolId: string;
+  userId: string;
+  email: string;
+  recipientName: string;
+  role: string;
+  tokenHash: string;
+  rawToken?: string;
+  status: 'PENDING' | 'ACCEPTED' | 'EXPIRED' | 'REVOKED' | 'FAILED';
+  expiresAt: string;
+  acceptedAt?: string | null;
+  sentAt?: string | null;
+  deliveryStatus?: string;
+  deliveryError?: string | null;
+  invitedByUserId?: string;
+  user?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    isActive: boolean;
+  };
+}
+
+let MEMORY_INVITATIONS: MemorySchoolAdminInvitation[] = [
+  {
+    id: 'inv-apex-admin',
+    schoolId: 'sch-apex-01',
+    userId: 'usr-schooladmin-01',
+    email: 'admin@apexacademy.edu',
+    recipientName: 'Dr. Ramesh Sharma',
+    role: 'SCHOOL_ADMIN',
+    tokenHash: 'hash-apex-01',
+    status: 'ACCEPTED',
+    expiresAt: new Date(Date.now() + 7 * 86400000).toISOString(),
+    acceptedAt: new Date(Date.now() - 30 * 86400000).toISOString(),
+    sentAt: new Date(Date.now() - 31 * 86400000).toISOString(),
+    deliveryStatus: 'DELIVERED',
+    user: {
+      id: 'usr-schooladmin-01',
+      firstName: 'Dr. Ramesh',
+      lastName: 'Sharma',
+      email: 'admin@apexacademy.edu',
+      isActive: true,
+    },
+  },
+  {
+    id: 'inv-greenwood-admin',
+    schoolId: 'sch-greenwood-02',
+    userId: 'usr-schooladmin-02',
+    email: 'contact@greenwood.edu',
+    recipientName: 'Sarah Jenkins',
+    role: 'SCHOOL_ADMIN',
+    tokenHash: 'hash-greenwood-02',
+    status: 'ACCEPTED',
+    expiresAt: new Date(Date.now() + 7 * 86400000).toISOString(),
+    acceptedAt: new Date(Date.now() - 10 * 86400000).toISOString(),
+    sentAt: new Date(Date.now() - 11 * 86400000).toISOString(),
+    deliveryStatus: 'DELIVERED',
+    user: {
+      id: 'usr-schooladmin-02',
+      firstName: 'Sarah',
+      lastName: 'Jenkins',
+      email: 'contact@greenwood.edu',
+      isActive: true,
+    },
+  },
+  {
+    id: 'inv-augustine-admin',
+    schoolId: 'sch-augustine-03',
+    userId: 'usr-schooladmin-03',
+    email: 'office@staugustine.edu',
+    recipientName: 'Father Michael',
+    role: 'SCHOOL_ADMIN',
+    tokenHash: 'hash-augustine-03',
+    status: 'PENDING',
+    expiresAt: new Date(Date.now() + 7 * 86400000).toISOString(),
+    acceptedAt: null,
+    sentAt: new Date(Date.now() - 1 * 86400000).toISOString(),
+    deliveryStatus: 'SENT',
+    user: {
+      id: 'usr-schooladmin-03',
+      firstName: 'Father',
+      lastName: 'Michael',
+      email: 'office@staugustine.edu',
+      isActive: false,
+    },
+  },
+];
 
 // Persistent memory state store for test environments or offline database fallbacks
 let MEMORY_SCHOOLS: Array<{
@@ -287,7 +381,7 @@ export class TenantService {
           ];
         }
 
-        return await prisma.school.findMany({
+        const schools = await prisma.school.findMany({
           where,
           include: {
             subscriptions: {
@@ -297,8 +391,75 @@ export class TenantService {
             _count: {
               select: { memberships: true },
             },
+            invitations: {
+              where: { role: 'SCHOOL_ADMIN' },
+              orderBy: { createdAt: 'desc' },
+              take: 1,
+              include: {
+                user: {
+                  select: { id: true, firstName: true, lastName: true, email: true, isActive: true },
+                },
+              },
+            },
+            memberships: {
+              where: { role: 'SCHOOL_ADMIN' },
+              orderBy: { createdAt: 'desc' },
+              take: 1,
+              include: {
+                user: {
+                  select: { id: true, firstName: true, lastName: true, email: true, isActive: true },
+                },
+              },
+            },
           },
           orderBy: { createdAt: 'desc' },
+        });
+
+        return schools.map((school) => {
+          const latestMembership = school.memberships?.[0];
+          const latestInvitation = school.invitations?.[0];
+
+          let schoolAdmin: any = null;
+          let invitationStatus = 'NOT_INVITED';
+
+          if (latestMembership?.user) {
+            schoolAdmin = {
+              id: latestMembership.user.id,
+              name: `${latestMembership.user.firstName} ${latestMembership.user.lastName}`.trim(),
+              email: latestMembership.user.email,
+              isActive: latestMembership.user.isActive,
+            };
+          } else if (latestInvitation?.user) {
+            schoolAdmin = {
+              id: latestInvitation.user.id,
+              name: `${latestInvitation.user.firstName} ${latestInvitation.user.lastName}`.trim(),
+              email: latestInvitation.email || latestInvitation.user.email,
+              isActive: latestInvitation.user.isActive,
+            };
+          }
+
+          if (latestInvitation) {
+            schoolAdmin = {
+              ...(schoolAdmin || {}),
+              invitationId: latestInvitation.id,
+              invitationStatus: latestInvitation.status,
+              expiresAt: latestInvitation.expiresAt,
+              sentAt: latestInvitation.sentAt,
+              deliveryStatus: latestInvitation.deliveryStatus,
+            };
+            invitationStatus = latestInvitation.status;
+            if (latestMembership?.user?.isActive && latestInvitation.status !== 'REVOKED') {
+              invitationStatus = 'ACCEPTED';
+            }
+          } else if (latestMembership?.user?.isActive) {
+            invitationStatus = 'ACCEPTED';
+          }
+
+          return {
+            ...school,
+            schoolAdmin,
+            invitationStatus,
+          };
         });
       } catch (err) {
         console.warn('Prisma listSchools error, using memory fallback:', err);
@@ -318,7 +479,26 @@ export class TenantService {
           s.city.toLowerCase().includes(q)
       );
     }
-    return result;
+    return result.map((s) => {
+      const inv = MEMORY_INVITATIONS.find((i) => i.schoolId === s.id && i.role === 'SCHOOL_ADMIN');
+      return {
+        ...s,
+        schoolAdmin: inv
+          ? {
+              id: inv.userId,
+              name: inv.recipientName,
+              email: inv.email,
+              isActive: inv.status === 'ACCEPTED',
+              invitationId: inv.id,
+              invitationStatus: inv.status,
+              expiresAt: inv.expiresAt,
+              sentAt: inv.sentAt,
+              deliveryStatus: inv.deliveryStatus,
+            }
+          : null,
+        invitationStatus: inv ? inv.status : 'NOT_INVITED',
+      };
+    });
   }
 
   async onboardSchool(dto: SchoolOnboardingDTO, adminUserId: string) {
@@ -340,6 +520,8 @@ export class TenantService {
       if (existingBySlug) {
         slug = `${baseSlug}-${Math.random().toString(36).substring(2, 7)}`;
       }
+
+      const cleanAdminEmail = dto.adminEmail ? dto.adminEmail.trim().toLowerCase() : null;
 
       const school = await prisma.school.create({
         data: {
@@ -372,6 +554,44 @@ export class TenantService {
         },
       });
 
+      let adminProvisionResult: any = null;
+
+      if (cleanAdminEmail) {
+        // Prevent duplicate School Admin accounts for the same email and tenant
+        const existingAdmin = await prisma.userMembership.findFirst({
+          where: {
+            schoolId: school.id,
+            role: 'SCHOOL_ADMIN',
+            user: { email: cleanAdminEmail },
+          },
+        });
+
+        if (existingAdmin) {
+          throw new AppError(
+            `A School Admin account with email '${cleanAdminEmail}' already exists for this tenant.`,
+            409,
+            'DUPLICATE_SCHOOL_ADMIN'
+          );
+        }
+
+        const nameParts = (dto.adminFullName || 'School Administrator').trim().split(/\s+/);
+        const firstName = nameParts[0] || 'School';
+        const lastName = nameParts.slice(1).join(' ') || 'Admin';
+
+        adminProvisionResult = await accountProvisioningService.provisionAccount(prisma, {
+          schoolId: school.id,
+          email: cleanAdminEmail,
+          firstName,
+          lastName,
+          phone: dto.adminPhone || dto.phone,
+          role: PlatformRole.SCHOOL_ADMIN,
+          actingUserRole: PlatformRole.SUPER_ADMIN,
+          actingUserId: adminUserId,
+          sendInvitation: dto.sendInvitation !== false,
+          schoolName: school.name,
+        });
+      }
+
       let validUserId: string | undefined = undefined;
       if (adminUserId) {
         const adminUser = await prisma.user.findUnique({ where: { id: adminUserId } });
@@ -385,11 +605,28 @@ export class TenantService {
           action: 'TENANT_ONBOARDED',
           entityType: 'School',
           entityId: school.id,
-          details: { code: dto.code, name: dto.name, planName: dto.planName },
+          details: {
+            code: dto.code,
+            name: dto.name,
+            planName: dto.planName,
+            schoolAdminEmail: cleanAdminEmail,
+            invitationIssued: Boolean(adminProvisionResult?.invitation),
+          },
         },
       });
 
-      return school;
+      return {
+        ...school,
+        schoolAdmin: adminProvisionResult?.user
+          ? {
+              ...adminProvisionResult.user,
+              invitation: adminProvisionResult.invitation,
+              accountStatus: 'PENDING_ACTIVATION',
+              rawActivationToken: adminProvisionResult.rawActivationToken,
+            }
+          : null,
+        invitationStatus: adminProvisionResult?.invitation ? 'SENT' : 'NOT_INVITED',
+      };
     }
 
     // Memory Fallback
@@ -428,6 +665,56 @@ export class TenantService {
       _count: { memberships: 0 },
     };
 
+    let memoryAdminUser: any = null;
+    let memoryInvitation: any = null;
+
+    if (dto.adminEmail && dto.adminEmail.trim()) {
+      const cleanEmail = dto.adminEmail.trim().toLowerCase();
+      const existingAdminMem = MEMORY_INVITATIONS.find(
+        (i) => i.schoolId === created.id && i.email === cleanEmail && i.role === 'SCHOOL_ADMIN'
+      );
+      if (existingAdminMem) {
+        throw new AppError(
+          `A School Admin account with email '${cleanEmail}' already exists for this tenant.`,
+          409,
+          'DUPLICATE_SCHOOL_ADMIN'
+        );
+      }
+
+      const rawToken = crypto.randomBytes(32).toString('hex');
+      const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+      const expiresAt = new Date(Date.now() + 7 * 86400000).toISOString();
+
+      memoryAdminUser = {
+        id: `usr-admin-${Date.now()}`,
+        firstName: dto.adminFullName ? dto.adminFullName.split(' ')[0] : 'School',
+        lastName: dto.adminFullName ? dto.adminFullName.split(' ').slice(1).join(' ') || 'Admin' : 'Admin',
+        email: cleanEmail,
+        phone: dto.adminPhone || dto.phone,
+        isActive: false,
+      };
+
+      memoryInvitation = {
+        id: `inv-${Date.now()}`,
+        schoolId: created.id,
+        userId: memoryAdminUser.id,
+        email: cleanEmail,
+        recipientName: dto.adminFullName || `${memoryAdminUser.firstName} ${memoryAdminUser.lastName}`,
+        role: 'SCHOOL_ADMIN',
+        tokenHash,
+        rawToken,
+        status: 'PENDING',
+        expiresAt,
+        sentAt: new Date().toISOString(),
+        deliveryStatus: 'SENT',
+        invitedByUserId: adminUserId,
+        user: memoryAdminUser,
+      };
+
+      MEMORY_INVITATIONS.unshift(memoryInvitation);
+      created._count.memberships = 1;
+    }
+
     MEMORY_SCHOOLS.unshift(created);
 
     AUDIT_LOGS.unshift({
@@ -437,11 +724,282 @@ export class TenantService {
       entityId: created.id,
       performedByUserId: adminUserId,
       timestamp: new Date().toISOString(),
-      details: { code: dto.code, name: dto.name, planName: dto.planName },
+      details: {
+        code: dto.code,
+        name: dto.name,
+        planName: dto.planName,
+        schoolAdminEmail: dto.adminEmail,
+      },
       school: { id: created.id, name: created.name, code: created.code },
     });
 
-    return created;
+    return {
+      ...created,
+      schoolAdmin: memoryAdminUser
+        ? {
+            ...memoryAdminUser,
+            invitation: memoryInvitation,
+            accountStatus: 'PENDING_ACTIVATION',
+            rawActivationToken: memoryInvitation.rawToken,
+          }
+        : null,
+      invitationStatus: memoryInvitation ? 'SENT' : 'NOT_INVITED',
+    };
+  }
+
+  async listSchoolInvitations(schoolId: string) {
+    const dbCheck = await checkDatabaseConnection();
+    if (dbCheck.connected) {
+      try {
+        const invitations = await prisma.accountInvitation.findMany({
+          where: {
+            schoolId,
+          },
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                phone: true,
+                isActive: true,
+              },
+            },
+            school: {
+              select: {
+                id: true,
+                name: true,
+                code: true,
+                slug: true,
+              },
+            },
+          },
+          orderBy: { createdAt: 'desc' },
+        });
+
+        return invitations.map((inv) => {
+          let computedStatus = inv.status;
+          if (computedStatus === 'PENDING' && new Date() > inv.expiresAt) {
+            computedStatus = 'EXPIRED';
+          }
+
+          return {
+            id: inv.id,
+            schoolId: inv.schoolId,
+            schoolName: inv.school.name,
+            userId: inv.userId,
+            email: inv.email || inv.user.email,
+            recipientName: `${inv.user.firstName} ${inv.user.lastName}`.trim(),
+            role: inv.role,
+            status: computedStatus,
+            accountStatus: inv.user.isActive ? 'ACTIVE' : 'PENDING_ACTIVATION',
+            expiresAt: inv.expiresAt,
+            sentAt: inv.sentAt,
+            acceptedAt: inv.acceptedAt,
+            deliveryStatus: inv.deliveryStatus || 'SENT',
+            deliveryError: inv.deliveryError,
+            userIsActive: inv.user.isActive,
+          };
+        });
+      } catch (err) {
+        console.warn('Prisma listSchoolInvitations error, using memory fallback:', err);
+      }
+    }
+
+    return MEMORY_INVITATIONS.filter((inv) => inv.schoolId === schoolId);
+  }
+
+  async sendSchoolAdminInvitation(schoolId: string, dto: SendSchoolAdminInvitationDTO, actingUserId: string) {
+    const cleanEmail = dto.adminEmail.trim().toLowerCase();
+    const dbCheck = await checkDatabaseConnection();
+
+    if (dbCheck.connected) {
+      const school = await prisma.school.findUnique({
+        where: { id: schoolId },
+      });
+      if (!school) {
+        throw new AppError(`School tenant '${schoolId}' not found.`, 404, 'SCHOOL_NOT_FOUND');
+      }
+
+      // Prevent duplicate School Admin accounts for the same email and tenant
+      const existingMembership = await prisma.userMembership.findFirst({
+        where: {
+          schoolId,
+          role: 'SCHOOL_ADMIN',
+          user: { email: cleanEmail },
+        },
+        include: { user: true },
+      });
+
+      if (existingMembership) {
+        if (existingMembership.isActive) {
+          throw new AppError(
+            `A School Admin account with email '${cleanEmail}' is already active for this school.`,
+            409,
+            'DUPLICATE_SCHOOL_ADMIN'
+          );
+        }
+
+        // If membership exists but inactive, check existing invitation or issue a fresh one
+        const existingInv = await prisma.accountInvitation.findFirst({
+          where: {
+            schoolId,
+            userId: existingMembership.userId,
+            role: 'SCHOOL_ADMIN',
+          },
+          orderBy: { createdAt: 'desc' },
+        });
+
+        if (existingInv && existingInv.status === 'PENDING') {
+          return await accountProvisioningService.resendInvitation(schoolId, existingInv.id, actingUserId);
+        }
+      }
+
+      const nameParts = dto.adminFullName.trim().split(/\s+/);
+      const firstName = nameParts[0] || 'School';
+      const lastName = nameParts.slice(1).join(' ') || 'Admin';
+
+      const provisionResult = await accountProvisioningService.provisionAccount(prisma, {
+        schoolId,
+        email: cleanEmail,
+        firstName,
+        lastName,
+        phone: dto.adminPhone,
+        role: PlatformRole.SCHOOL_ADMIN,
+        actingUserRole: PlatformRole.SUPER_ADMIN,
+        actingUserId,
+        sendInvitation: dto.sendInvitation !== false,
+        schoolName: school.name,
+      });
+
+      return {
+        success: true,
+        user: provisionResult.user,
+        invitation: provisionResult.invitation,
+        rawActivationToken: process.env.NODE_ENV !== 'production' ? provisionResult.rawActivationToken : undefined,
+      };
+    }
+
+    // Memory Fallback
+    const school = MEMORY_SCHOOLS.find((s) => s.id === schoolId);
+    if (!school) {
+      throw new AppError(`School tenant '${schoolId}' not found.`, 404, 'SCHOOL_NOT_FOUND');
+    }
+
+    const existingMem = MEMORY_INVITATIONS.find(
+      (i) => i.schoolId === schoolId && i.email === cleanEmail && i.role === 'SCHOOL_ADMIN'
+    );
+    if (existingMem && existingMem.status === 'ACCEPTED') {
+      throw new AppError(
+        `A School Admin account with email '${cleanEmail}' is already active for this school.`,
+        409,
+        'DUPLICATE_SCHOOL_ADMIN'
+      );
+    }
+
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const expiresAt = new Date(Date.now() + 7 * 86400000).toISOString();
+
+    const newInv: MemorySchoolAdminInvitation = {
+      id: `inv-${Date.now()}`,
+      schoolId,
+      userId: `usr-${Date.now()}`,
+      email: cleanEmail,
+      recipientName: dto.adminFullName.trim(),
+      role: 'SCHOOL_ADMIN',
+      tokenHash,
+      rawToken,
+      status: 'PENDING',
+      expiresAt,
+      sentAt: new Date().toISOString(),
+      deliveryStatus: 'SENT',
+      invitedByUserId: actingUserId,
+      user: {
+        id: `usr-${Date.now()}`,
+        firstName: dto.adminFullName.split(' ')[0] || 'Admin',
+        lastName: dto.adminFullName.split(' ').slice(1).join(' ') || 'User',
+        email: cleanEmail,
+        isActive: false,
+      },
+    };
+
+    MEMORY_INVITATIONS.unshift(newInv);
+
+    return {
+      success: true,
+      user: newInv.user,
+      invitation: {
+        id: newInv.id,
+        status: newInv.status,
+        expiresAt: newInv.expiresAt,
+        deliveryStatus: newInv.deliveryStatus,
+      },
+      rawActivationToken: process.env.NODE_ENV !== 'production' ? rawToken : undefined,
+    };
+  }
+
+  async resendSchoolAdminInvitation(schoolId: string, invitationId: string, actingUserId: string) {
+    if (!invitationId) {
+      throw new AppError('Invitation ID is required.', 400, 'MISSING_INVITATION_ID');
+    }
+
+    const dbCheck = await checkDatabaseConnection();
+    if (dbCheck.connected) {
+      return await accountProvisioningService.resendInvitation(schoolId, invitationId, actingUserId);
+    }
+
+    // Memory Fallback
+    const existing = MEMORY_INVITATIONS.find((i) => i.id === invitationId && i.schoolId === schoolId);
+    if (!existing) {
+      throw new AppError('Invitation record not found.', 404, 'INVITATION_NOT_FOUND');
+    }
+
+    if (existing.status === 'ACCEPTED') {
+      throw new AppError('Account is already activated. Cannot resend an accepted invitation.', 400, 'ACCOUNT_ALREADY_ACTIVATED');
+    }
+
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    existing.tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    existing.rawToken = rawToken;
+    existing.status = 'PENDING';
+    existing.expiresAt = new Date(Date.now() + 7 * 86400000).toISOString();
+    existing.sentAt = new Date().toISOString();
+    existing.deliveryStatus = 'SENT';
+
+    return {
+      id: existing.id,
+      email: existing.email,
+      role: existing.role,
+      status: existing.status,
+      expiresAt: existing.expiresAt,
+      rawToken: process.env.NODE_ENV !== 'production' ? rawToken : undefined,
+    };
+  }
+
+  async revokeSchoolAdminInvitation(schoolId: string, invitationId: string, actingUserId: string, reason?: string) {
+    if (!invitationId) {
+      throw new AppError('Invitation ID is required.', 400, 'MISSING_INVITATION_ID');
+    }
+
+    const dbCheck = await checkDatabaseConnection();
+    if (dbCheck.connected) {
+      return await accountProvisioningService.revokeInvitation(schoolId, invitationId, actingUserId, reason);
+    }
+
+    // Memory Fallback
+    const existing = MEMORY_INVITATIONS.find((i) => i.id === invitationId && i.schoolId === schoolId);
+    if (!existing) {
+      throw new AppError('Invitation record not found.', 404, 'INVITATION_NOT_FOUND');
+    }
+
+    if (existing.status === 'ACCEPTED') {
+      throw new AppError('Cannot revoke an invitation that has already been accepted.', 400, 'INVITATION_ALREADY_ACCEPTED');
+    }
+
+    existing.status = 'REVOKED';
+    return existing;
   }
 
   async updateSchoolStatus(schoolId: string, status: any, adminUserId: string) {

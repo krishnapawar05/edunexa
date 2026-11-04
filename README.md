@@ -78,6 +78,7 @@ Every feature listed below has been verified against the local source code, data
 | **School Identity & Branding** | Multi-tenant school customization and white-labeling. | Centralized in Super Admin Platform Settings; enables configuring institution name, monogram, affiliation code, primary/accent colors, and contact info persisted in PostgreSQL. | **Implemented** |
 | **Institutional Theme & A11y** | Forest-green institutional UI design system. | Accessible high-contrast institutional light theme by default, with seamless dark mode and system theme toggle, fixing all dark-on-dark contrast issues across public and ERP views. | **Implemented** |
 | **Universal Multi-Select & Bulk Actions** | Consistent, context-aware batch operations across all roles. | Reusable `useBulkSelection` hook, indeterminate `SelectAllCheckbox`, `RowCheckbox`, `BulkActionToolbar`, and confirmation modals across 10 directories (Student Directory, Admissions Queue, Faculty HR, HR Staff Records, Staff Leave, Teacher Classes, Exam Publishing, Accounts Invoices, Tenant Subscriptions, and Audit Logs). | **Implemented** |
+| **School Admin Onboarding & Invitation** | End-to-end School Admin provisioning, invitation management, and account activation. | Integrated admin onboarding in Super Admin tenant management, duplicate admin prevention, SHA-256 token hashing, single-use expiring links, Resend transactional emails, resend/revoke controls, and password strength enforced `/activate` and `/auth/activate` pages. | **Implemented** |
 
 ---
 
@@ -551,6 +552,26 @@ All successful responses return JSON enveloped as:
 3. If configured with Resend, an activation email with a one-click button is dispatched immediately to the user's inbox; in development, operational telemetry is logged.
 4. The user opens `/auth/activate?token=...`, reviews their institutional profile and role badge, and sets their secure password.
 5. School administrators can view live activation status in the **Student Dossier**, generate temporary credentials, trigger password reset links (`/auth/reset-password`), or revoke access instantly. All administrative interventions produce immutable audit logs.
+
+### 6. School Admin Onboarding, Invitation Management & Account Activation
+1. **School Tenant Onboarding**: During institution onboarding on the Super Admin School Tenant Management page (`/superadmin/schools`), the Super Admin inputs the institution details alongside the designated **School Administrator's Full Name**, **Email Address**, and optional **Phone Number**.
+2. **Account Provisioning & Tenant Linking**:
+   - The platform creates the new `School` tenant namespace.
+   - It securely provisions a `User` record with role `SCHOOL_ADMIN`, status `isActive: false` (`PENDING_ACTIVATION`), and a linked `UserMembership`.
+   - Prevents duplicate School Admin accounts for the same email and school tenant (`409 DUPLICATE_SCHOOL_ADMIN`).
+3. **Cryptographic Security & Email Dispatch**:
+   - Generates a cryptographically random 32-byte hexadecimal activation token.
+   - Computes a SHA-256 digest (`tokenHash`) and stores **only the hash** in PostgreSQL (`AccountInvitation.tokenHash`). The raw token is never persisted.
+   - Dispatches a branded EduNexa invitation email via Resend with a secure, single-use, 7-day expiring activation link (`${CLIENT_ORIGIN}/activate?token=${rawToken}` or `/auth/activate?token=...`).
+4. **Lifecycle & Invitation Management**:
+   - In the Super Admin School Tenants ledger, each institution displays the assigned administrator and real-time status badge: `Pending Activation`, `Invitation Sent`, `Accepted / Active`, `Expired`, or `Revoked`.
+   - Super Admins can **Send New Invitation**, **Resend Invitation** (generates fresh token and updates expiration), **View Status & Audit Trail**, or **Revoke Invitation** with an administrative reason.
+   - Revoked or expired invitations are strictly rejected upon verification or activation attempts.
+5. **Self-Service School Admin Account Activation**:
+   - The invited School Admin opens the activation link, which verifies the token via `GET /api/v1/auth/invitations/verify/:token` and displays institutional branding.
+   - The School Admin sets their own password, enforced by strict strength criteria (8+ chars, uppercase, lowercase, number, special symbol).
+   - Submitting `POST /api/v1/auth/invitations/activate` securely hashes the password with bcrypt (10 rounds), activates the account (`isActive: true`), activates the tenant membership, marks the invitation `ACCEPTED`, and redirects the user to `/login`.
+   - Subsequent attempts to use the same activation token fail (single-use enforcement).
 
 ---
 

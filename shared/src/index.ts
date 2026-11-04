@@ -122,9 +122,23 @@ export const SchoolOnboardingSchema = z.object({
   country: z.string().default('India'),
   websiteUrl: z.string().url().optional().or(z.literal('')),
   planName: z.enum(['Standard', 'Pro', 'Enterprise']).default('Standard'),
+  // School Admin Account Details & Provisioning
+  adminFullName: z.string().min(2, 'School Admin full name must be at least 2 characters').optional().or(z.literal('')),
+  adminEmail: z.string().email('Valid administrator email is required').optional().or(z.literal('')),
+  adminPhone: z.string().optional().or(z.literal('')),
+  sendInvitation: z.boolean().optional().default(true),
 });
 
 export type SchoolOnboardingDTO = z.infer<typeof SchoolOnboardingSchema>;
+
+export const SendSchoolAdminInvitationSchema = z.object({
+  adminFullName: z.string().min(2, 'School Admin full name is required'),
+  adminEmail: z.string().email('Valid school administrator email is required'),
+  adminPhone: z.string().optional().or(z.literal('')),
+  sendInvitation: z.boolean().optional().default(true),
+});
+
+export type SendSchoolAdminInvitationDTO = z.infer<typeof SendSchoolAdminInvitationSchema>;
 
 export const StudentAdmissionApplicationSchema = z.object({
   schoolSlug: z.string(),

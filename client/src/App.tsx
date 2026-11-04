@@ -116,6 +116,7 @@ export const App: React.FC = () => {
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/activate" element={<AccountActivationPage />} />
+        <Route path="/auth/activate" element={<AccountActivationPage />} />
         <Route path="/verify-id" element={<PublicIdCardVerification />} />
         <Route path="/verify-id/:token" element={<PublicIdCardVerification />} />
 

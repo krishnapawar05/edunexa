@@ -17,6 +17,12 @@ import {
   UserCheck,
   UserX,
   FileCheck,
+  Mail,
+  Send,
+  RotateCcw,
+  Ban,
+  UserPlus,
+  Clock,
 } from 'lucide-react';
 import {
   useBulkSelection,
@@ -41,12 +47,27 @@ export const SchoolTenantsPage: React.FC = () => {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showStatusConfirmModal, setShowStatusConfirmModal] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showInvitationsModal, setShowInvitationsModal] = useState(false);
+  const [showRevokeModal, setShowRevokeModal] = useState(false);
 
   const [selectedSchool, setSelectedSchool] = useState<any | null>(null);
   const [targetStatus, setTargetStatus] = useState<string>('SUSPENDED');
   const [statusReason, setStatusReason] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Invitation Management State
+  const [schoolInvitations, setSchoolInvitations] = useState<any[]>([]);
+  const [loadingInvitations, setLoadingInvitations] = useState(false);
+  const [selectedInvitation, setSelectedInvitation] = useState<any | null>(null);
+  const [revokeReason, setRevokeReason] = useState<string>('');
+  const [newAdminForm, setNewAdminForm] = useState({
+    adminFullName: '',
+    adminEmail: '',
+    adminPhone: '',
+    sendInvitation: true,
+  });
 
   // Bulk Selection & Actions State
   const selection = useBulkSelection();
@@ -76,6 +97,10 @@ export const SchoolTenantsPage: React.FC = () => {
     state: '',
     postalCode: '',
     planName: 'Pro' as 'Standard' | 'Pro' | 'Enterprise',
+    adminFullName: '',
+    adminEmail: '',
+    adminPhone: '',
+    sendInvitation: true,
   });
 
   // Edit School Form State
@@ -126,6 +151,10 @@ export const SchoolTenantsPage: React.FC = () => {
       state: '',
       postalCode: '',
       planName: 'Pro',
+      adminFullName: '',
+      adminEmail: '',
+      adminPhone: '',
+      sendInvitation: true,
     });
     setShowOnboardModal(true);
   };
@@ -136,17 +165,211 @@ export const SchoolTenantsPage: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      await superadminApi.onboardSchool({
+      const res = await superadminApi.onboardSchool({
         ...newSchool,
         code: newSchool.code.toUpperCase().trim(),
         country: 'India',
       });
       setShowOnboardModal(false);
+      showToast(
+        res.schoolAdmin
+          ? `Tenant '${newSchool.name}' onboarded and invitation issued to ${res.schoolAdmin.email}.`
+          : `Tenant '${newSchool.name}' onboarded successfully.`
+      );
       await loadSchools();
     } catch (err: any) {
       alert(`Onboarding failed: ${err.message}`);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // Invitation Management Handlers
+  const fetchSchoolInvitations = async (schoolId: string) => {
+    setLoadingInvitations(true);
+    try {
+      const data = await superadminApi.listSchoolInvitations(schoolId);
+      setSchoolInvitations(Array.isArray(data) ? data : []);
+    } catch (err: any) {
+      showToast(err.message || 'Failed to fetch invitation status.');
+    } finally {
+      setLoadingInvitations(false);
+    }
+  };
+
+  const handleOpenInviteModal = (school: any) => {
+    setSelectedSchool(school);
+    setNewAdminForm({
+      adminFullName: '',
+      adminEmail: '',
+      adminPhone: '',
+      sendInvitation: true,
+    });
+    setShowInviteModal(true);
+  };
+
+  const handleSendInvitationSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedSchool || !newAdminForm.adminFullName || !newAdminForm.adminEmail) return;
+
+    setIsSubmitting(true);
+    try {
+      await superadminApi.sendSchoolAdminInvitation(selectedSchool.id, newAdminForm);
+      showToast(`Invitation sent to ${newAdminForm.adminEmail}.`);
+      setShowInviteModal(false);
+      await loadSchools();
+      if (showInvitationsModal) {
+        await fetchSchoolInvitations(selectedSchool.id);
+      }
+    } catch (err: any) {
+      alert(`Failed to send invitation: ${err.message}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleOpenInvitationsModal = async (school: any) => {
+    setSelectedSchool(school);
+    setShowInvitationsModal(true);
+    await fetchSchoolInvitations(school.id);
+  };
+
+  const handleResendInvitation = async (invitationId: string) => {
+    if (!selectedSchool) return;
+    setIsSubmitting(true);
+    try {
+      await superadminApi.resendSchoolAdminInvitation(selectedSchool.id, invitationId);
+      showToast('Fresh invitation email sent with new single-use token.');
+      await fetchSchoolInvitations(selectedSchool.id);
+      await loadSchools();
+    } catch (err: any) {
+      alert(`Failed to resend invitation: ${err.message}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleOpenRevokeModal = (invitation: any) => {
+    setSelectedInvitation(invitation);
+    setRevokeReason('');
+    setShowRevokeModal(true);
+  };
+
+  const handleConfirmRevokeInvitation = async () => {
+    if (!selectedSchool || !selectedInvitation) return;
+    setIsSubmitting(true);
+    try {
+      await superadminApi.revokeSchoolAdminInvitation(selectedSchool.id, selectedInvitation.id, revokeReason);
+      showToast('Invitation successfully revoked.');
+      setShowRevokeModal(false);
+      setSelectedInvitation(null);
+      await fetchSchoolInvitations(selectedSchool.id);
+      await loadSchools();
+    } catch (err: any) {
+      alert(`Failed to revoke invitation: ${err.message}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const renderInvitationBadge = (status: string) => {
+    switch (status) {
+      case 'ACCEPTED':
+        return (
+          <span
+            style={{
+              fontSize: '0.72rem',
+              fontWeight: 600,
+              padding: '2px 8px',
+              borderRadius: 'var(--radius-pill)',
+              backgroundColor: 'var(--success-bg)',
+              color: 'var(--success-text)',
+              border: '1px solid var(--success-border)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+            }}
+          >
+            <CheckCircle2 size={11} /> Accepted / Active
+          </span>
+        );
+      case 'SENT':
+      case 'PENDING':
+        return (
+          <span
+            style={{
+              fontSize: '0.72rem',
+              fontWeight: 600,
+              padding: '2px 8px',
+              borderRadius: 'var(--radius-pill)',
+              backgroundColor: 'rgba(59, 130, 246, 0.1)',
+              color: '#2563eb',
+              border: '1px solid rgba(59, 130, 246, 0.3)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+            }}
+          >
+            <Mail size={11} /> Pending Activation
+          </span>
+        );
+      case 'EXPIRED':
+        return (
+          <span
+            style={{
+              fontSize: '0.72rem',
+              fontWeight: 600,
+              padding: '2px 8px',
+              borderRadius: 'var(--radius-pill)',
+              backgroundColor: 'rgba(245, 158, 11, 0.1)',
+              color: '#d97706',
+              border: '1px solid rgba(245, 158, 11, 0.3)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+            }}
+          >
+            <Clock size={11} /> Expired
+          </span>
+        );
+      case 'REVOKED':
+        return (
+          <span
+            style={{
+              fontSize: '0.72rem',
+              fontWeight: 600,
+              padding: '2px 8px',
+              borderRadius: 'var(--radius-pill)',
+              backgroundColor: 'var(--danger-bg)',
+              color: 'var(--danger-text)',
+              border: '1px solid var(--danger-border)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+            }}
+          >
+            <Ban size={11} /> Revoked
+          </span>
+        );
+      default:
+        return (
+          <span
+            style={{
+              fontSize: '0.72rem',
+              fontWeight: 500,
+              padding: '2px 8px',
+              borderRadius: 'var(--radius-pill)',
+              backgroundColor: 'var(--bg-subtle)',
+              color: 'var(--text-muted)',
+              border: '1px solid var(--border-default)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+            }}
+          >
+            Not Invited
+          </span>
+        );
     }
   };
 
@@ -451,6 +674,7 @@ export const SchoolTenantsPage: React.FC = () => {
                       <SelectAllCheckbox pageIds={schools.map((s) => s.id)} selection={selection} />
                     </th>
                     <th style={{ padding: '12px 16px' }}>School Identity</th>
+                    <th style={{ padding: '12px 16px' }}>School Admin & Invitation</th>
                     <th style={{ padding: '12px 16px' }}>Code / Slug</th>
                     <th style={{ padding: '12px 16px' }}>Location</th>
                     <th style={{ padding: '12px 16px' }}>Subscription Plan</th>
@@ -482,6 +706,47 @@ export const SchoolTenantsPage: React.FC = () => {
                         <td style={{ padding: '12px 16px' }}>
                           <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{school.name}</div>
                           <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>{school.email}</div>
+                        </td>
+
+                        <td style={{ padding: '12px 16px' }}>
+                          {school.schoolAdmin ? (
+                            <div>
+                              <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.82rem' }}>
+                                {school.schoolAdmin.name || 'School Admin'}
+                              </div>
+                              <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                                {school.schoolAdmin.email}
+                              </div>
+                              <div style={{ marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                {renderInvitationBadge(
+                                  school.invitationStatus ||
+                                    school.schoolAdmin.invitationStatus ||
+                                    (school.schoolAdmin.isActive ? 'ACCEPTED' : 'PENDING')
+                                )}
+                              </div>
+                            </div>
+                          ) : (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                                No Admin
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleOpenInviteModal(school)}
+                                className="ed-btn ed-btn-outline"
+                                style={{
+                                  padding: '2px 8px',
+                                  fontSize: '0.72rem',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                }}
+                              >
+                                <UserPlus size={11} />
+                                <span>Invite</span>
+                              </button>
+                            </div>
+                          )}
                         </td>
 
                         <td style={{ padding: '12px 16px' }}>
@@ -554,6 +819,14 @@ export const SchoolTenantsPage: React.FC = () => {
                               title="View full tenant details"
                             >
                               <Eye size={15} />
+                            </button>
+
+                            <button
+                              onClick={() => handleOpenInvitationsModal(school)}
+                              className="ed-btn-icon"
+                              title="Manage Administrator Invitations"
+                            >
+                              <Mail size={15} />
                             </button>
 
                             <button
@@ -722,6 +995,75 @@ export const SchoolTenantsPage: React.FC = () => {
                     value={newSchool.postalCode}
                     onChange={(e) => setNewSchool({ ...newSchool, postalCode: e.target.value })}
                   />
+                </div>
+              </div>
+
+              {/* School Administrator Initial Account Provisioning */}
+              <div
+                style={{
+                  marginTop: '6px',
+                  borderTop: '1px solid var(--border-default)',
+                  paddingTop: '12px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 'var(--space-3)',
+                }}
+              >
+                <div style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <UserCheck size={16} style={{ color: 'var(--primary-600)' }} />
+                  <span>School Administrator Account (Required for Tenant Access)</span>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
+                  <div className="ed-input-group">
+                    <label className="ed-label">Admin Full Name *</label>
+                    <input
+                      required
+                      type="text"
+                      className="ed-input"
+                      placeholder="e.g. Dr. Arthur Pendelton"
+                      value={newSchool.adminFullName}
+                      onChange={(e) => setNewSchool({ ...newSchool, adminFullName: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="ed-input-group">
+                    <label className="ed-label">Admin Email Address *</label>
+                    <input
+                      required
+                      type="email"
+                      className="ed-input"
+                      placeholder="principal@school.edu"
+                      value={newSchool.adminEmail}
+                      onChange={(e) => setNewSchool({ ...newSchool, adminEmail: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)', alignItems: 'center' }}>
+                  <div className="ed-input-group">
+                    <label className="ed-label">Admin Phone Number</label>
+                    <input
+                      type="tel"
+                      className="ed-input"
+                      placeholder="+91 80 4000 1199"
+                      value={newSchool.adminPhone}
+                      onChange={(e) => setNewSchool({ ...newSchool, adminPhone: e.target.value })}
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginTop: '16px' }}>
+                    <input
+                      type="checkbox"
+                      id="sendInvitationCheck"
+                      checked={newSchool.sendInvitation}
+                      onChange={(e) => setNewSchool({ ...newSchool, sendInvitation: e.target.checked })}
+                      style={{ cursor: 'pointer', marginTop: '2px' }}
+                    />
+                    <label htmlFor="sendInvitationCheck" style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', cursor: 'pointer', lineHeight: 1.4 }}>
+                      Send invitation email with secure activation link immediately
+                    </label>
+                  </div>
                 </div>
               </div>
 
@@ -904,6 +1246,47 @@ export const SchoolTenantsPage: React.FC = () => {
                 </div>
               </div>
 
+              {/* School Administrator Summary */}
+              <div style={{ borderTop: '1px solid var(--border-default)', paddingTop: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <div style={{ fontWeight: 600, fontSize: '0.86rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <UserCheck size={16} style={{ color: 'var(--primary-600)' }} />
+                    <span>School Administrator Account</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowDetailModal(false);
+                      handleOpenInvitationsModal(selectedSchool);
+                    }}
+                    className="ed-btn ed-btn-outline"
+                    style={{ padding: '2px 8px', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                  >
+                    <Mail size={12} />
+                    <span>Manage Invitations</span>
+                  </button>
+                </div>
+
+                {selectedSchool.schoolAdmin ? (
+                  <div style={{ fontSize: '0.82rem', padding: '10px', backgroundColor: 'var(--bg-subtle)', borderRadius: 'var(--radius-sm)' }}>
+                    <div><strong>Name:</strong> {selectedSchool.schoolAdmin.name || 'Admin'}</div>
+                    <div style={{ marginTop: '2px' }}><strong>Email:</strong> {selectedSchool.schoolAdmin.email}</div>
+                    <div style={{ marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <strong>Status:</strong>
+                      {renderInvitationBadge(
+                        selectedSchool.invitationStatus ||
+                          selectedSchool.schoolAdmin.invitationStatus ||
+                          (selectedSchool.schoolAdmin.isActive ? 'ACCEPTED' : 'PENDING')
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ fontSize: '0.82rem', padding: '10px', backgroundColor: 'var(--bg-subtle)', borderRadius: 'var(--radius-sm)', color: 'var(--text-muted)' }}>
+                    No administrator assigned yet. Click "Manage Invitations" to invite a school administrator.
+                  </div>
+                )}
+              </div>
+
               {selectedSchool.subscriptions && selectedSchool.subscriptions.length > 0 && (
                 <div>
                   <div style={{ fontWeight: 600, fontSize: '0.86rem', marginBottom: '8px' }}>Subscription Allocation</div>
@@ -989,6 +1372,270 @@ export const SchoolTenantsPage: React.FC = () => {
                   : targetStatus === 'SUSPENDED'
                   ? 'Suspend Tenant'
                   : 'Reactivate Tenant'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Send School Admin Invitation Modal */}
+      {showInviteModal && selectedSchool && (
+        <div className="ed-modal-overlay">
+          <div className="ed-modal" style={{ maxWidth: '480px' }}>
+            <div className="ed-modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700 }}>
+                <Mail size={16} style={{ color: 'var(--primary-600)' }} />
+                <span>Invite School Administrator</span>
+              </div>
+              <button onClick={() => setShowInviteModal(false)} className="ed-btn-icon">
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSendInvitationSubmit} className="ed-modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+              <div style={{ fontSize: '0.84rem', color: 'var(--text-muted)', backgroundColor: 'var(--bg-subtle)', padding: '10px 12px', borderRadius: 'var(--radius-sm)' }}>
+                Target Institution: <strong style={{ color: 'var(--text-primary)' }}>{selectedSchool.name}</strong> ({selectedSchool.code})
+              </div>
+
+              <div className="ed-input-group">
+                <label className="ed-label">Administrator Full Name *</label>
+                <input
+                  required
+                  type="text"
+                  className="ed-input"
+                  placeholder="e.g. Dr. Arthur Pendelton"
+                  value={newAdminForm.adminFullName}
+                  onChange={(e) => setNewAdminForm({ ...newAdminForm, adminFullName: e.target.value })}
+                />
+              </div>
+
+              <div className="ed-input-group">
+                <label className="ed-label">Administrator Official Email *</label>
+                <input
+                  required
+                  type="email"
+                  className="ed-input"
+                  placeholder="admin@school.edu"
+                  value={newAdminForm.adminEmail}
+                  onChange={(e) => setNewAdminForm({ ...newAdminForm, adminEmail: e.target.value })}
+                />
+              </div>
+
+              <div className="ed-input-group">
+                <label className="ed-label">Contact Phone (Optional)</label>
+                <input
+                  type="tel"
+                  className="ed-input"
+                  placeholder="+91 80 4000 1199"
+                  value={newAdminForm.adminPhone}
+                  onChange={(e) => setNewAdminForm({ ...newAdminForm, adminPhone: e.target.value })}
+                />
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginTop: '4px' }}>
+                <input
+                  type="checkbox"
+                  id="modalSendCheck"
+                  checked={newAdminForm.sendInvitation}
+                  onChange={(e) => setNewAdminForm({ ...newAdminForm, sendInvitation: e.target.checked })}
+                  style={{ cursor: 'pointer', marginTop: '2px' }}
+                />
+                <label htmlFor="modalSendCheck" style={{ fontSize: '0.80rem', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+                  Send branded EduNexa invitation email with single-use expiring activation link
+                </label>
+              </div>
+
+              <div className="ed-modal-footer" style={{ marginTop: 'var(--space-2)' }}>
+                <button type="button" onClick={() => setShowInviteModal(false)} className="ed-btn ed-btn-secondary">
+                  Cancel
+                </button>
+                <button type="submit" disabled={isSubmitting} className="ed-btn ed-btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Send size={14} />
+                  <span>{isSubmitting ? 'Sending...' : 'Send Official Invitation'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* View & Manage Invitations Modal / Ledger */}
+      {showInvitationsModal && selectedSchool && (
+        <div className="ed-modal-overlay">
+          <div className="ed-modal" style={{ maxWidth: '680px', width: '92%' }}>
+            <div className="ed-modal-header">
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, fontSize: '1.05rem' }}>
+                  <Mail size={18} style={{ color: 'var(--primary-600)' }} />
+                  <span>Administrator Invitations & Access Status</span>
+                </div>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                  {selectedSchool.name} • Code: {selectedSchool.code}
+                </div>
+              </div>
+              <button onClick={() => setShowInvitationsModal(false)} className="ed-btn-icon">
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="ed-modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ fontSize: '0.84rem', color: 'var(--text-secondary)' }}>
+                  Active tokens and status history for this tenant
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleOpenInviteModal(selectedSchool)}
+                  className="ed-btn ed-btn-primary"
+                  style={{ padding: '4px 10px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '5px' }}
+                >
+                  <Plus size={13} />
+                  <span>Issue New Invitation</span>
+                </button>
+              </div>
+
+              {loadingInvitations ? (
+                <div style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                  <RefreshCw size={20} className="ed-spin" style={{ margin: '0 auto 8px' }} />
+                  <div>Loading invitation ledger...</div>
+                </div>
+              ) : schoolInvitations.length === 0 ? (
+                <div style={{ padding: '30px', textAlign: 'center', backgroundColor: 'var(--bg-subtle)', borderRadius: 'var(--radius-sm)' }}>
+                  <Mail size={28} style={{ margin: '0 auto 8px', opacity: 0.4 }} />
+                  <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.88rem' }}>No invitations on record</div>
+                  <div style={{ fontSize: '0.80rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                    Click "Issue New Invitation" above to onboard an administrator for this school.
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                  {schoolInvitations.map((inv) => (
+                    <div
+                      key={inv.id}
+                      style={{
+                        padding: '12px 14px',
+                        border: '1px solid var(--border-default)',
+                        borderRadius: 'var(--radius-sm)',
+                        backgroundColor: 'var(--bg-surface)',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        gap: '12px',
+                        flexWrap: 'wrap',
+                      }}
+                    >
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.86rem' }}>
+                            {inv.recipientName}
+                          </span>
+                          {renderInvitationBadge(inv.status)}
+                        </div>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                          {inv.email} • Role: <strong>{inv.role}</strong>
+                        </div>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                          Sent: {inv.sentAt ? new Date(inv.sentAt).toLocaleDateString() : '—'} • Expires:{' '}
+                          {inv.expiresAt ? new Date(inv.expiresAt).toLocaleDateString() : '—'} • Delivery:{' '}
+                          <span style={{ textTransform: 'uppercase', fontWeight: 600 }}>{inv.deliveryStatus || 'SENT'}</span>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        {inv.status !== 'ACCEPTED' && (
+                          <button
+                            type="button"
+                            onClick={() => handleResendInvitation(inv.id)}
+                            disabled={isSubmitting}
+                            className="ed-btn ed-btn-secondary"
+                            style={{ padding: '4px 8px', fontSize: '0.74rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                            title="Resend invitation email with fresh token"
+                          >
+                            <RotateCcw size={12} />
+                            <span>Resend</span>
+                          </button>
+                        )}
+
+                        {inv.status !== 'ACCEPTED' && inv.status !== 'REVOKED' && (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenRevokeModal(inv)}
+                            disabled={isSubmitting}
+                            className="ed-btn ed-btn-outline"
+                            style={{ padding: '4px 8px', fontSize: '0.74rem', color: 'var(--danger-text)', borderColor: 'var(--danger-border)', display: 'flex', alignItems: 'center', gap: '4px' }}
+                            title="Revoke invitation link"
+                          >
+                            <Ban size={12} />
+                            <span>Revoke</span>
+                          </button>
+                        )}
+
+                        {inv.status === 'ACCEPTED' && (
+                          <span style={{ fontSize: '0.75rem', color: 'var(--success-text)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <CheckCircle2 size={13} /> Active Account
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="ed-modal-footer">
+              <button type="button" onClick={() => setShowInvitationsModal(false)} className="ed-btn ed-btn-secondary">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Revoke Invitation Confirmation Modal */}
+      {showRevokeModal && selectedInvitation && (
+        <div className="ed-modal-overlay">
+          <div className="ed-modal" style={{ maxWidth: '440px' }}>
+            <div className="ed-modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, color: 'var(--danger-text)' }}>
+                <Ban size={16} />
+                <span>Confirm Invitation Revocation</span>
+              </div>
+              <button onClick={() => setShowRevokeModal(false)} className="ed-btn-icon">
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="ed-modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                Are you sure you want to revoke the administrator invitation for{' '}
+                <strong style={{ color: 'var(--text-primary)' }}>{selectedInvitation.email}</strong>?
+                <br />
+                The single-use activation link will be permanently invalidated and cannot be used to activate an account.
+              </div>
+
+              <div className="ed-input-group">
+                <label className="ed-label">Administrative Revocation Reason</label>
+                <input
+                  type="text"
+                  className="ed-input"
+                  placeholder="e.g. Email address incorrect / Staff role re-assignment"
+                  value={revokeReason}
+                  onChange={(e) => setRevokeReason(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="ed-modal-footer">
+              <button type="button" onClick={() => setShowRevokeModal(false)} className="ed-btn ed-btn-secondary">
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmRevokeInvitation}
+                disabled={isSubmitting}
+                className="ed-btn ed-btn-danger"
+              >
+                {isSubmitting ? 'Revoking...' : 'Revoke Invitation'}
               </button>
             </div>
           </div>

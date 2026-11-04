@@ -36,6 +36,31 @@ router.post('/schools/bulk-actions', validateRequest({ body: BulkActionRequestSc
   tenantController.bulkSchoolActions(req, res, next);
 });
 
+// School Admin Invitation Management
+router.get('/schools/:id/invitations', (req, res, next) => {
+  tenantController.listSchoolInvitations(req, res, next);
+});
+
+router.post('/schools/:id/invitations/send', (req, res, next) => {
+  tenantController.sendSchoolAdminInvitation(req, res, next);
+});
+
+router.post('/schools/:id/invitations/resend', (req, res, next) => {
+  tenantController.resendSchoolAdminInvitation(req, res, next);
+});
+
+router.post('/schools/:id/invitations/:invitationId/resend', (req, res, next) => {
+  tenantController.resendSchoolAdminInvitation(req, res, next);
+});
+
+router.post('/schools/:id/invitations/revoke', (req, res, next) => {
+  tenantController.revokeSchoolAdminInvitation(req, res, next);
+});
+
+router.post('/schools/:id/invitations/:invitationId/revoke', (req, res, next) => {
+  tenantController.revokeSchoolAdminInvitation(req, res, next);
+});
+
 // 3. Subscriptions & Plans
 router.get('/subscriptions', (req, res, next) => {
   tenantController.listSubscriptions(req, res, next);
