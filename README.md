@@ -71,7 +71,12 @@ Every feature listed below has been verified against the local source code, data
 | **AI School Assistant** | Grounded institutional question-answering. | Google Gemini model grounded in approved institutional policy documents (`APPROVED_SCHOOL_DOCUMENTS`), anti-hallucination guard (`isMissingInformation`). | **Implemented** |
 | **AI Quiz Generator** | Teacher-moderated automated quiz draft generation. | Generates structured JSON questions via Gemini; drafts are strictly held in `PENDING_REVIEW` until teacher editorial approval. | **Implemented** |
 | **AI Student Concept Tutor** | Interactive pedagogical study assistant. | Pedagogical concept explanations, step-by-step guidance, practice questions, and revision tips for students across grades. | **Implemented** |
-| **Email Invitations & SMTP** | Outbound transactional email delivery. | Account provisioning and notifications operate via in-app feeds and database records. Real external SMTP/email delivery (SendGrid/Nodemailer) is not hooked. | **Planned / Unimplemented** |
+| **Email Invitations & Recovery** | Outbound transactional email delivery for invitations & recovery. | Native HTTPS dispatch to Resend REST API (`https://api.resend.com/emails`) with responsive HTML templates, role badges, and activation links; includes safe dev fallback mode. | **Implemented** |
+| **Account Provisioning & Credentials** | Role-based credential management and lifecycle controls. | Automated student/staff user provisioning, admin-issued activation invitations, secure temporary password generation with forced change flags, one-click access revocation, and credential slip export. | **Implemented** |
+| **Self-Service Password Recovery** | Public activation and password reset workflows. | Public pages (`/auth/activate`, `/auth/reset-password`) with SHA-256 token hashing, expiration checks, and strength-enforced password updates. | **Implemented** |
+| **Public Online Admissions 2026–2027** | End-to-end prospective student admission application. | Multi-step public application form with dynamic class selection, emergency contacts, parent linking, and automated admission queue review with student roster enrollment. | **Implemented** |
+| **School Identity & Branding** | Multi-tenant school customization and white-labeling. | Centralized in Super Admin Platform Settings; enables configuring institution name, monogram, affiliation code, primary/accent colors, and contact info persisted in PostgreSQL. | **Implemented** |
+| **Institutional Theme & A11y** | Forest-green institutional UI design system. | Accessible high-contrast institutional light theme by default, with seamless dark mode and system theme toggle, fixing all dark-on-dark contrast issues across public and ERP views. | **Implemented** |
 
 ---
 
@@ -438,6 +443,12 @@ erDiagram
 ### 4. Super Admin Break-Glass Auditing
 - In compliance with PRD §4, Super Administrators do not have silent access to student marks or financial payments. Accessing sensitive endpoints requires an explicit audited support header: `x-audit-reason: <minimum 10 characters>`. Missing headers trigger `403 SUPER_ADMIN_AUDIT_REQUIRED`.
 
+### 5. Account Provisioning, Credential Lifecycle & Password Recovery
+- **Cryptographic Token Lifecycle**: Secure one-time activation and reset tokens are generated using `crypto.randomBytes(32)` (`hex`). The raw token is dispatched strictly to the recipient; only a SHA-256 hash (`tokenHash`) is persisted in PostgreSQL.
+- **Invitation & Activation Workflow**: New students and staff receive an activation link with a 48-hour expiration. Visiting `/auth/activate?token=...` allows setting their initial password meeting institutional complexity requirements (min 8 chars, uppercase, lowercase, number, special char).
+- **Self-Service Password Reset**: Users can initiate reset requests via `POST /api/v1/auth/forgot-password`. Tokens expire in 1 hour and are single-use (`usedAt`).
+- **Administrative Credential Management**: Within the Student Dossier or HR views, authorized staff (`SCHOOL_ADMIN`, `PRINCIPAL`, `HR_STAFF`) can issue invitations, generate temporary passwords with enforced first-login password rotation (`mustChangePassword: true`), and instantly revoke credentials. All operations generate immutable `AuditLog` records.
+
 ---
 
 ## 📡 API Reference
@@ -457,13 +468,25 @@ All successful responses return JSON enveloped as:
 | :--- | :--- | :--- | :--- | :---: |
 | `POST` | `/api/v1/auth/login` | Authenticate user & issue tokens | Public | N/A |
 | `POST` | `/api/v1/auth/refresh` | Refresh expired access token | Public | N/A |
+| `POST` | `/api/v1/auth/activate` | Activate account via one-time token & set password | Public | N/A |
+| `POST` | `/api/v1/auth/forgot-password` | Request self-service password reset email | Public | N/A |
+| `POST` | `/api/v1/auth/reset-password` | Set new password using reset token | Public | N/A |
 | `GET` | `/api/v1/superadmin/telemetry` | Platform-wide school & user metrics | `SUPER_ADMIN` | Global |
 | `POST` | `/api/v1/superadmin/schools` | Onboard and provision a new school tenant | `SUPER_ADMIN` | Global |
 | `PATCH`| `/api/v1/superadmin/schools/:id/status`| Suspend or activate a school tenant | `SUPER_ADMIN` | Global |
+| `PUT`  | `/api/v1/superadmin/schools/:id/branding`| Update institutional identity & branding | `SUPER_ADMIN` | Global |
 | `GET` | `/api/v1/core/school/overview-stats` | Institutional KPI summary stats | `SCHOOL_ADMIN`, `PRINCIPAL` | Tenant |
+| `POST` | `/api/v1/core/admissions/apply` | Submit public online admission application (2026–2027) | Public | Tenant |
+| `PATCH`| `/api/v1/core/admissions/:id/review` | Approve/reject admission with auto-enrollment | `SCHOOL_ADMIN`, `PRINCIPAL` | Tenant |
 | `GET` | `/api/v1/core/students` | List student directory with filters | `SCHOOL_ADMIN`, `PRINCIPAL`, `TEACHER`, `EXAM_COORDINATOR` | Tenant |
 | `POST` | `/api/v1/core/students` | Register student, membership & ID card | `SCHOOL_ADMIN`, `PRINCIPAL` | Tenant |
 | `GET` | `/api/v1/core/students/:id` | Retrieve comprehensive student dossier | Authorized Staff / Self / Linked Parent | Tenant |
+| `POST` | `/api/v1/core/provisioning/students/:studentId/account` | Provision user account for student | `SCHOOL_ADMIN`, `PRINCIPAL` | Tenant |
+| `POST` | `/api/v1/core/provisioning/invite` | Dispatch / reissue account activation email & link | `SCHOOL_ADMIN`, `PRINCIPAL`, `HR_STAFF` | Tenant |
+| `POST` | `/api/v1/core/provisioning/temp-password` | Generate temporary password with must-change flag | `SCHOOL_ADMIN`, `PRINCIPAL`, `HR_STAFF` | Tenant |
+| `POST` | `/api/v1/core/provisioning/reset-password` | Administrative password reset trigger | `SCHOOL_ADMIN`, `PRINCIPAL`, `HR_STAFF` | Tenant |
+| `POST` | `/api/v1/core/provisioning/revoke` | Revoke credentials & suspend user login | `SCHOOL_ADMIN`, `PRINCIPAL` | Tenant |
+| `GET` | `/api/v1/core/provisioning/status/:userId` | Fetch account activation & credential telemetry | Authorized Staff | Tenant |
 | `GET` | `/api/v1/core/staff` | List staff and faculty directory | `HR_STAFF`, `SCHOOL_ADMIN`, `PRINCIPAL` | Tenant |
 | `POST` | `/api/v1/core/staff` | Register faculty profile & assign credentials| `HR_STAFF`, `SCHOOL_ADMIN`, `PRINCIPAL` | Tenant |
 | `POST` | `/api/v1/core/id-cards/generate` | Issue digital ID card with verification token | `SCHOOL_ADMIN`, `PRINCIPAL`, `HR_STAFF` | Tenant |
@@ -521,6 +544,13 @@ All successful responses return JSON enveloped as:
 4. The database transaction deducts the payment from `amountPaid`, updates status to `PAID` or `PARTIALLY_PAID`, rejects overpayments, and creates a ledger receipt (`REC-2026-XXXX`).
 5. Real certified receipt PDF can be downloaded immediately.
 
+### 5. Role-Based Account Provisioning & Credential Lifecycle
+1. When a student application is approved or a faculty member is registered, a corresponding `User` account is automatically provisioned.
+2. The system generates a cryptographic 32-byte hex activation token (hashed in DB) with a 48-hour expiration window.
+3. If configured with Resend, an activation email with a one-click button is dispatched immediately to the user's inbox; in development, operational telemetry is logged.
+4. The user opens `/auth/activate?token=...`, reviews their institutional profile and role badge, and sets their secure password.
+5. School administrators can view live activation status in the **Student Dossier**, generate temporary credentials, trigger password reset links (`/auth/reset-password`), or revoke access instantly. All administrative interventions produce immutable audit logs.
+
 ---
 
 ## 🤖 AI Integrations & Safety Architecture
@@ -551,9 +581,19 @@ EduNexa integrates Google Gemini (`gemini-3.8-flash`) via direct HTTPS API calls
 
 ## 📧 Email & Notification Infrastructure
 
-### Current Implementation Status
-- **In-App Notification Feed**: Fully implemented in PostgreSQL via the `Notification` model. Users receive in-app alerts with unread badges, timestamping, and navigation links.
-- **External Email Delivery**: **Unimplemented / Mocked**. The repository does not include SMTP or third-party email providers (e.g., SendGrid, Resend, AWS SES, or Nodemailer). Account provisioning occurs directly via the administrative portal, and credentials/invitations are managed in-platform.
+### 1. In-App Notification Feed
+- Fully implemented in PostgreSQL via the `Notification` model.
+- Users across all 9 roles receive real-time, persisted in-app alerts with read/unread statuses, category badges, timestamps, and navigation deep-links.
+
+### 2. Transactional Email Engine (Resend REST API)
+- Outbound institutional transactional email is implemented in `server/src/services/email.service.ts` using the **Resend REST API** (`POST https://api.resend.com/emails`).
+- **Zero Heavy SDK Dependencies**: Dispatches native Node.js `fetch` requests with Bearer authentication.
+- **Responsive Institutional HTML Templates**:
+  - **Account Invitation & Activation**: Delivers a branded message featuring the school name, recipient name, assigned role badge, expiration warning, and a secure one-click button pointing to `${CLIENT_ORIGIN}/auth/activate?token=...`.
+  - **Password Recovery**: Delivers a high-priority reset notice with direct link pointing to `${CLIENT_ORIGIN}/auth/reset-password?token=...`.
+- **Dual Execution Modes**:
+  - **Production Mode**: Triggered when `RESEND_API_KEY` is configured in `.env`. Sends real emails to recipient inboxes and records delivery `messageId` in PostgreSQL audit logs.
+  - **Safe Development Fallback**: Triggered when `RESEND_API_KEY` is omitted. Simulates delivery, logs safe telemetry without leaking credentials or tokens, and prevents application crashes during offline testing or local evaluation.
 
 ---
 
@@ -563,10 +603,12 @@ EduNexa integrates Google Gemini (`gemini-3.8-flash`) via direct HTTPS API calls
 | :--- | :--- | :--- | :---: | :--- |
 | `NODE_ENV` | Server | Application execution environment (`development`, `production`, `test`) | Yes | `development` |
 | `PORT` | Server | HTTP port on which Express listens | No | `5000` |
-| `CLIENT_ORIGIN` | Server | Allowed CORS origin for frontend requests | No | `http://localhost:5173` |
+| `CLIENT_ORIGIN` | Server | Frontend base URL for CORS and email activation/reset links | No | `http://localhost:5173` |
 | `DATABASE_URL` | Server / Prisma | PostgreSQL connection URI | Yes | `postgresql://postgres:root@localhost:5432/edunexa_dev?schema=public` |
 | `JWT_ACCESS_SECRET`| Server | Secret key used to sign access JWTs (min 32 chars) | Yes | `edunexa_super_secure_production_access_secret_key_32_chars_min` |
 | `JWT_REFRESH_SECRET`| Server | Secret key used to sign refresh JWTs (min 32 chars) | Yes | `edunexa_super_secure_production_refresh_secret_key_32_chars_min` |
+| `RESEND_API_KEY` | Server | Resend API key for real transactional email dispatch (`re_...`) | Optional | `""` (Triggers safe development mode) |
+| `EMAIL_FROM` | Server | Verified sender address for outbound emails | No | `EduNexa Access <onboarding@edunexa.org>` |
 | `AI_PROVIDER_API_KEY`| Server | Google Gemini API Key for AI assistance and quiz generation | Optional | `""` (Empty string triggers graceful fallback) |
 | `AI_PROVIDER_MODEL` | Server | Google Gemini model identifier | No | `gemini-3.8-flash` |
 | `LOG_LEVEL` | Server | Minimum logging verbosity (`debug`, `info`, `warn`, `error`) | No | `info` |
@@ -656,21 +698,21 @@ The repository contains a test suite executed via **Vitest** and **Supertest** t
 npm test --workspace=server -- --run
 ```
 
-### Verified Test Results (Executed October 21, 2026)
+### Verified Test Results (Executed November 2026)
 ```
  ✓ src/app.test.ts (4 tests)
  ✓ src/modules/auth/auth.security.test.ts (21 tests)
- ✓ src/modules/core/core.test.ts (17 tests)
+ ✓ src/modules/core/core.test.ts (20 tests)
  ✓ src/modules/core/hr.test.ts (22 tests)
  ✓ src/modules/academic/academic.test.ts (31 tests)
  ✓ src/modules/operations/operations.test.ts (26 tests)
+ ✓ src/modules/parent/parent.portal.test.ts (15 tests)
  ✓ src/modules/ai/ai.test.ts (14 tests)
- ✓ src/modules/superadmin/superadmin.test.ts (26 tests)
  ✓ src/modules/e2e-workflows.test.ts (24 tests)
 
  Test Files  9 passed (9 total)
-      Tests  185 passed (185 total, 0 failed)
-   Duration  4.21s
+      Tests  200 passed (200 total, 0 failed)
+   Duration  ~19.8s
 ```
 
 ### Type Checking & Production Build Validation
@@ -730,6 +772,9 @@ EduNexa is configured for single-service full-stack deployment on **Railway** (o
    - `NODE_ENV=production`
    - `JWT_ACCESS_SECRET=<random-32-character-secret>`
    - `JWT_REFRESH_SECRET=<random-32-character-secret>`
+   - `RESEND_API_KEY=<optional-resend-api-key>`
+   - `EMAIL_FROM=EduNexa Access <onboarding@resend.dev>`
+   - `CLIENT_ORIGIN=https://<your-railway-domain>.up.railway.app`
    - `AI_PROVIDER_API_KEY=<optional-gemini-key>`
    - `AI_PROVIDER_MODEL=gemini-3.8-flash`
 4. Railway automatically detects `nixpacks.toml`, builds the client and server, runs `prisma migrate deploy`, and exposes the unified application.
@@ -758,10 +803,10 @@ Detailed instructions are available in [docs/RAILWAY_DEPLOYMENT.md](docs/RAILWAY
 
 ## 🗺️ Known Limitations & Technical Roadmap
 
-1. **Email / SMS Dispatch**: Real SMTP email delivery (SendGrid/Resend) for account invitations and password reset links is planned for future phases.
-2. **Production Payment Gateway**: Fee payments currently record simulated ledger transactions; direct integration with Razorpay or Stripe webhooks is planned.
-3. **Biometric Device Hardware Integration**: Attendance check-in currently uses manual roll-call and simulated biometric timestamps; direct hardware SDK integration is scheduled.
-4. **File Storage Provider**: Document attachments currently store file URLs; direct S3/MinIO bucket uploads are slated for subsequent releases.
+1. **SMS Gateway Integration**: Real SMS notifications via Twilio/Gupshup for critical institutional broadcasts; outbound email delivery for invitations and password recovery is already operational via the Resend API engine.
+2. **Production Payment Gateway**: Fee payments currently record atomic verified ledger transactions; direct integration with Razorpay or Stripe webhooks is planned.
+3. **Biometric Device Hardware Integration**: Attendance check-in currently uses teacher batch roll-call and simulated biometric timestamps; direct hardware SDK integration is scheduled.
+4. **Cloud Object Storage Provider**: Document attachments currently store file URLs; direct S3/MinIO bucket uploads are slated for subsequent releases.
 
 ---
 

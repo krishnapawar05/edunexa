@@ -28,3 +28,4 @@ CREATE INDEX "PasswordResetToken_tokenHash_idx" ON "PasswordResetToken"("tokenHa
 
 -- AddForeignKey
 ALTER TABLE "PasswordResetToken" ADD CONSTRAINT "PasswordResetToken_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+

@@ -166,3 +166,4 @@ The system uses PostgreSQL managed through Prisma ORM. Secret tokens and raw pas
 - **Server Test Suite:** 200 tests passing across 9 test files (100% pass rate).
 - **TypeScript Typecheck:** `@edunexa/shared`, `@edunexa/server`, and `@edunexa/client` pass with 0 errors.
 - **Tenant Isolation Verification:** Cross-tenant reset and suspension attempts rejected with HTTP 403 / 404; Super Admin protection verified.
+

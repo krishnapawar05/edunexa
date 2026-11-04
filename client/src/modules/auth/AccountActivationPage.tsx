@@ -403,3 +403,4 @@ export const AccountActivationPage: React.FC = () => {
     </div>
   );
 };
+
