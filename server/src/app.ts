@@ -15,6 +15,10 @@ import academicRouter from './modules/academic/academic.routes.js';
 import operationsRouter from './modules/operations/operations.routes.js';
 import paymentsRouter from './modules/payments/payments.routes.js';
 import websiteRouter from './modules/website/website.routes.js';
+import admissionsRouter from './modules/admissions/admissions.routes.js';
+import idCardsRouter from './modules/idcards/idcards.routes.js';
+import admitCardsRouter from './modules/admitcards/admitcards.routes.js';
+import assessmentRouter from './modules/assessment/assessment.routes.js';
 import aiRouter from './modules/ai/ai.routes.js';
 
 export function createApp(): express.Application {
@@ -78,6 +82,10 @@ export function createApp(): express.Application {
   app.use('/api/v1/operations', operationsRouter);
   app.use('/api/v1/payments', paymentsRouter);
   app.use('/api/v1/website', websiteRouter);
+  app.use('/api/v1/admissions', admissionsRouter);
+  app.use('/api/v1/id-cards', idCardsRouter);
+  app.use('/api/v1/admit-cards', admitCardsRouter);
+  app.use('/api/v1/assessments', assessmentRouter);
   app.use('/api/v1/ai', aiRouter);
   if (env.nodeEnv !== 'production') {
     app.use('/api/v1/security-test', securityTestRouter);

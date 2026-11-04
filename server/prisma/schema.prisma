@@ -58,8 +58,32 @@ enum QuestionType {
   MULTIPLE_CHOICE
   MULTIPLE_SELECT
   TRUE_FALSE
+  FILL_IN_BLANKS
   SHORT_ANSWER
+  LONG_ANSWER
   DESCRIPTIVE
+  MATCH_THE_FOLLOWING
+  NUMERICAL
+  FILE_UPLOAD
+}
+
+enum QuestionDifficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum QuestionPaperStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum AssessmentAttemptStatus {
+  IN_PROGRESS
+  SUBMITTED
+  EVALUATED
+  PUBLISHED
 }
 
 enum QuizStatus {
@@ -110,9 +134,19 @@ enum CardStatus {
 enum ApplicationStatus {
   SUBMITTED
   UNDER_REVIEW
+  DOCUMENTS_REQUIRED
   APPROVED
   REJECTED
   WAITLISTED
+  ENROLLED
+}
+
+enum EnquiryStatus {
+  NEW
+  CONTACTED
+  FOLLOW_UP_REQUIRED
+  CONVERTED
+  CLOSED
 }
 
 enum InvitationStatus {
@@ -159,6 +193,7 @@ model School {
   subscriptions     Subscription[]
   auditLogs         AuditLog[]
   admissionApplications AdmissionApplication[]
+  admissionEnquiries    AdmissionEnquiry[]
   notifications     Notification[]
   invitations       AccountInvitation[]
   paymentTransactions PaymentTransaction[]
@@ -170,6 +205,12 @@ model School {
   downloadableDocs    DownloadableDocument[]
   galleryCategories   GalleryCategory[]
   galleryItems        GalleryItem[]
+  idCardTemplates     IdCardTemplate[]
+  virtualIdCards      VirtualIdCard[]
+  admitCards          AdmitCard[]
+  questionBankItems   QuestionBankItem[]
+  questionPapers      QuestionPaper[]
+  assessmentAttempts  AssessmentAttempt[]
 
   @@index([slug])
   @@index([status])
@@ -314,6 +355,7 @@ model AcademicSession {
   school      School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   enrollments StudentEnrollment[]
   examSchedules ExamSchedule[]
+  admitCards    AdmitCard[]
 
   @@unique([schoolId, name])
   @@index([schoolId, isCurrent])
@@ -343,6 +385,8 @@ model Class {
   subjects    Subject[]
   enrollments StudentEnrollment[]
   feeStructures FeeStructure[]
+  questionBankItems QuestionBankItem[]
+  questionPapers    QuestionPaper[]
 
   @@unique([schoolId, code])
   @@index([schoolId])
@@ -376,6 +420,8 @@ model Subject {
   quizzes     Quiz[]
   examSchedules ExamSchedule[]
   learningResources LearningResource[]
+  questionBankItems QuestionBankItem[]
+  questionPapers    QuestionPaper[]
 
   @@unique([classId, code])
 }
@@ -405,6 +451,8 @@ model StudentProfile {
   examMarks       ExamMark[]
   feeInvoices     FeeInvoice[]
   submissions     AssignmentSubmission[]
+  admitCards      AdmitCard[]
+  assessmentAttempts AssessmentAttempt[]
 
   @@index([admissionNumber])
   @@index([status])
@@ -435,6 +483,8 @@ model AdmissionApplication {
   gender                  String
   bloodGroup              String?
   applyingClass           String
+  academicSession         String?           @default("2026-2027")
+  studentEmail            String?
   guardianName            String
   guardianRelationship    String
   guardianEmail           String
@@ -442,6 +492,9 @@ model AdmissionApplication {
   residentialAddress      String
   previousSchool          String?
   previousMarksPercentage Float?
+  documents               Json?
+  missingDocuments        Json?
+  enrolledStudentProfileId String?
   status                  ApplicationStatus @default(SUBMITTED)
   reviewedByUserId        String?
   reviewNotes             String?
@@ -452,6 +505,28 @@ model AdmissionApplication {
 
   @@index([schoolId, status])
   @@index([applicationNumber])
+}
+
+model AdmissionEnquiry {
+  id            String        @id @default(uuid())
+  schoolId      String
+  enquiryNumber String        @unique
+  parentName    String
+  studentName   String
+  email         String
+  phone         String
+  applyingClass String
+  message       String?
+  status        EnquiryStatus @default(NEW)
+  internalNotes String?
+  source        String        @default("WEBSITE_POPUP")
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  school        School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, status])
+  @@index([enquiryNumber])
 }
 
 model StudentEnrollment {
@@ -510,23 +585,59 @@ model TeacherAssignment {
 }
 
 model VirtualIdCard {
-  id                 String       @id @default(uuid())
-  studentProfileId   String?      @unique
-  staffProfileId     String?      @unique
-  cardNumber         String       @unique
-  verificationToken  String       @unique
-  status             CardStatus   @default(ACTIVE)
-  issuedAt           DateTime     @default(now())
+  id                 String          @id @default(uuid())
+  schoolId           String?
+  studentProfileId   String?         @unique
+  staffProfileId     String?         @unique
+  templateId         String?
+  cardNumber         String          @unique
+  verificationToken  String          @unique
+  dataHash           String?
+  status             CardStatus      @default(ACTIVE)
+  issuedAt           DateTime        @default(now())
   expiresAt          DateTime?
   revokedAt          DateTime?
   revocationReason   String?
 
+  school             School?         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  template           IdCardTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
   student            StudentProfile? @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
   staff              StaffProfile?   @relation(fields: [staffProfileId], references: [id], onDelete: Cascade)
 
+  @@index([schoolId])
+  @@index([templateId])
   @@index([verificationToken])
   @@index([cardNumber])
   @@index([status])
+}
+
+model IdCardTemplate {
+  id                 String          @id @default(uuid())
+  schoolId           String
+  name               String
+  description        String?
+  targetRole         String          @default("ALL") // "STUDENT", "TEACHER", "STAFF", "ALL"
+  isDefault          Boolean         @default(false)
+  isActive           Boolean         @default(true)
+  primaryColor       String          @default("#1e3a8a") // Deep Navy
+  secondaryColor     String          @default("#d97706") // Academic Gold
+  headerTextColor    String          @default("#ffffff")
+  cardOrientation    String          @default("LANDSCAPE") // "LANDSCAPE" | "PORTRAIT"
+  showBloodGroup     Boolean         @default(true)
+  showParentContact  Boolean         @default(true)
+  showEmergencyPhone Boolean         @default(true)
+  showPrincipalSign  Boolean         @default(true)
+  showSchoolSeal     Boolean         @default(true)
+  showBarcode        Boolean         @default(false)
+  customTermsText    String?
+  layoutConfig       Json?           // Fine-grained field coordinates and styling
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  school             School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  virtualIdCards     VirtualIdCard[]
+
+  @@index([schoolId])
 }
 
 model AttendanceRecord {
@@ -703,11 +814,14 @@ model ExamSchedule {
   maxMarks          Float
   passMarks         Float
   weightagePercent  Float           @default(100.0)
+  roomNumber        String?         @default("Examination Hall A")
+  instructions      String?
   status            ExamStatus      @default(SCHEDULED)
 
   academicSession   AcademicSession @relation(fields: [academicSessionId], references: [id], onDelete: Cascade)
   subject           Subject         @relation(fields: [subjectId], references: [id], onDelete: Cascade)
   marks             ExamMark[]
+  questionPapers    QuestionPaper[]
 
   @@index([academicSessionId, subjectId])
 }
@@ -999,6 +1113,8 @@ model WebsiteContent {
   sportsActivitiesDescription String @default("Synthetic running tracks, Olympic-standard courts, and multi-disciplinary music and theatre amphitheatres.")
   sportsActivitiesImageUrl  String   @default("/images/school/sports_ground.jpg")
 
+  admissionNoticeOpen       Boolean  @default(true)
+  admissionSession          String   @default("2026–2027")
   admissionHeading          String   @default("Admissions Open 2026–2027")
   admissionDescription      String   @default("Accepting applications for Pre-Primary through Grade 11. Limited seats available per section to ensure personalized faculty attention.")
   admissionImageUrl         String   @default("/images/school/science_lab.jpg")
@@ -1009,6 +1125,12 @@ model WebsiteContent {
   admissionFormTitle        String   @default("Official Admission Application Form 2026-27")
   admissionFormDescription  String   @default("Download the official PDF admission form. Complete and submit at the admissions desk along with required academic records.")
   admissionFormUrl          String?
+
+  admissionPopupEnabled     Boolean  @default(true)
+  admissionPopupHeading     String   @default("Admissions Open 2026–2027")
+  admissionPopupDescription String   @default("Schedule a campus visit, enquire about our academic programs, or connect with our admissions committee.")
+  admissionPopupFrequency   String   @default("ONCE_PER_SESSION")
+  requiredDocumentsConfig   Json?
 
   officeTimings             String   @default("Monday - Saturday: 8:00 AM - 4:00 PM")
   mapEmbedUrl               String?
@@ -1154,4 +1276,192 @@ model GalleryItem {
 
   @@index([schoolId, categoryId])
   @@index([schoolId, mediaType, isPublished])
+}
+
+// ============================================================================
+// EXAMINATION ADMIT CARD MANAGEMENT (SECTION 5)
+// ============================================================================
+
+enum AdmitCardStatus {
+  GENERATED
+  PUBLISHED
+  WITHHELD
+  REVOKED
+}
+
+enum ClearanceStatus {
+  CLEARED
+  PENDING_FEES
+  PENDING_ATTENDANCE
+  PENDING_ADMIN
+  BLOCKED
+}
+
+model AdmitCard {
+  id                    String          @id @default(uuid())
+  schoolId              String
+  studentProfileId      String
+  academicSessionId     String
+  examTitle             String
+  examType              String
+  admitCardNumber       String          @unique
+  rollNumber            String?
+  className             String
+  sectionName           String?
+  centerName            String          @default("Main Campus Examination Center")
+  roomNumber            String?         @default("Examination Hall A")
+  status                AdmitCardStatus @default(GENERATED)
+  clearanceStatus       ClearanceStatus @default(CLEARED)
+  clearanceDetails      Json?
+  candidateInstructions String?         @default("1. Candidates must arrive at the examination center at least 30 minutes before the start time.\n2. No candidate will be allowed entry into the examination hall without this official Admit Card and Student ID badge.\n3. Electronic devices, programmable calculators, cellular phones, and unauthorized notes are strictly prohibited.\n4. Candidates must adhere strictly to the institutional examination code of conduct.")
+  qrToken               String          @unique
+  publishedAt           DateTime?
+  publishedByUserId     String?
+  issuedAt              DateTime        @default(now())
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  school                School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  student               StudentProfile  @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  academicSession       AcademicSession @relation(fields: [academicSessionId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, status])
+  @@index([schoolId, examTitle])
+  @@index([studentProfileId])
+  @@index([qrToken])
+}
+
+// ============================================================================
+// SECTION 6: EXAMINATION, QUESTION PAPER & ONLINE QUIZ MANAGEMENT
+// ============================================================================
+
+model QuestionBankItem {
+  id               String             @id @default(uuid())
+  schoolId         String
+  subjectId        String
+  classId          String?
+  chapter          String?
+  topic            String?
+  difficulty       QuestionDifficulty @default(MEDIUM)
+  questionType     QuestionType
+  questionText     String
+  marks            Float              @default(1.0)
+  negativeMarks    Float              @default(0.0)
+  explanation      String?
+  imageUrl         String?
+  metadata         Json?
+  createdById      String
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  school           School             @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  subject          Subject            @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  class            Class?             @relation(fields: [classId], references: [id], onDelete: SetNull)
+  paperItems       QuestionPaperItem[]
+
+  @@index([schoolId, subjectId])
+  @@index([schoolId, difficulty])
+  @@index([schoolId, questionType])
+}
+
+model QuestionPaper {
+  id                 String              @id @default(uuid())
+  schoolId           String
+  academicSessionId  String?
+  examScheduleId     String?
+  subjectId          String
+  classId            String?
+  title              String
+  instructions       String?
+  durationMinutes    Int                 @default(60)
+  totalMarks         Float               @default(50.0)
+  passingMarks       Float               @default(20.0)
+  status             QuestionPaperStatus @default(DRAFT)
+  randomizeQuestions Boolean             @default(false)
+  randomizeOptions   Boolean             @default(false)
+  sections           Json?
+  createdById        String
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  school             School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  subject            Subject             @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  class              Class?              @relation(fields: [classId], references: [id], onDelete: SetNull)
+  examSchedule       ExamSchedule?       @relation(fields: [examScheduleId], references: [id], onDelete: SetNull)
+  items              QuestionPaperItem[]
+  attempts           AssessmentAttempt[]
+
+  @@index([schoolId, subjectId])
+  @@index([schoolId, status])
+}
+
+model QuestionPaperItem {
+  id                 String            @id @default(uuid())
+  questionPaperId    String
+  questionBankItemId String?
+  sectionName        String            @default("Section A")
+  orderIndex         Int               @default(0)
+  questionText       String
+  questionType       QuestionType
+  marks              Float             @default(1.0)
+  negativeMarks      Float             @default(0.0)
+  explanation        String?
+  imageUrl           String?
+  metadata           Json?
+
+  questionPaper      QuestionPaper     @relation(fields: [questionPaperId], references: [id], onDelete: Cascade)
+  bankItem           QuestionBankItem? @relation(fields: [questionBankItemId], references: [id], onDelete: SetNull)
+  answers            AssessmentAnswer[]
+
+  @@index([questionPaperId, orderIndex])
+}
+
+model AssessmentAttempt {
+  id               String                  @id @default(uuid())
+  schoolId         String
+  questionPaperId  String
+  studentProfileId String
+  attemptNumber    Int                     @default(1)
+  startedAt        DateTime                @default(now())
+  submittedAt      DateTime?
+  durationMinutes  Int
+  isAutoSubmitted  Boolean                 @default(false)
+  scoreObtained    Float?
+  percentage       Float?
+  isPassed         Boolean?
+  status           AssessmentAttemptStatus @default(IN_PROGRESS)
+  evaluatedById    String?
+  evaluatedAt      DateTime?
+  teacherFeedback  String?
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+
+  school           School                  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  questionPaper    QuestionPaper           @relation(fields: [questionPaperId], references: [id], onDelete: Cascade)
+  student          StudentProfile          @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  answers          AssessmentAnswer[]
+
+  @@unique([questionPaperId, studentProfileId, attemptNumber])
+  @@index([schoolId, status])
+  @@index([studentProfileId])
+}
+
+model AssessmentAnswer {
+  id               String            @id @default(uuid())
+  attemptId        String
+  paperItemId      String
+  studentAnswer    Json?
+  isEvaluated      Boolean           @default(false)
+  isAutoEvaluated  Boolean           @default(false)
+  marksAwarded     Float?
+  maxMarks         Float
+  teacherRemarks   String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  attempt          AssessmentAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  paperItem        QuestionPaperItem @relation(fields: [paperItemId], references: [id], onDelete: Cascade)
+
+  @@unique([attemptId, paperItemId])
+  @@index([attemptId])
 }

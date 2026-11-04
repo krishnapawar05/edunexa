@@ -27,6 +27,7 @@ import {
 import { useSchoolBranding } from '../../context/SchoolBrandingContext.js';
 import { ThemeSwitcher } from '../../components/ThemeSwitcher.js';
 import { coreApi } from '../../services/api.js';
+import { AdmissionEnquiryModal } from '../../components/AdmissionEnquiryModal.js';
 
 export const PublicLayout: React.FC = () => {
   const { branding } = useSchoolBranding();
@@ -764,6 +765,9 @@ export const PublicLayout: React.FC = () => {
           </div>
         </div>
       </footer>
+
+      {/* Dynamic Admission Enquiry Popup Modal */}
+      <AdmissionEnquiryModal />
     </div>
   );
 };

@@ -13,11 +13,11 @@ import {
   Lock,
   ExternalLink,
 } from 'lucide-react';
-import { coreApi, getStoredUser } from '../../services/api.js';
-import { downloadIdCardPdf } from '../../services/pdfGenerator.js';
+import { idCardsApi } from '../../services/api.js';
+import { downloadIndividualIdCardPdf } from '../../utils/idCardPdf.js';
 
 export const StudentVirtualIdCardPage: React.FC = () => {
-  const [student, setStudent] = useState<any>(null);
+  const [cardData, setCardData] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [showQrModal, setShowQrModal] = useState<boolean>(false);
@@ -27,11 +27,10 @@ export const StudentVirtualIdCardPage: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const storedUser = getStoredUser();
-      const currentStudentId = storedUser?.studentProfileId || 'stu-aarav-01';
-
-      const studentProfile = await coreApi.getStudentById(currentStudentId);
-      setStudent(studentProfile);
+      const res = await idCardsApi.getMyIdCard();
+      if (res) {
+        setCardData(res.card ? res : res.data);
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to fetch student virtual ID credential.');
     } finally {
@@ -43,16 +42,50 @@ export const StudentVirtualIdCardPage: React.FC = () => {
     loadStudentCard();
   }, []);
 
-  const studentFullName = student
-    ? `${student.firstName} ${student.lastName}`
-    : 'Authenticated Student';
-  const admissionNumber = student?.admissionNumber || '—';
-  const className = student?.className || student?.enrollments?.[0]?.class?.name || '—';
-  const sectionName = student?.sectionName || student?.enrollments?.[0]?.section?.name || '—';
-  const rollNumber = student?.rollNumber || student?.enrollments?.[0]?.rollNumber || '—';
-  const bloodGroup = student?.bloodGroup || '—';
-  const cardStatus = student?.idCard?.status || 'PENDING';
-  const verificationToken = student?.idCard?.verificationToken || '';
+  const card = cardData?.card;
+  const profile = cardData?.profile;
+  const school = cardData?.school;
+  const template = cardData?.template;
+
+  const studentFullName = profile?.fullName || (profile ? `${profile.firstName} ${profile.lastName}` : 'Authenticated Student');
+  const admissionNumber = profile?.admissionNumber || profile?.identifier || '—';
+  const className = profile?.className || profile?.class || '—';
+  const sectionName = profile?.sectionName || profile?.section || '—';
+  const rollNumber = profile?.rollNumber || '—';
+  const bloodGroup = profile?.bloodGroup || '—';
+  const cardStatus = card?.status || 'ACTIVE';
+  const cardNumber = card?.cardNumber || 'STU-CR80-0001';
+  const verificationToken = card?.verificationToken || '';
+  const schoolName = school?.name || 'EduNexa Central School';
+  const schoolCode = school?.code || 'EDUNEXA';
+
+  const handleDownloadPdf = () => {
+    if (!profile) return;
+    downloadIndividualIdCardPdf(
+      {
+        holderType: 'STUDENT',
+        fullName: studentFullName,
+        identifier: admissionNumber,
+        subDetail: `${className} - ${sectionName} • Roll: ${rollNumber}`,
+        bloodGroup: bloodGroup,
+        dateOfBirth: profile?.dateOfBirth ? new Date(profile.dateOfBirth).toLocaleDateString() : undefined,
+        emergencyPhone: profile?.emergencyPhone || profile?.parentPhone,
+        address: profile?.address,
+        academicSession: profile?.academicSession || '2026–2027',
+        avatarUrl: profile?.avatarUrl,
+        cardNumber: cardNumber,
+        verificationToken: verificationToken,
+        status: cardStatus,
+        schoolName: schoolName,
+        schoolCode: schoolCode,
+        schoolAddress: school?.address,
+        schoolPhone: school?.phone,
+        schoolEmail: school?.email,
+      },
+      template,
+      `Student-ID-${admissionNumber || 'Card'}.pdf`
+    );
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
@@ -85,7 +118,7 @@ export const StudentVirtualIdCardPage: React.FC = () => {
             </span>
           </div>
           <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-            Official ISO CR80 tamper-proof digital student credential with dynamic HMAC verification.
+            Official ISO CR80 digital student credential backed by live school database records.
           </p>
         </div>
 
@@ -98,10 +131,17 @@ export const StudentVirtualIdCardPage: React.FC = () => {
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh Credential
           </button>
           <button
+            className="ed-btn ed-btn-secondary"
+            onClick={handleDownloadPdf}
+            disabled={loading || !card}
+          >
+            <Download size={14} /> Download PDF
+          </button>
+          <button
             className="ed-btn ed-btn-primary"
             onClick={() => window.print()}
           >
-            <Printer size={15} /> Print Physical Copy
+            <Printer size={15} /> Print Card
           </button>
         </div>
       </div>
@@ -187,8 +227,8 @@ export const StudentVirtualIdCardPage: React.FC = () => {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <div
                         style={{
-                          width: '32px',
-                          height: '32px',
+                          width: '34px',
+                          height: '34px',
                           borderRadius: '6px',
                           backgroundColor: 'var(--brand-forest-700)',
                           display: 'flex',
@@ -200,14 +240,14 @@ export const StudentVirtualIdCardPage: React.FC = () => {
                           border: '1px solid var(--academic-gold-500)',
                         }}
                       >
-                        A
+                        {schoolName ? schoolName.charAt(0) : 'E'}
                       </div>
                       <div>
                         <div style={{ fontSize: '0.9rem', fontWeight: 800, letterSpacing: '-0.01em', color: '#f8fafc' }}>
-                          Apex Academy of Sciences
+                          {schoolName}
                         </div>
                         <div style={{ fontSize: '0.66rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                          Affiliated to CBSE Board
+                          {schoolCode} • OFFICIAL STUDENT CREDENTIAL
                         </div>
                       </div>
                     </div>
@@ -282,8 +322,8 @@ export const StudentVirtualIdCardPage: React.FC = () => {
 
                   {/* Card Footer */}
                   <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)', paddingTop: '8px', display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', color: '#94a3b8' }}>
-                    <span>Session: <strong>2026–2027</strong></span>
-                    <span>Valid Thru: <strong>April 2027</strong></span>
+                    <span>Card ID: <strong>{cardNumber}</strong></span>
+                    <span>Status: <strong style={{ color: '#34d399' }}>{cardStatus}</strong></span>
                   </div>
                 </>
               ) : (
@@ -301,16 +341,16 @@ export const StudentVirtualIdCardPage: React.FC = () => {
                       }}
                     />
                     <div style={{ fontSize: '0.74rem', color: '#cbd5e1', lineHeight: 1.4 }}>
-                      <strong style={{ color: '#ffffff' }}>Terms of Use:</strong> This card is the property of Apex Academy of Sciences and must be returned upon request or transfer. Found cards should be deposited at the campus administration office.
+                      <strong style={{ color: '#ffffff' }}>Terms of Use:</strong> This card is the property of {schoolName} and must be returned upon transfer or withdrawal. Found cards must be deposited at the campus administration office.
                     </div>
                     <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '6px' }}>
-                      <div>Campus Contact: {student?.membership?.school?.phone || 'Campus Administration Office'}</div>
-                      <div>Portal Verification URL: https://edunexa.campus.edu/verify</div>
+                      <div>Campus Contact: {school?.phone || 'Administration Office'}</div>
+                      <div>Address: {school?.address || 'School Campus'}</div>
                     </div>
                   </div>
 
                   <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)', paddingTop: '8px', display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', color: '#94a3b8' }}>
-                    <span>Authorized Signature: [Principal]</span>
+                    <span>Authorized Principal Signature</span>
                     <span style={{ fontFamily: 'var(--font-mono)' }}>ENC-SHA256</span>
                   </div>
                 </>
@@ -329,21 +369,10 @@ export const StudentVirtualIdCardPage: React.FC = () => {
               <button
                 className="ed-btn ed-btn-primary"
                 style={{ flex: 1 }}
-                onClick={() => {
-                  downloadIdCardPdf({
-                    schoolName: 'Apex Academy of Sciences & Arts',
-                    fullName: studentFullName,
-                    identifierNumber: admissionNumber,
-                    roleCategory: 'STUDENT',
-                    classOrDept: className ? `${className} - ${sectionName}` : 'Grade 10-A',
-                    academicSession: '2026–2027',
-                    bloodGroup: bloodGroup,
-                    status: cardStatus,
-                    verificationToken: verificationToken || 'v-tok-8f2c-49a1-9b7e-e214',
-                  });
-                }}
+                onClick={handleDownloadPdf}
+                disabled={!profile}
               >
-                <Download size={14} /> Download ID Card (PDF)
+                <Download size={14} /> Download PDF
               </button>
             </div>
           </div>
@@ -360,7 +389,7 @@ export const StudentVirtualIdCardPage: React.FC = () => {
             </div>
             <div className="ed-card-body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
               <div style={{ fontSize: '0.86rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                In accordance with <strong>B2World EduNexa PRD §6</strong>, this virtual student card uses a time-signed, revocable QR verification payload.
+                In accordance with <strong>Section 4 of the Project Enhancement Report</strong>, this virtual student card uses a time-signed, revocable QR verification payload and ISO CR80 physical standards.
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
@@ -374,14 +403,14 @@ export const StudentVirtualIdCardPage: React.FC = () => {
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
                   <CheckCircle2 size={16} style={{ color: 'var(--success-solid)', marginTop: '2px', flexShrink: 0 }} />
                   <div style={{ fontSize: '0.82rem' }}>
-                    <strong>Instant Server Revocability:</strong> If a student changes sections, graduates, or if a card is reported compromised, administrators can revoke the token instantly in the database.
+                    <strong>Instant Server Revocability:</strong> If a student changes sections, transfers, or if a card is compromised, administrators can revoke the token instantly.
                   </div>
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
                   <CheckCircle2 size={16} style={{ color: 'var(--success-solid)', marginTop: '2px', flexShrink: 0 }} />
                   <div style={{ fontSize: '0.82rem' }}>
-                    <strong>Physical & Digital Dual Support:</strong> Conforms strictly to ISO/IEC 7810 ID-1 standard dimensions (85.60 × 53.98 mm) for standard badge card printers.
+                    <strong>ISO CR80 Print Ready:</strong> Exact 85.60 × 53.98 mm physical dimensions ready for PVC badge card printers or A4 batch print sheets.
                   </div>
                 </div>
               </div>
@@ -399,10 +428,10 @@ export const StudentVirtualIdCardPage: React.FC = () => {
                   gap: '6px',
                 }}
               >
-                <div><strong>Issuer:</strong> Apex Academy Administrative Registry</div>
+                <div><strong>Issuer:</strong> {schoolName} Administrative Registry</div>
                 <div><strong>Token ID:</strong> <span style={{ fontFamily: 'var(--font-mono)' }}>{verificationToken}</span></div>
                 <div><strong>Status:</strong> <span style={{ color: 'var(--success-solid)', fontWeight: 600 }}>Active & Verified in PostgreSQL</span></div>
-                <div><strong>Cryptographic Protocol:</strong> HMAC-SHA256 Token Signature</div>
+                <div><strong>Data Integrity:</strong> SHA-256 Hash Synchronized</div>
               </div>
             </div>
           </div>
@@ -486,14 +515,15 @@ export const StudentVirtualIdCardPage: React.FC = () => {
                 }}
               >
                 <div><strong>Full Name:</strong> {studentFullName}</div>
-                <div><strong>Institution:</strong> Apex Academy of Sciences</div>
+                <div><strong>Institution:</strong> {schoolName}</div>
                 <div><strong>Role:</strong> Student ({className} - {sectionName})</div>
                 <div><strong>Admission ID:</strong> {admissionNumber}</div>
+                <div><strong>Card Number:</strong> {cardNumber}</div>
                 <div><strong>Status:</strong> Valid for Academic Year 2026–2027</div>
               </div>
 
               <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 'var(--space-3)', lineHeight: 1.4 }}>
-                PRD Compliance: PII and private student metrics are excluded from this verification token.
+                Section 4 Compliance: Personal address, parent contacts, and private financial records are not exposed during public scans.
               </p>
 
               <button
@@ -510,4 +540,5 @@ export const StudentVirtualIdCardPage: React.FC = () => {
     </div>
   );
 };
+
 export default StudentVirtualIdCardPage;

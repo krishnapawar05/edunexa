@@ -14,6 +14,7 @@ import { ResetPasswordPage } from './modules/auth/ResetPasswordPage.js';
 import { AccountActivationPage } from './modules/auth/AccountActivationPage.js';
 import { ChangePasswordPage } from './modules/auth/ChangePasswordPage.js';
 import { PublicIdCardVerification } from './modules/public/PublicIdCardVerification.js';
+import { PublicAdmitCardVerification } from './modules/public/PublicAdmitCardVerification.js';
 
 // Public School Website Subpages
 import { HomePage } from './modules/public/pages/HomePage.js';
@@ -51,14 +52,19 @@ import { TeacherDashboard } from './modules/teacher/TeacherDashboard.js';
 import { TeacherSchedulePage } from './modules/teacher/TeacherSchedulePage.js';
 import { TeacherAttendancePage } from './modules/teacher/TeacherAttendancePage.js';
 import { TeacherQuizzesPage } from './modules/teacher/TeacherQuizzesPage.js';
+import { QuestionBankPage } from './modules/teacher/QuestionBankPage.js';
+import { QuestionPaperBuilderPage } from './modules/teacher/QuestionPaperBuilderPage.js';
+import { ExamEvaluationDashboard } from './modules/teacher/ExamEvaluationDashboard.js';
 import { TeacherExamMarksPage } from './modules/teacher/TeacherExamMarksPage.js';
 import { TeacherResourcesPage } from './modules/teacher/TeacherResourcesPage.js';
 import { TeacherHomeworkPage } from './modules/teacher/TeacherHomeworkPage.js';
 import { TeacherTimetablePage } from './modules/teacher/TeacherTimetablePage.js';
 import { TeacherClassesPage } from './modules/teacher/TeacherClassesPage.js';
 import { TeacherNoticesPage } from './modules/teacher/TeacherNoticesPage.js';
+import { TeacherVirtualIdCardPage } from './modules/teacher/TeacherVirtualIdCardPage.js';
 import { StudentOverviewPage } from './modules/student/StudentOverviewPage.js';
 import { StudentVirtualIdCardPage } from './modules/student/StudentVirtualIdCardPage.js';
+import { StudentAdmitCardsPage } from './modules/student/StudentAdmitCardsPage.js';
 import { StudentAssessmentsPage } from './modules/student/StudentAssessmentsPage.js';
 import { StudentResultsPage } from './modules/student/StudentResultsPage.js';
 import { StudentTimetablePage } from './modules/student/StudentTimetablePage.js';
@@ -73,8 +79,10 @@ import { ParentResultsPage } from './modules/parent/ParentResultsPage.js';
 import { ParentAttendancePage } from './modules/parent/ParentAttendancePage.js';
 import { ParentFeesPage } from './modules/parent/ParentFeesPage.js';
 import { ParentNoticesPage } from './modules/parent/ParentNoticesPage.js';
+import { ParentAdmitCardsPage } from './modules/parent/ParentAdmitCardsPage.js';
 import { ExamOverviewPage } from './modules/examinations/ExamOverviewPage.js';
 import { ExamSchedulesPage } from './modules/examinations/ExamSchedulesPage.js';
+import { AdmitCardManagementPage } from './modules/examinations/AdmitCardManagementPage.js';
 import { ExamMarksEntryPage } from './modules/examinations/ExamMarksEntryPage.js';
 import { ExamMarksAuditPage } from './modules/examinations/ExamMarksAuditPage.js';
 import { ExamGradingSchemesPage } from './modules/examinations/ExamGradingSchemesPage.js';
@@ -130,6 +138,8 @@ export const App: React.FC = () => {
         />
         <Route path="/verify-id" element={<PublicIdCardVerification />} />
         <Route path="/verify-id/:token" element={<PublicIdCardVerification />} />
+        <Route path="/verify-admit-card" element={<PublicAdmitCardVerification />} />
+        <Route path="/verify-admit-card/:token" element={<PublicAdmitCardVerification />} />
 
         {/* ================================================================ */}
         {/* 3. ROLE-SPECIFIC ERP PAGE HIERARCHY                              */}
@@ -168,6 +178,7 @@ export const App: React.FC = () => {
           <Route path="/admin/faculty" element={<FacultyHrPage />} />
           <Route path="/admin/staff" element={<Navigate to="/admin/faculty" replace />} />
           <Route path="/admin/id-cards" element={<VirtualIdCardsPage />} />
+          <Route path="/admin/admit-cards" element={<AdmitCardManagementPage />} />
           <Route path="/admin/attendance" element={<DailyAttendancePage />} />
           <Route path="/admin/fees" element={<FeesInvoicesPage />} />
           <Route path="/admin/finance" element={<Navigate to="/admin/fees" replace />} />
@@ -187,6 +198,9 @@ export const App: React.FC = () => {
         >
           <Route path="/teacher" element={<TeacherSchedulePage />} />
           <Route path="/teacher/attendance" element={<TeacherAttendancePage />} />
+          <Route path="/teacher/question-bank" element={<QuestionBankPage />} />
+          <Route path="/teacher/question-papers" element={<QuestionPaperBuilderPage />} />
+          <Route path="/teacher/evaluations" element={<ExamEvaluationDashboard />} />
           <Route path="/teacher/quizzes" element={<TeacherQuizzesPage />} />
           <Route path="/teacher/exams/marks" element={<TeacherExamMarksPage />} />
           <Route path="/teacher/examinations" element={<Navigate to="/teacher/exams/marks" replace />} />
@@ -194,6 +208,7 @@ export const App: React.FC = () => {
           <Route path="/teacher/homework" element={<TeacherHomeworkPage />} />
           <Route path="/teacher/timetable" element={<TeacherTimetablePage />} />
           <Route path="/teacher/classes" element={<TeacherClassesPage />} />
+          <Route path="/teacher/id-card" element={<TeacherVirtualIdCardPage />} />
           <Route path="/teacher/notices" element={<TeacherNoticesPage />} />
         </Route>
 
@@ -207,6 +222,7 @@ export const App: React.FC = () => {
         >
           <Route path="/student" element={<StudentOverviewPage />} />
           <Route path="/student/id-card" element={<StudentVirtualIdCardPage />} />
+          <Route path="/student/admit-cards" element={<StudentAdmitCardsPage />} />
           <Route path="/student/assessments" element={<StudentAssessmentsPage />} />
           <Route path="/student/quizzes" element={<Navigate to="/student/assessments" replace />} />
           <Route path="/student/results" element={<StudentResultsPage />} />
@@ -228,6 +244,7 @@ export const App: React.FC = () => {
           }
         >
           <Route path="/parent" element={<ParentDashboard />} />
+          <Route path="/parent/admit-cards" element={<ParentAdmitCardsPage />} />
           <Route path="/parent/results" element={<ParentResultsPage />} />
           <Route path="/parent/attendance" element={<ParentAttendancePage />} />
           <Route path="/parent/fees" element={<ParentFeesPage />} />
@@ -243,6 +260,10 @@ export const App: React.FC = () => {
           }
         >
           <Route path="/examinations" element={<ExamOverviewPage />} />
+          <Route path="/examinations/admit-cards" element={<AdmitCardManagementPage />} />
+          <Route path="/examinations/question-bank" element={<QuestionBankPage />} />
+          <Route path="/examinations/question-papers" element={<QuestionPaperBuilderPage />} />
+          <Route path="/examinations/evaluations" element={<ExamEvaluationDashboard />} />
           <Route path="/examinations/schedules" element={<ExamSchedulesPage />} />
           <Route path="/examinations/marks" element={<ExamMarksEntryPage />} />
           <Route path="/examinations/marks-entry" element={<ExamMarksEntryPage />} />

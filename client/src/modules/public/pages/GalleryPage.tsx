@@ -137,7 +137,7 @@ const FALLBACK_ITEMS: GalleryItem[] = [
     mediaType: 'VIDEO',
     mediaUrl: '/images/school/science_lab.jpg',
     thumbnailUrl: '/images/school/science_lab.jpg',
-    videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+    videoUrl: 'https://www.youtube.com/watch?v=3bj_KM9bnW8',
     categoryId: 'cat-labs',
   },
   {
@@ -147,7 +147,7 @@ const FALLBACK_ITEMS: GalleryItem[] = [
     mediaType: 'VIDEO',
     mediaUrl: '/images/school/sports_ground.jpg',
     thumbnailUrl: '/images/school/sports_ground.jpg',
-    videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+    videoUrl: 'https://www.youtube.com/watch?v=3bj_KM9bnW8',
     categoryId: 'cat-sports',
   },
 ];

@@ -2090,7 +2090,7 @@ export const WebsiteCmsPage: React.FC = () => {
                   className="ed-input"
                   value={modalForm.videoUrl || ''}
                   onChange={(e) => setModalForm({ ...modalForm, videoUrl: e.target.value })}
-                  placeholder="https://www.youtube.com/watch?v=..."
+                  placeholder="https://www.youtube.com/watch?v=3bj_KM9bnW8"
                 />
               </div>
             ) : (

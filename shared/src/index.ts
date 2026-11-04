@@ -359,11 +359,38 @@ export const QuestionType = {
   MULTIPLE_CHOICE: 'MULTIPLE_CHOICE',
   MULTIPLE_SELECT: 'MULTIPLE_SELECT',
   TRUE_FALSE: 'TRUE_FALSE',
+  FILL_IN_BLANKS: 'FILL_IN_BLANKS',
   SHORT_ANSWER: 'SHORT_ANSWER',
+  LONG_ANSWER: 'LONG_ANSWER',
   DESCRIPTIVE: 'DESCRIPTIVE',
+  MATCH_THE_FOLLOWING: 'MATCH_THE_FOLLOWING',
+  NUMERICAL: 'NUMERICAL',
+  FILE_UPLOAD: 'FILE_UPLOAD',
 } as const;
 
 export type QuestionTypeEnum = (typeof QuestionType)[keyof typeof QuestionType];
+
+export const QuestionDifficulty = {
+  EASY: 'EASY',
+  MEDIUM: 'MEDIUM',
+  HARD: 'HARD',
+} as const;
+export type QuestionDifficultyType = (typeof QuestionDifficulty)[keyof typeof QuestionDifficulty];
+
+export const QuestionPaperStatus = {
+  DRAFT: 'DRAFT',
+  PUBLISHED: 'PUBLISHED',
+  ARCHIVED: 'ARCHIVED',
+} as const;
+export type QuestionPaperStatusType = (typeof QuestionPaperStatus)[keyof typeof QuestionPaperStatus];
+
+export const AssessmentAttemptStatus = {
+  IN_PROGRESS: 'IN_PROGRESS',
+  SUBMITTED: 'SUBMITTED',
+  EVALUATED: 'EVALUATED',
+  PUBLISHED: 'PUBLISHED',
+} as const;
+export type AssessmentAttemptStatusType = (typeof AssessmentAttemptStatus)[keyof typeof AssessmentAttemptStatus];
 
 export const QuizStatus = {
   DRAFT: 'DRAFT',
@@ -439,7 +466,18 @@ export const QuizQuestionChoiceSchema = z.object({
 export const QuizQuestionSchema = z.object({
   id: z.string().optional(),
   questionText: z.string().min(3, 'Question text must be at least 3 characters'),
-  questionType: z.enum(['MULTIPLE_CHOICE', 'MULTIPLE_SELECT', 'TRUE_FALSE', 'SHORT_ANSWER', 'DESCRIPTIVE']),
+  questionType: z.enum([
+    'MULTIPLE_CHOICE',
+    'MULTIPLE_SELECT',
+    'TRUE_FALSE',
+    'FILL_IN_BLANKS',
+    'SHORT_ANSWER',
+    'LONG_ANSWER',
+    'DESCRIPTIVE',
+    'MATCH_THE_FOLLOWING',
+    'NUMERICAL',
+    'FILE_UPLOAD',
+  ]),
   marks: z.number().positive('Marks must be positive'),
   negativeMarks: z.number().min(0).default(0),
   explanation: z.string().optional(),
@@ -505,6 +543,8 @@ export const CreateExamScheduleSchema = z.object({
   maxMarks: z.number().positive(),
   passMarks: z.number().positive(),
   weightagePercent: z.number().min(1).max(100).default(100),
+  roomNumber: z.string().optional(),
+  instructions: z.string().optional(),
 });
 
 export type CreateExamScheduleDTO = z.infer<typeof CreateExamScheduleSchema>;
@@ -1183,6 +1223,462 @@ export interface PublicWebsiteData {
   };
   downloadableDocs: any[];
 }
+
+// ============================================================================
+// SECTION 3: ADMISSION MANAGEMENT & ENQUIRIES SCHEMAS & CONTRACTS
+// ============================================================================
+
+export const EnquiryStatusEnum = {
+  NEW: 'NEW',
+  CONTACTED: 'CONTACTED',
+  FOLLOW_UP_REQUIRED: 'FOLLOW_UP_REQUIRED',
+  CONVERTED: 'CONVERTED',
+  CLOSED: 'CLOSED',
+} as const;
+
+export type EnquiryStatusType = (typeof EnquiryStatusEnum)[keyof typeof EnquiryStatusEnum];
+
+export const CreateAdmissionEnquirySchema = z.object({
+  parentName: z.string().min(2, 'Parent name must be at least 2 characters'),
+  studentName: z.string().min(2, 'Student name must be at least 2 characters'),
+  email: z.string().email('Please enter a valid email address'),
+  phone: z.string().min(8, 'Phone number must be at least 8 digits'),
+  applyingClass: z.string().min(1, 'Please select the class applying for'),
+  message: z.string().optional().nullable(),
+  source: z.string().default('WEBSITE_POPUP'),
+});
+export type CreateAdmissionEnquiryDTO = z.infer<typeof CreateAdmissionEnquirySchema>;
+
+export const UpdateAdmissionEnquirySchema = z.object({
+  status: z.enum(['NEW', 'CONTACTED', 'FOLLOW_UP_REQUIRED', 'CONVERTED', 'CLOSED']).optional(),
+  internalNotes: z.string().optional().nullable(),
+});
+export type UpdateAdmissionEnquiryDTO = z.infer<typeof UpdateAdmissionEnquirySchema>;
+
+export const SubmitOnlineApplicationSchema = z.object({
+  // Student Information
+  studentFirstName: z.string().min(2, 'Student first name is required'),
+  studentLastName: z.string().min(1, 'Student last name is required'),
+  dateOfBirth: z.string().min(4, 'Valid date of birth is required'),
+  gender: z.string().min(1, 'Gender is required'),
+  bloodGroup: z.string().optional().nullable(),
+  studentEmail: z.string().email().optional().nullable().or(z.literal('')),
+  residentialAddress: z.string().min(5, 'Residential address is required'),
+
+  // Guardian Information
+  guardianName: z.string().min(2, 'Parent/guardian name is required'),
+  guardianRelationship: z.string().optional().default('Parent'),
+  fatherName: z.string().optional().nullable(),
+  motherName: z.string().optional().nullable(),
+  guardianEmail: z.string().email('Valid guardian email is required'),
+  guardianPhone: z.string().min(8, 'Valid guardian phone is required'),
+
+  // Academic Information
+  applyingClass: z.string().min(1, 'Applying class is required'),
+  academicSession: z.string().optional().default('2026-2027'),
+  previousSchool: z.string().optional().nullable(),
+  previousClass: z.string().optional().nullable(),
+  previousMarksPercentage: z.number().min(0).max(100).optional().nullable(),
+  marksPercentage: z.number().min(0).max(100).optional().nullable(),
+
+  // Uploaded Documents
+  documents: z
+    .array(
+      z.object({
+        type: z.string(),
+        name: z.string().optional(),
+        fileName: z.string().optional(),
+        url: z.string().optional(),
+        fileUrl: z.string().optional(),
+        size: z.string().optional(),
+        fileSize: z.string().optional(),
+        uploadedAt: z.string().optional(),
+      })
+    )
+    .optional()
+    .default([]),
+
+  // Declaration
+  declarationAccepted: z.boolean().optional(),
+  declarationAgreed: z.boolean().optional(),
+}).refine((data) => data.declarationAccepted === true || data.declarationAgreed === true, {
+  message: 'You must confirm and accept the admission declaration',
+  path: ['declarationAgreed'],
+});
+export type SubmitOnlineApplicationDTO = z.infer<typeof SubmitOnlineApplicationSchema>;
+
+export const TrackApplicationStatusSchema = z.object({
+  applicationNumber: z.string().min(3, 'Application reference number is required'),
+  verificationContact: z.string().min(3, 'Parent email or phone number is required'),
+});
+export type TrackApplicationStatusDTO = z.infer<typeof TrackApplicationStatusSchema>;
+
+export const AdmissionReviewDecisionSchema = z.object({
+  decision: z.enum(['APPROVED', 'REJECTED', 'UNDER_REVIEW', 'DOCUMENTS_REQUIRED', 'WAITLISTED']),
+  reviewNotes: z.string().optional().nullable(),
+  assignedClass: z.string().optional(),
+  assignedSection: z.string().optional(),
+  missingDocuments: z
+    .array(
+      z.object({
+        type: z.string(),
+        notes: z.string().optional(),
+        requestedAt: z.string().optional(),
+      })
+    )
+    .optional(),
+});
+export type AdmissionReviewDecisionDTO = z.infer<typeof AdmissionReviewDecisionSchema>;
+
+export const UpdateAdmissionConfigSchema = z.object({
+  admissionNoticeOpen: z.boolean().optional(),
+  admissionNoticeTitle: z.string().optional(),
+  admissionNoticeDesc: z.string().optional(),
+  admissionSession: z.string().optional(),
+  admissionDates: z.any().optional(),
+  admissionEligibility: z.any().optional(),
+  admissionProcedure: z.any().optional(),
+  admissionFormTitle: z.string().optional(),
+  admissionFormDescription: z.string().optional(),
+  admissionFormUrl: z.string().optional().nullable(),
+  admissionPopupEnabled: z.boolean().optional(),
+  admissionPopupHeading: z.string().optional(),
+  admissionPopupDescription: z.string().optional(),
+  admissionPopupFrequency: z.enum(['EVERY_VISIT', 'ONCE_PER_SESSION', 'ONCE_PER_DAY']).optional(),
+  requiredDocumentsConfig: z
+    .array(
+      z.object({
+        type: z.string(),
+        label: z.string(),
+        isRequired: z.boolean(),
+        description: z.string().optional(),
+      })
+    )
+    .optional(),
+});
+export type UpdateAdmissionConfigDTO = z.infer<typeof UpdateAdmissionConfigSchema>;
+
+// ============================================================================
+// 15. ID CARD MANAGEMENT & TEMPLATES (SECTION 4)
+// ============================================================================
+
+export const GenerateIdCardSchema = z.object({
+  holderType: z.enum(['STUDENT', 'STAFF', 'TEACHER']),
+  profileId: z.string().min(1, 'Profile ID is required'),
+  templateId: z.string().optional(),
+});
+export type GenerateIdCardDTO = z.infer<typeof GenerateIdCardSchema>;
+
+export const BulkGenerateIdCardsSchema = z.object({
+  targetType: z.enum([
+    'CLASS',
+    'SECTION',
+    'ALL_TEACHERS',
+    'ALL_STAFF',
+    'DEPARTMENT_STAFF',
+    'SELECTED_STUDENTS',
+    'SELECTED_STAFF',
+  ]),
+  classId: z.string().optional(),
+  sectionId: z.string().optional(),
+  departmentId: z.string().optional(),
+  profileIds: z.array(z.string()).optional(),
+  templateId: z.string().optional(),
+});
+export type BulkGenerateIdCardsDTO = z.infer<typeof BulkGenerateIdCardsSchema>;
+
+export const IdCardTemplateSchema = z.object({
+  name: z.string().min(2, 'Template name is required'),
+  description: z.string().optional(),
+  targetRole: z.enum(['STUDENT', 'TEACHER', 'STAFF', 'ALL']).default('ALL'),
+  isDefault: z.boolean().default(false),
+  isActive: z.boolean().default(true),
+  primaryColor: z.string().default('#1e3a8a'),
+  secondaryColor: z.string().default('#d97706'),
+  headerTextColor: z.string().default('#ffffff'),
+  cardOrientation: z.enum(['LANDSCAPE', 'PORTRAIT']).default('LANDSCAPE'),
+  showBloodGroup: z.boolean().default(true),
+  showParentContact: z.boolean().default(true),
+  showEmergencyPhone: z.boolean().default(true),
+  showPrincipalSign: z.boolean().default(true),
+  showSchoolSeal: z.boolean().default(true),
+  showBarcode: z.boolean().default(false),
+  customTermsText: z.string().optional(),
+  layoutConfig: z.any().optional(),
+});
+export type IdCardTemplateDTO = z.infer<typeof IdCardTemplateSchema>;
+
+export const UpdateIdCardStatusSchema = z.object({
+  status: z.enum(['ACTIVE', 'REVOKED', 'EXPIRED']),
+  reason: z.string().optional(),
+});
+export type UpdateIdCardStatusDTO = z.infer<typeof UpdateIdCardStatusSchema>;
+
+// ============================================================================
+// EXAMINATION ADMIT CARD CONTRACTS (SECTION 5)
+// ============================================================================
+
+export interface AdmitCardTimetableEntry {
+  subjectName: string;
+  subjectCode: string;
+  examDate: string;
+  dayOfWeek: string;
+  startTime: string;
+  endTime: string;
+  durationMinutes: number;
+  roomNumber: string;
+  maxMarks: number;
+}
+
+export const GenerateAdmitCardSchema = z.object({
+  studentProfileId: z.string().min(1, 'Student ID is required'),
+  examTitle: z.string().min(1, 'Examination title is required'),
+  examType: z.string().optional(),
+  centerName: z.string().optional(),
+  roomNumber: z.string().optional(),
+  candidateInstructions: z.string().optional(),
+});
+export type GenerateAdmitCardDTO = z.infer<typeof GenerateAdmitCardSchema>;
+
+export const BulkGenerateAdmitCardsSchema = z.object({
+  targetType: z.enum(['CLASS', 'SECTION', 'SELECTED_STUDENTS', 'ALL_ELIGIBLE']).optional(),
+  className: z.string().optional(),
+  sectionName: z.string().optional(),
+  studentProfileIds: z.array(z.string()).optional(),
+  selectedIds: z.array(z.string()).optional(),
+  allEligible: z.boolean().optional(),
+  examTitle: z.string().min(1, 'Examination title is required'),
+  examType: z.string().optional(),
+  academicSessionId: z.string().optional(),
+  centerName: z.string().optional(),
+  roomNumber: z.string().optional(),
+  defaultRoomNumber: z.string().optional(),
+  candidateInstructions: z.string().optional(),
+  skipUnpaidFees: z.boolean().optional(),
+  feeThresholdAmount: z.number().optional(),
+  skipLowAttendance: z.boolean().optional(),
+  minAttendancePercent: z.number().optional(),
+});
+export type BulkGenerateAdmitCardsDTO = z.infer<typeof BulkGenerateAdmitCardsSchema>;
+
+export const PublishAdmitCardsSchema = z.object({
+  cardIds: z.array(z.string()).optional(),
+  admitCardIds: z.array(z.string()).optional(),
+  action: z.enum(['PUBLISH', 'UNPUBLISH', 'WITHHOLD', 'REVOKE']).optional(),
+  publish: z.boolean().optional(),
+  enforceClearance: z.boolean().optional(),
+  examTitle: z.string().optional(),
+  className: z.string().optional(),
+});
+export type PublishAdmitCardsDTO = z.infer<typeof PublishAdmitCardsSchema>;
+
+export const UpdateAdmitCardClearanceSchema = z.object({
+  clearanceStatus: z.enum(['CLEARED', 'PENDING_FEES', 'PENDING_ATTENDANCE', 'PENDING_ADMIN', 'BLOCKED']),
+  remarks: z.string().optional(),
+  reason: z.string().optional(),
+});
+export type UpdateAdmitCardClearanceDTO = z.infer<typeof UpdateAdmitCardClearanceSchema>;
+
+// ============================================================================
+// SECTION 6: QUESTION BANK, QUESTION PAPER & ONLINE EXAM CONTRACTS
+// ============================================================================
+
+export const QuestionBankMetadataSchema = z.object({
+  choices: z
+    .array(
+      z.object({
+        id: z.string().optional(),
+        choiceText: z.string(),
+        isCorrect: z.boolean(),
+        orderIndex: z.number().int().optional(),
+      })
+    )
+    .optional(),
+  blanks: z
+    .array(
+      z.object({
+        index: z.number().int(),
+        acceptedAnswers: z.array(z.string()),
+      })
+    )
+    .optional(),
+  matchPairs: z
+    .object({
+      leftItems: z.array(z.string()),
+      rightItems: z.array(z.string()),
+      correctPairs: z.array(
+        z.object({
+          leftIndex: z.number().int(),
+          rightIndex: z.number().int(),
+        })
+      ),
+    })
+    .optional(),
+  numerical: z
+    .object({
+      expectedNumber: z.number(),
+      tolerance: z.number().min(0).default(0.01),
+      unit: z.string().optional(),
+    })
+    .optional(),
+  sampleAnswer: z.string().optional(),
+  evaluationRubric: z.string().optional(),
+  maxWordCount: z.number().optional(),
+  allowedFileTypes: z.array(z.string()).optional(),
+}).passthrough();
+export type QuestionBankMetadata = z.infer<typeof QuestionBankMetadataSchema>;
+
+export const CreateQuestionBankItemSchema = z.object({
+  subjectId: z.string().min(1, 'Subject is required'),
+  classId: z.string().optional(),
+  chapter: z.string().optional(),
+  topic: z.string().optional(),
+  difficulty: z.enum(['EASY', 'MEDIUM', 'HARD']).default('MEDIUM'),
+  questionType: z.enum([
+    'MULTIPLE_CHOICE',
+    'MULTIPLE_SELECT',
+    'TRUE_FALSE',
+    'FILL_IN_BLANKS',
+    'SHORT_ANSWER',
+    'LONG_ANSWER',
+    'DESCRIPTIVE',
+    'MATCH_THE_FOLLOWING',
+    'NUMERICAL',
+    'FILE_UPLOAD',
+  ]),
+  questionText: z.string().min(3, 'Question text must be at least 3 characters'),
+  marks: z.number().positive('Marks must be positive').default(1.0),
+  negativeMarks: z.number().min(0).default(0.0),
+  explanation: z.string().optional(),
+  imageUrl: z.string().optional(),
+  metadata: QuestionBankMetadataSchema.optional(),
+});
+export type CreateQuestionBankItemDTO = z.infer<typeof CreateQuestionBankItemSchema>;
+
+export const UpdateQuestionBankItemSchema = CreateQuestionBankItemSchema.partial();
+export type UpdateQuestionBankItemDTO = z.infer<typeof UpdateQuestionBankItemSchema>;
+
+export const QuestionPaperSectionSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  instructions: z.string().optional(),
+  marks: z.number().optional(),
+});
+export type QuestionPaperSection = z.infer<typeof QuestionPaperSectionSchema>;
+
+export const QuestionPaperItemSchema = z.object({
+  id: z.string().optional(),
+  questionBankItemId: z.string().optional(),
+  sectionName: z.string().default('Section A'),
+  orderIndex: z.number().int().default(0),
+  questionText: z.string().min(1, 'Question text is required'),
+  questionType: z.enum([
+    'MULTIPLE_CHOICE',
+    'MULTIPLE_SELECT',
+    'TRUE_FALSE',
+    'FILL_IN_BLANKS',
+    'SHORT_ANSWER',
+    'LONG_ANSWER',
+    'DESCRIPTIVE',
+    'MATCH_THE_FOLLOWING',
+    'NUMERICAL',
+    'FILE_UPLOAD',
+  ]),
+  marks: z.number().positive().default(1.0),
+  negativeMarks: z.number().min(0).default(0.0),
+  explanation: z.string().optional(),
+  imageUrl: z.string().optional(),
+  metadata: QuestionBankMetadataSchema.optional(),
+});
+export type QuestionPaperItemDTO = z.infer<typeof QuestionPaperItemSchema>;
+
+export const CreateQuestionPaperSchema = z.object({
+  title: z.string().min(3, 'Title must be at least 3 characters'),
+  subjectId: z.string().min(1, 'Subject is required'),
+  classId: z.string().optional(),
+  academicSessionId: z.string().optional(),
+  examScheduleId: z.string().optional(),
+  instructions: z.string().optional(),
+  durationMinutes: z.number().int().positive().default(60),
+  totalMarks: z.number().positive().default(50.0),
+  passingMarks: z.number().positive().default(20.0),
+  status: z.enum(['DRAFT', 'PUBLISHED', 'ARCHIVED']).default('DRAFT'),
+  randomizeQuestions: z.boolean().default(false),
+  randomizeOptions: z.boolean().default(false),
+  sections: z.array(QuestionPaperSectionSchema).optional(),
+  items: z.array(QuestionPaperItemSchema).min(1, 'Question paper must have at least one question'),
+});
+export type CreateQuestionPaperDTO = z.infer<typeof CreateQuestionPaperSchema>;
+
+export const UpdateQuestionPaperSchema = CreateQuestionPaperSchema.partial();
+export type UpdateQuestionPaperDTO = z.infer<typeof UpdateQuestionPaperSchema>;
+
+export const StartAssessmentAttemptSchema = z.object({
+  questionPaperId: z.string().min(1, 'Question Paper ID is required'),
+});
+export type StartAssessmentAttemptDTO = z.infer<typeof StartAssessmentAttemptSchema>;
+
+export const StudentAssessmentAnswerDataSchema = z.object({
+  selectedChoiceIds: z.array(z.string()).optional(),
+  textAnswer: z.string().optional(),
+  blankAnswers: z.array(z.string()).optional(),
+  matchedPairs: z
+    .array(
+      z.object({
+        leftIndex: z.number().int(),
+        rightIndex: z.number().int(),
+      })
+    )
+    .optional(),
+  numericalValue: z.number().optional(),
+  fileUrl: z.string().optional(),
+}).passthrough();
+export type StudentAssessmentAnswerData = z.infer<typeof StudentAssessmentAnswerDataSchema>;
+
+export const SaveAssessmentAnswerSchema = z.object({
+  attemptId: z.string().min(1),
+  paperItemId: z.string().min(1),
+  studentAnswer: StudentAssessmentAnswerDataSchema,
+});
+export type SaveAssessmentAnswerDTO = z.infer<typeof SaveAssessmentAnswerSchema>;
+
+export const SubmitAssessmentAttemptSchema = z.object({
+  attemptId: z.string().min(1),
+  answers: z
+    .array(
+      z.object({
+        paperItemId: z.string().min(1),
+        studentAnswer: StudentAssessmentAnswerDataSchema,
+      })
+    )
+    .optional(),
+  isAutoSubmitted: z.boolean().default(false),
+});
+export type SubmitAssessmentAttemptDTO = z.infer<typeof SubmitAssessmentAttemptSchema>;
+
+export const SingleItemEvaluationSchema = z.object({
+  paperItemId: z.string().min(1),
+  marksAwarded: z.number().min(0),
+  teacherRemarks: z.string().optional(),
+});
+export type SingleItemEvaluation = z.infer<typeof SingleItemEvaluationSchema>;
+
+export const EvaluateAssessmentAttemptSchema = z.object({
+  attemptId: z.string().min(1),
+  status: z.enum(['SUBMITTED', 'EVALUATED', 'PUBLISHED']).default('EVALUATED'),
+  teacherFeedback: z.string().optional(),
+  itemEvaluations: z.array(SingleItemEvaluationSchema),
+});
+export type EvaluateAssessmentAttemptDTO = z.infer<typeof EvaluateAssessmentAttemptSchema>;
+
+export const PublishAssessmentResultsSchema = z.object({
+  questionPaperId: z.string().min(1),
+  publish: z.boolean().default(true),
+  syncToExamMarks: z.boolean().default(true),
+});
+export type PublishAssessmentResultsDTO = z.infer<typeof PublishAssessmentResultsSchema>;
+
+
 
 
 

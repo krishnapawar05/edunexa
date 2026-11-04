@@ -1522,3 +1522,447 @@ export const websiteApi = {
     });
   },
 };
+
+// ============================================================================
+// ADMISSION MANAGEMENT & ONLINE PORTAL API
+// ============================================================================
+
+export const admissionsApi = {
+  // Public APIs
+  async getPublicConfig(school?: string): Promise<ApiResponse<any>> {
+    const q = school ? `?school=${encodeURIComponent(school)}` : '';
+    return apiRequest<ApiResponse<any>>(`/api/v1/admissions/public/config${q}`);
+  },
+
+  async submitEnquiry(data: any, school?: string): Promise<ApiResponse<any>> {
+    const q = school ? `?school=${encodeURIComponent(school)}` : '';
+    return apiRequest<ApiResponse<any>>(`/api/v1/admissions/public/enquiry${q}`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async submitApplication(data: any, school?: string): Promise<ApiResponse<any>> {
+    const q = school ? `?school=${encodeURIComponent(school)}` : '';
+    return apiRequest<ApiResponse<any>>(`/api/v1/admissions/public/apply${q}`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async trackStatus(data: { applicationNumber: string; verificationContact: string }, school?: string): Promise<ApiResponse<any>> {
+    const q = school ? `?school=${encodeURIComponent(school)}` : '';
+    return apiRequest<ApiResponse<any>>(`/api/v1/admissions/public/track${q}`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  // Admin APIs
+  async getAdminStats(): Promise<ApiResponse<any>> {
+    return apiRequest<ApiResponse<any>>('/api/v1/admissions/admin/stats');
+  },
+
+  async listAdminEnquiries(params?: { status?: string; search?: string; page?: number; limit?: number }): Promise<ApiResponse<any>> {
+    const sp = new URLSearchParams();
+    if (params?.status) sp.set('status', params.status);
+    if (params?.search) sp.set('search', params.search);
+    if (params?.page) sp.set('page', String(params.page));
+    if (params?.limit) sp.set('limit', String(params.limit));
+    const qs = sp.toString() ? `?${sp.toString()}` : '';
+    return apiRequest<ApiResponse<any>>(`/api/v1/admissions/admin/enquiries${qs}`);
+  },
+
+  async updateAdminEnquiry(id: string, data: any): Promise<ApiResponse<any>> {
+    return apiRequest<ApiResponse<any>>(`/api/v1/admissions/admin/enquiries/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteAdminEnquiry(id: string): Promise<ApiResponse<any>> {
+    return apiRequest<ApiResponse<any>>(`/api/v1/admissions/admin/enquiries/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  async listAdminApplications(params?: { status?: string; search?: string; applyingClass?: string; page?: number; limit?: number }): Promise<ApiResponse<any>> {
+    const sp = new URLSearchParams();
+    if (params?.status) sp.set('status', params.status);
+    if (params?.search) sp.set('search', params.search);
+    if (params?.applyingClass) sp.set('applyingClass', params.applyingClass);
+    if (params?.page) sp.set('page', String(params.page));
+    if (params?.limit) sp.set('limit', String(params.limit));
+    const qs = sp.toString() ? `?${sp.toString()}` : '';
+    return apiRequest<ApiResponse<any>>(`/api/v1/admissions/admin/applications${qs}`);
+  },
+
+  async getAdminApplicationById(id: string): Promise<ApiResponse<any>> {
+    return apiRequest<ApiResponse<any>>(`/api/v1/admissions/admin/applications/${id}`);
+  },
+
+  async reviewApplication(id: string, data: any): Promise<ApiResponse<any>> {
+    return apiRequest<ApiResponse<any>>(`/api/v1/admissions/admin/applications/${id}/review`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async updateAdmissionConfig(data: any): Promise<ApiResponse<any>> {
+    return apiRequest<ApiResponse<any>>('/api/v1/admissions/admin/config', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+};
+
+// ============================================================================
+// ID CARD MANAGEMENT & TEMPLATES API (SECTION 4)
+// ============================================================================
+
+export const idCardsApi = {
+  // Self-Service (Student & Teacher/Staff)
+  async getMyIdCard(): Promise<any> {
+    return apiRequest<any>('/api/v1/id-cards/my-card');
+  },
+
+  // Admin Dashboard & Telemetry
+  async getDashboardStats(): Promise<any> {
+    return apiRequest<any>('/api/v1/id-cards/admin/stats');
+  },
+
+  // Student Rosters
+  async listStudents(params?: { classId?: string; sectionId?: string; status?: string; search?: string; page?: number; limit?: number }): Promise<any> {
+    const sp = new URLSearchParams();
+    if (params?.classId) sp.set('classId', params.classId);
+    if (params?.sectionId) sp.set('sectionId', params.sectionId);
+    if (params?.status) sp.set('status', params.status);
+    if (params?.search) sp.set('search', params.search);
+    if (params?.page) sp.set('page', String(params.page));
+    if (params?.limit) sp.set('limit', String(params.limit));
+    const qs = sp.toString() ? `?${sp.toString()}` : '';
+    return apiRequest<any>(`/api/v1/id-cards/admin/students${qs}`);
+  },
+
+  // Employee Rosters
+  async listEmployees(params?: { category?: string; departmentId?: string; status?: string; search?: string; page?: number; limit?: number }): Promise<any> {
+    const sp = new URLSearchParams();
+    if (params?.category) sp.set('category', params.category);
+    if (params?.departmentId) sp.set('departmentId', params.departmentId);
+    if (params?.status) sp.set('status', params.status);
+    if (params?.search) sp.set('search', params.search);
+    if (params?.page) sp.set('page', String(params.page));
+    if (params?.limit) sp.set('limit', String(params.limit));
+    const qs = sp.toString() ? `?${sp.toString()}` : '';
+    return apiRequest<any>(`/api/v1/id-cards/admin/employees${qs}`);
+  },
+
+  // Generation & Status
+  async generateIndividual(data: { holderType: string; profileId: string; templateId?: string }): Promise<any> {
+    return apiRequest<any>('/api/v1/id-cards/admin/generate', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async bulkGenerate(data: any): Promise<any> {
+    return apiRequest<any>('/api/v1/id-cards/admin/bulk-generate', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async updateStatus(cardId: string, data: { status: string; reason?: string }): Promise<any> {
+    return apiRequest<any>(`/api/v1/id-cards/admin/cards/${cardId}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
+  // Templates
+  async listTemplates(): Promise<any> {
+    return apiRequest<any>('/api/v1/id-cards/admin/templates');
+  },
+
+  async createTemplate(data: any): Promise<any> {
+    return apiRequest<any>('/api/v1/id-cards/admin/templates', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async updateTemplate(id: string, data: any): Promise<any> {
+    return apiRequest<any>(`/api/v1/id-cards/admin/templates/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteTemplate(id: string): Promise<any> {
+    return apiRequest<any>(`/api/v1/id-cards/admin/templates/${id}`, {
+      method: 'DELETE',
+    });
+  },
+};
+
+// ============================================================================
+// ADMIT CARD GENERATION, DOWNLOAD & CLEARANCE API (SECTION 5)
+// ============================================================================
+
+export const admitCardsApi = {
+  // Admin & Exam Coordinator Telemetry
+  async getDashboardStats(): Promise<any> {
+    return apiRequest<any>('/api/v1/admit-cards/admin/stats');
+  },
+
+  // Admin Rosters & Directory
+  async listAdmitCards(params?: {
+    examTitle?: string;
+    className?: string;
+    sectionName?: string;
+    status?: string;
+    clearanceStatus?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<any> {
+    const sp = new URLSearchParams();
+    if (params?.examTitle) sp.set('examTitle', params.examTitle);
+    if (params?.className) sp.set('className', params.className);
+    if (params?.sectionName) sp.set('sectionName', params.sectionName);
+    if (params?.status) sp.set('status', params.status);
+    if (params?.clearanceStatus) sp.set('clearanceStatus', params.clearanceStatus);
+    if (params?.search) sp.set('search', params.search);
+    if (params?.page) sp.set('page', String(params.page));
+    if (params?.limit) sp.set('limit', String(params.limit));
+    const qs = sp.toString() ? `?${sp.toString()}` : '';
+    return apiRequest<any>(`/api/v1/admit-cards/admin/list${qs}`);
+  },
+
+  // Single Candidate Generation
+  async generateIndividual(data: {
+    studentProfileId: string;
+    examTitle: string;
+    examType?: string;
+    academicSessionId?: string;
+    centerName?: string;
+    roomNumber?: string;
+    candidateInstructions?: string;
+    rollNumber?: string;
+    overrideClearance?: boolean;
+    clearanceReason?: string;
+  }): Promise<any> {
+    return apiRequest<any>('/api/v1/admit-cards/admin/generate-individual', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  // Bulk Generation Studio
+  async bulkGenerate(data: {
+    examTitle: string;
+    examType?: string;
+    academicSessionId?: string;
+    className?: string;
+    sectionName?: string;
+    studentProfileIds?: string[];
+    allEligible?: boolean;
+    centerName?: string;
+    defaultRoomNumber?: string;
+    candidateInstructions?: string;
+    skipUnpaidFees?: boolean;
+    feeThresholdAmount?: number;
+    skipLowAttendance?: boolean;
+    minAttendancePercent?: number;
+  }): Promise<any> {
+    return apiRequest<any>('/api/v1/admit-cards/admin/bulk-generate', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  // Publishing & Withholding Gatekeeper
+  async publishCards(data: {
+    cardIds: string[];
+    action: 'PUBLISH' | 'UNPUBLISH' | 'WITHHOLD' | 'REVOKE';
+    enforceClearance?: boolean;
+  }): Promise<any> {
+    return apiRequest<any>('/api/v1/admit-cards/admin/publish', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  // Clearance Override
+  async updateClearance(
+    cardId: string,
+    data: {
+      clearanceStatus: 'CLEARED' | 'PENDING_FEES' | 'PENDING_ATTENDANCE' | 'PENDING_ADMIN' | 'BLOCKED';
+      reason?: string;
+    }
+  ): Promise<any> {
+    return apiRequest<any>(`/api/v1/admit-cards/admin/cards/${cardId}/clearance`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
+  // Student Self-Service
+  async getMyAdmitCards(): Promise<any> {
+    return apiRequest<any>('/api/v1/admit-cards/my-cards');
+  },
+
+  // Parent / Guardian Self-Service
+  async getChildAdmitCards(studentProfileId?: string): Promise<any> {
+    const qs = studentProfileId ? `?studentProfileId=${encodeURIComponent(studentProfileId)}` : '';
+    return apiRequest<any>(`/api/v1/admit-cards/child-cards${qs}`);
+  },
+
+  // Public Verification (QR Code)
+  async verifyAdmitCardToken(token: string): Promise<any> {
+    return apiRequest<any>(`/api/v1/admit-cards/public/verify/${encodeURIComponent(token)}`);
+  },
+};
+
+// ============================================================================
+// SECTION 6: QUESTION BANK, QUESTION PAPER & ASSESSMENT ENGINE API
+// ============================================================================
+
+export const assessmentApi = {
+  // Question Bank Management
+  async listQuestionBank(filters?: {
+    subjectId?: string;
+    classId?: string;
+    difficulty?: 'EASY' | 'MEDIUM' | 'HARD';
+    questionType?: string;
+    chapter?: string;
+    search?: string;
+  }): Promise<any[]> {
+    const params = new URLSearchParams();
+    if (filters?.subjectId) params.append('subjectId', filters.subjectId);
+    if (filters?.classId) params.append('classId', filters.classId);
+    if (filters?.difficulty) params.append('difficulty', filters.difficulty);
+    if (filters?.questionType) params.append('questionType', filters.questionType);
+    if (filters?.chapter) params.append('chapter', filters.chapter);
+    if (filters?.search) params.append('search', filters.search);
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    return apiRequest<any[]>(`/api/v1/assessments/bank${qs}`);
+  },
+
+  async getQuestionBankItem(id: string): Promise<any> {
+    return apiRequest<any>(`/api/v1/assessments/bank/${id}`);
+  },
+
+  async createQuestionBankItem(data: any): Promise<any> {
+    return apiRequest<any>('/api/v1/assessments/bank', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async updateQuestionBankItem(id: string, data: any): Promise<any> {
+    return apiRequest<any>(`/api/v1/assessments/bank/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteQuestionBankItem(id: string): Promise<any> {
+    return apiRequest<any>(`/api/v1/assessments/bank/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // Question Papers Builder
+  async listQuestionPapers(filters?: {
+    subjectId?: string;
+    classId?: string;
+    status?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+    examScheduleId?: string;
+    search?: string;
+  }): Promise<any[]> {
+    const params = new URLSearchParams();
+    if (filters?.subjectId) params.append('subjectId', filters.subjectId);
+    if (filters?.classId) params.append('classId', filters.classId);
+    if (filters?.status) params.append('status', filters.status);
+    if (filters?.examScheduleId) params.append('examScheduleId', filters.examScheduleId);
+    if (filters?.search) params.append('search', filters.search);
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    return apiRequest<any[]>(`/api/v1/assessments/papers${qs}`);
+  },
+
+  async getQuestionPaper(id: string): Promise<any> {
+    return apiRequest<any>(`/api/v1/assessments/papers/${id}`);
+  },
+
+  async createQuestionPaper(data: any): Promise<any> {
+    return apiRequest<any>('/api/v1/assessments/papers', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async updateQuestionPaper(id: string, data: any): Promise<any> {
+    return apiRequest<any>(`/api/v1/assessments/papers/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteQuestionPaper(id: string): Promise<any> {
+    return apiRequest<any>(`/api/v1/assessments/papers/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // Online Exam Taking Engine
+  async startAttempt(paperId: string): Promise<any> {
+    return apiRequest<any>(`/api/v1/assessments/papers/${paperId}/attempts/start`, {
+      method: 'POST',
+    });
+  },
+
+  async saveAnswer(data: { attemptId: string; paperItemId: string; studentAnswer: any }): Promise<any> {
+    return apiRequest<any>('/api/v1/assessments/attempts/answer', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async submitAttempt(data: { attemptId: string; answers?: any[]; isAutoSubmitted?: boolean }): Promise<any> {
+    return apiRequest<any>('/api/v1/assessments/attempts/submit', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async getAttempt(id: string): Promise<any> {
+    return apiRequest<any>(`/api/v1/assessments/attempts/${id}`);
+  },
+
+  // Manual Evaluation & Publishing
+  async evaluateAttempt(data: {
+    attemptId: string;
+    status?: 'SUBMITTED' | 'EVALUATED' | 'PUBLISHED';
+    teacherFeedback?: string;
+    itemEvaluations: Array<{ paperItemId: string; marksAwarded: number; teacherRemarks?: string }>;
+  }): Promise<any> {
+    return apiRequest<any>('/api/v1/assessments/attempts/evaluate', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async publishResults(paperId: string, data: { publish: boolean; syncToExamMarks?: boolean }): Promise<any> {
+    return apiRequest<any>(`/api/v1/assessments/papers/${paperId}/publish-results`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  // Student / Parent Results
+  async getStudentResults(studentProfileId?: string): Promise<any[]> {
+    const qs = studentProfileId ? `?studentProfileId=${encodeURIComponent(studentProfileId)}` : '';
+    return apiRequest<any[]>(`/api/v1/assessments/results/student${qs}`);
+  },
+};

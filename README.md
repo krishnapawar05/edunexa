@@ -84,6 +84,9 @@ Every feature listed below has been verified against the local source code, data
 | **Razorpay Fee Payment Gateway Integration** | Complete database-backed Razorpay test mode payment processing. | Order creation (`/api/v1/payments/razorpay/order`), HMAC-SHA256 signature verification (`/api/v1/payments/razorpay/verify`), webhook processing (`/api/v1/payments/razorpay/webhook`), atomic `PaymentTransaction` recording, invoice balance decrement, auto-receipt generation (`fee-receipt-<number>.pdf`), parent fee checkout modal, student policy enforcement, and accounts staff reconciliation. | **Implemented** |
 | **Dynamic School Website CMS & Branding (Section 1)** | Database-backed website content and institutional branding management. | Managed via School Admin `/admin/website` CMS; full CRUD over Hero banners, School branding, About Us, Principal's Desk, Vision & Mission, STEM labs, Athletics, Why Choose Us highlights, Campus facilities, Student achievements, Parent testimonials, and downloadable admission forms/circulars; real-time preview; zero static dummy arrays. | **Implemented** |
 | **Professional Website Design & Image Gallery (Section 2)** | Modern responsive public school website with photo & video albums. | Redesigned public homepage with all 17 PRD-mandated sections; dedicated `/gallery` page with category albums, media switcher (All / Photos / Videos), responsive grid, full-screen keyboard-navigable Lightbox viewer, and embedded YouTube video modal; pre-seeded with 9 local high-resolution campus photographs. | **Implemented** |
+| **Admission Management & Downloadable Forms (Section 3)** | Public website admission portal + School Admin admission management suite. | Multi-step online application form, dynamic classes & academic sessions, dynamic document requirements checklist, official printable school-branded A4 PDF application form (`jspdf`), non-PII application status tracking (`APP-2026-XXXX`), configurable admission enquiry popup modal (`ENQ-2026-XXXX`) with frequency controls (`ONCE_PER_SESSION`, `ONCE_PER_DAY`, `EVERY_VISIT`), 5-tab School Admin admission hub (`/admin/admissions`) with telemetry, document review, and transaction-safe approval with automatic student provisioning. | **Implemented** |
+| **Professional Student & Teacher ID Cards (Section 4)** | Centralized institutional identity management, CR80 generator, duplex bulk sheets, and self-service. | Comprehensive 7-tab School Admin ID card suite (`/admin/id-cards`); ISO CR80 physical standards (85.6mm × 53.98mm); duplex mirrored 8-card A4 print sheets; dynamic teacher/staff cards; SHA-256 profile hash change tracking for outdated card flags; template customization engine (colors, orientations, seals, signatures, terms); zero-PII public QR verification (`/api/v1/core/id-cards/verify/:token`); and authenticated student/teacher self-service portals. | **Implemented** |
+| **Admit Card Generation & Hall Tickets (Section 5)** | Examination Admit Card Management System, printable A4 Hall Tickets, fee & attendance clearance enforcement, and self-service. | Centralized 5-tab School Admin / Exam Coordinator suite (`/examinations/admit-cards`); subject schedule resolution per class; dynamic timetable table; conflict-free schedule validator; automated fee balance and attendance threshold clearance gatekeeper; single candidate & class/section/cohort bulk generation; single & multi-page print-ready A4 PDF download engine (`jspdf`); publish/withhold portal access controls; student (`/student/admit-cards`) and parent (`/parent/admit-cards`) self-service portals; and zero-PII public QR verification (`/api/v1/admit-cards/public/verify/:token`). | **Implemented** |
 
 ---
 
@@ -933,6 +936,104 @@ EduNexa implements an enterprise-grade, cryptographically verified Razorpay paym
 - **Parent & Student Portals**: Parents can remit fees for linked wards with the institutional Emerald theme Razorpay Checkout modal and immediately download official PDF receipts.
 - **Accounts & Audit Tracking**: Accounts Officers and School Admins view real-time transaction ledgers with Razorpay Order IDs, Payment IDs, and clearance statuses.
 - **Documentation**: See [`docs/RAZORPAY_INTEGRATION.md`](docs/RAZORPAY_INTEGRATION.md) for full configuration, webhook setup, and security architecture.
+
+---
+
+## 🎓 Admission Management & Downloadable Admission Forms (Section 3)
+
+EduNexa implements an end-to-end, multi-tenant admission portal and administrative review system as specified in Section 3 of the enhancement report:
+
+### 1. Architectural Highlights
+- **Dynamic Database Integration**: Classes, current academic sessions, mandatory/optional document checklists, and eligibility guidelines are fetched dynamically from PostgreSQL.
+- **Official Printable PDF Form Generator**: Client-side high-resolution printable A4 admission form generated via `jspdf`, formatted with official school banner, monogram, reference serial lines, passport photo box, structured candidate/guardian grids, document checklist, parental declaration, and signature boxes (`downloadAdmissionFormPdf`).
+- **Interactive Multi-Step Online Application**:
+  - **Step 1: Student Particulars**: First/last name, DOB, gender, blood group, address, student email.
+  - **Step 2: Parent/Guardian Details**: Primary guardian, relationship, father/mother particulars, phone, email.
+  - **Step 3: Academic Details**: Dynamic class selection from DB, target session, previous school records, marks %.
+  - **Step 4: Supporting Document Upload**: Interactive uploader with format/size verification and mandatory requirement checks.
+  - **Step 5: Review & Parental Declaration**: Summary verification and legal code of conduct declaration.
+  - **Persistence**: Emits persistent tracking reference `APP-2026-XXXX`.
+- **Zero-PII Application Tracking**:
+  - Parents track application state via `applicationNumber` and verification contact (email/phone).
+  - Sanitized progress pipeline: `SUBMITTED` ➔ `UNDER_REVIEW` ➔ `DOCUMENTS_REQUIRED` (with missing documents alert) ➔ `APPROVED` ➔ `ENROLLED`.
+- **Configurable Admission Enquiry Modal**:
+  - Branded modal popup mounted on public layout with customizable heading and description.
+  - Administrative frequency controls: `ONCE_PER_SESSION`, `ONCE_PER_DAY`, `EVERY_VISIT`.
+  - Emits tracking reference `ENQ-2026-XXXX` and includes rapid re-submission spam defense.
+- **School Admin Admission Council Suite (`/admin/admissions`)**:
+  - **Tab 1: Telemetry Dashboard**: Real-time KPI telemetry for applications and public enquiries.
+  - **Tab 2: Applications Queue**: Filter by status and grade, universal multi-select bulk actions (`UNDER_REVIEW`, `REJECT`), and detailed review modal.
+  - **Tab 3: Enquiries Desk**: View prospective parent leads, search, filter by status (`NEW`, `CONTACTED`, `FOLLOW_UP_REQUIRED`, `CONVERTED`, `CLOSED`), update follow-up notes, or delete.
+  - **Tab 4: Document Requirements Checklist**: Manage institution-specific document requirements (add, edit, toggle mandatory/optional).
+  - **Tab 5: Admission Settings & Popup Manager**: Configure admissions open toggle, target academic session, deadlines, and website enquiry popup behavior.
+- **Transaction-Safe Student Provisioning**:
+  - Upon approving an application, the system automatically calls `coreSchoolService.createStudent` within a transaction.
+  - Auto-provisions: User account, `StudentProfile`, `ParentStudentLink`, classroom enrollment, permanent admission number (`ADM-2026-XXXX`), and ISO CR80 digital student ID card.
+
+---
+
+## 🪪 Professional Student & Teacher ID Card Generation (Section 4)
+
+EduNexa implements an enterprise-grade, centralized, database-backed ID Card Management System designed strictly according to **Section 4 (Professional Student & Teacher ID Card Generation)** of `Final Project Enhancement Report.pdf`.
+
+```
+                        ┌─────────────────────────────────────────────────────────┐
+                        │      School Admin ID Card Hub (/admin/id-cards)         │
+                        └───────────────────────────┬─────────────────────────────┘
+                                                    │
+                 ┌──────────────────────────────────┼──────────────────────────────────┐
+                 │                                  │                                  │
+    ┌────────────▼───────────┐      ┌───────────────▼──────────────┐     ┌─────────────▼────────────┐
+    │ Student ID Cards Roster│      │ Faculty & Staff Cards Roster │     │  Bulk Generation Studio  │
+    │  - Class/Sec filtering │      │  - Dept/Role filtering       │     │  - Class/Sec/All batch   │
+    │  - Universal Checkbox  │      │  - Universal Checkbox        │     │  - Duplex A4 Print Sheet │
+    │  - SHA-256 Hash Sync   │      │  - SHA-256 Hash Sync         │     │  - 8 Cards/Sheet Mirror  │
+    └────────────┬───────────┘      └───────────────┬──────────────┘     └─────────────┬────────────┘
+                 │                                  │                                  │
+                 └──────────────────────────────────┼──────────────────────────────────┘
+                                                    │
+                                     ┌──────────────▼─────────────┐
+                                     │  PostgreSQL Persistence    │
+                                     │  - VirtualIdCard model     │
+                                     │  - IdCardTemplate model    │
+                                     │  - dataHash SHA-256        │
+                                     │  - v-tok-UUID token        │
+                                     └──────────────┬─────────────┘
+                                                    │
+                 ┌──────────────────────────────────┴──────────────────────────────────┐
+                 │                                                                     │
+    ┌────────────▼───────────┐                                            ┌────────────▼───────────┐
+    │  Self-Service Portals  │                                            │  Public QR Verifier    │
+    │  - Student: /student/  │                                            │  - Zero PII exposure   │
+    │  - Teacher: /teacher/  │                                            │  - Instant Revocability│
+    │  - CR80 PDF Download   │                                            │  - /id-cards/verify/   │
+    └────────────────────────┘                                            └────────────────────────┘
+```
+
+### 1. Centralized Administrative ID Card Suite (`/admin/id-cards`)
+Accessible to `SCHOOL_ADMIN` and `PRINCIPAL`:
+- **Tab 1: Telemetry & Ledger**: Live database counters for total eligible students, teachers, and staff; total active cards; revoked cards; and recent issuance activity ledger.
+- **Tab 2: Student ID Cards**: Class and section filtering; status filtering (`ACTIVE`, `UNISSUED`, `REVOKED`); universal multi-select toolbar; single/bulk generation; outdated card badge (`Update Required`); interactive CR80 front/back modal; and single/bulk PDF downloads.
+- **Tab 3: Teacher ID Cards**: Faculty directory filtering by department and status; individual/bulk issue; and instant CR80 PDF generator.
+- **Tab 4: Staff ID Cards**: Administrative and support staff credentials; department-wise filtering; and revocation controls.
+- **Tab 5: Bulk Generation Studio**: Batch issuance wizard for entire classes, sections, all teaching faculty, or departmental staff with template selection.
+- **Tab 6: Card Templates**: Visual template designer enabling School Admins to customize primary brand colors, gold accent colors, card orientation (`LANDSCAPE` vs `PORTRAIT`), field visibility (blood group, emergency phone, parent contact, principal signature, school seal watermark), and custom back-side terms of conduct.
+- **Tab 7: QR Verification Portal**: Verification token tester with instant validity feedback adhering to zero-PII privacy policies.
+
+### 2. Physical ISO CR80 Standards & Client-Side PDF Engine
+- **Card Form Factor**: Exact ISO/IEC 7810 ID-1 standard dimensions (85.60 mm × 53.98 mm).
+- **Front Side Design**: Official school header banner, monogram logo box, holder photograph placeholder, full name, identification number (`STU-CR80-XXXX` or `TEA-CR80-XXXX`), class/section or department designation, blood group, academic session, active status badge, and simulated holographic watermark.
+- **Back Side Design**: Magnetic stripe representation, campus administration address and emergency contacts, institutional terms of conduct, authorized principal signature line, and SHA-256 data hash seal.
+- **Duplex Print-Ready A4 Generator (`downloadBulkIdCardsPdf`)**: Formats 8 cards per A4 page (2 columns × 4 rows); Page N outputs front sides, Page N+1 outputs corresponding back sides mirrored horizontally for 2-sided duplex printer alignment.
+
+### 3. Automatic Profile Hash & Change Detection (`dataHash`)
+- When profile attributes change in SIS or HR records (e.g. section change, roll number update, phone change), the cryptographic hash of the current record (`computeProfileHash`) diverges from the stored `VirtualIdCard.dataHash`.
+- The system automatically marks the card with an `Update Required` warning badge and provides a one-click re-synchronization action that updates the card details and cryptographic hash without breaking historical audit trails.
+
+### 4. Zero-PII QR Verification & Self-Service Portals
+- **Public QR Route**: Public verification endpoint (`/api/v1/core/id-cards/verify/:token`) verifies the token against PostgreSQL and returns only holder name, institution, role, card number, and session validity without exposing student home address, phone numbers, or academic marks.
+- **Student Self-Service (`/student/id-card`)**: Authenticated students view their live credential, toggle front/back view, download individual CR80 PDF, and print.
+- **Teacher Self-Service (`/teacher/id-card`)**: Authenticated teachers view their faculty credential, department badge, join date, download CR80 PDF, and verify QR validity.
 
 ---
 

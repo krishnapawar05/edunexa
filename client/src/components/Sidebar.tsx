@@ -28,6 +28,9 @@ import {
   ShieldCheck,
   KeyRound,
   Globe,
+  FileText,
+  Database,
+  CheckSquare,
   X,
 } from 'lucide-react';
 import { useSchoolBranding } from '../context/SchoolBrandingContext.js';
@@ -87,6 +90,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           { id: 'admissions', path: '/admin/admissions', label: 'Admissions Review Queue', icon: FileCheck },
           { id: 'faculty', path: '/admin/faculty', label: 'Faculty & HR', icon: Users },
           { id: 'id-cards', path: '/admin/id-cards', label: 'Virtual ID Cards & QR', icon: IdCard },
+          { id: 'admit-cards', path: '/admin/admit-cards', label: 'Admit Cards & Hall Tickets', icon: FileText },
           { id: 'attendance', path: '/admin/attendance', label: 'Daily Attendance', icon: CalendarCheck },
           { id: 'fees', path: '/admin/fees', label: 'Fees & Invoices', icon: CreditCard },
           { id: 'events-notices', path: '/admin/events-notices', label: 'Events & Notices', icon: Bell },
@@ -100,6 +104,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           { id: 'admissions', path: '/admin/admissions', label: 'Admissions Review Queue', icon: FileCheck },
           { id: 'faculty', path: '/admin/faculty', label: 'Faculty & HR', icon: Users },
           { id: 'id-cards', path: '/admin/id-cards', label: 'Virtual ID Cards & QR', icon: IdCard },
+          { id: 'admit-cards', path: '/admin/admit-cards', label: 'Admit Cards & Hall Tickets', icon: FileText },
           { id: 'attendance', path: '/admin/attendance', label: 'Daily Attendance', icon: CalendarCheck },
           { id: 'fees', path: '/admin/fees', label: 'Fees & Invoices', icon: CreditCard },
           { id: 'events-notices', path: '/admin/events-notices', label: 'Events & Notices', icon: Bell },
@@ -107,7 +112,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       case 'TEACHER':
         return [
           { id: 'overview', path: '/teacher', label: 'Teacher Schedule', icon: LayoutDashboard },
+          { id: 'id-card', path: '/teacher/id-card', label: 'My Virtual ID Card', icon: IdCard },
           { id: 'attendance', path: '/teacher/attendance', label: 'Mark Attendance', icon: CalendarCheck },
+          { id: 'question-bank', path: '/teacher/question-bank', label: 'Question Bank (10 Types)', icon: Database },
+          { id: 'question-papers', path: '/teacher/question-papers', label: 'Paper Builder', icon: FileSpreadsheet },
+          { id: 'evaluations', path: '/teacher/evaluations', label: 'Exam Evaluation', icon: CheckSquare },
           { id: 'quizzes', path: '/teacher/quizzes', label: 'Online Quizzes', icon: FileQuestion },
           { id: 'examinations', path: '/teacher/exams/marks', label: 'Exam Marks Entry', icon: Award },
           { id: 'resources', path: '/teacher/resources', label: 'Study Resources', icon: BookOpen },
@@ -120,6 +129,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         return [
           { id: 'overview', path: '/student', label: 'Student Dashboard', icon: LayoutDashboard },
           { id: 'id-card', path: '/student/id-card', label: 'My Virtual ID Card', icon: IdCard },
+          { id: 'admit-cards', path: '/student/admit-cards', label: 'Exam Admit Cards', icon: FileText },
           { id: 'assessments', path: '/student/assessments', label: 'Assessments & Quizzes', icon: FileQuestion },
           { id: 'results', path: '/student/results', label: 'Academic Results', icon: Award },
           { id: 'timetable', path: '/student/timetable', label: 'Class Timetable', icon: Calendar },
@@ -133,6 +143,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       case 'PARENT':
         return [
           { id: 'overview', path: '/parent', label: 'Parent Dashboard', icon: LayoutDashboard },
+          { id: 'admit-cards', path: '/parent/admit-cards', label: 'Ward Admit Cards', icon: FileText },
           { id: 'results', path: '/parent/results', label: 'Published Report Cards', icon: Award },
           { id: 'attendance', path: '/parent/attendance', label: 'Attendance Records', icon: CalendarCheck },
           { id: 'fees', path: '/parent/fees', label: 'Fee Payments & Invoices', icon: CreditCard },
@@ -141,6 +152,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
       case 'EXAM_COORDINATOR':
         return [
           { id: 'overview', path: '/examinations', label: 'Exam Workspace', icon: LayoutDashboard },
+          { id: 'admit-cards', path: '/examinations/admit-cards', label: 'Admit Cards & Hall Tickets', icon: FileText },
+          { id: 'question-bank', path: '/examinations/question-bank', label: 'Question Bank', icon: Database },
+          { id: 'question-papers', path: '/examinations/question-papers', label: 'Question Paper Builder', icon: FileSpreadsheet },
+          { id: 'evaluations', path: '/examinations/evaluations', label: 'Online Exam Evaluations', icon: CheckSquare },
           { id: 'schedules', path: '/examinations/schedules', label: 'Examination Schedules', icon: FileSpreadsheet },
           { id: 'marks', path: '/examinations/marks', label: 'Marks Entry & Grading', icon: Edit3 },
           { id: 'marks-audit', path: '/examinations/marks-audit', label: 'Marks Entry Audit', icon: ShieldCheck },
