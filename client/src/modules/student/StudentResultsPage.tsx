@@ -12,12 +12,14 @@ import {
   User,
   Building2,
 } from 'lucide-react';
-import { academicApi, coreApi, getStoredUser } from '../../services/api.js';
+import { academicApi, coreApi, marksheetsApi, getStoredUser } from '../../services/api.js';
 import { downloadReportCardPdf } from '../../services/pdfGenerator.js';
+import { downloadIndividualMarksheetPdf, MarksheetPdfData } from '../../utils/marksheetPdf.js';
 
 export const StudentResultsPage: React.FC = () => {
   const [reportCard, setReportCard] = useState<any | null>(null);
   const [student, setStudent] = useState<any | null>(null);
+  const [officialMarksheets, setOfficialMarksheets] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -28,13 +30,15 @@ export const StudentResultsPage: React.FC = () => {
       const storedUser = getStoredUser();
       const currentStudentId = storedUser?.studentProfileId || 'stu-aarav-01';
 
-      const [profile, rc] = await Promise.all([
-        coreApi.getStudentById(currentStudentId),
-        academicApi.getReportCard(currentStudentId),
+      const [profile, rc, mSheets] = await Promise.all([
+        coreApi.getStudentById(currentStudentId).catch(() => null),
+        academicApi.getReportCard(currentStudentId).catch(() => null),
+        marksheetsApi.getMyMarksheets().catch(() => []),
       ]);
 
       setStudent(profile);
       setReportCard(rc);
+      setOfficialMarksheets(mSheets || []);
     } catch (err: any) {
       setError(err.message || 'Failed to retrieve published report card from PostgreSQL.');
     } finally {
@@ -94,6 +98,42 @@ export const StudentResultsPage: React.FC = () => {
           >
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh Results
           </button>
+          {officialMarksheets.length > 0 && (
+            <button
+              className="ed-btn ed-btn-primary"
+              onClick={() => {
+                const latest = officialMarksheets[0];
+                const st = latest.studentSnapshot || {};
+                const pdfData: MarksheetPdfData = {
+                  marksheetNumber: latest.marksheetNumber,
+                  examTitle: latest.examTitle,
+                  examType: latest.examType,
+                  sessionName: latest.academicSession?.name || '2026–2027 Academic Year',
+                  studentName: st.fullName || studentFullName,
+                  admissionNumber: st.admissionNumber || admissionNumber,
+                  rollNumber: String(st.rollNumber || rollNumber),
+                  className: latest.className || className,
+                  sectionName: latest.sectionName || sectionName,
+                  fatherName: st.fatherName,
+                  motherName: st.motherName,
+                  totalMaxMarks: latest.totalMaxMarks,
+                  totalMarksObtained: latest.totalMarksObtained,
+                  overallPercentage: latest.overallPercentage,
+                  grade: latest.grade,
+                  division: latest.division,
+                  isPassed: latest.isPassed,
+                  version: latest.version,
+                  qrToken: latest.qrToken,
+                  classTeacherRemarks: latest.classTeacherRemarks,
+                  principalRemarks: latest.principalRemarks,
+                  subjects: (latest.subjectMarksSnapshot as any[]) || [],
+                };
+                downloadIndividualMarksheetPdf(pdfData);
+              }}
+            >
+              <Award size={15} /> Download Official CBSE Marksheet (PDF)
+            </button>
+          )}
           <button
             className="ed-btn ed-btn-secondary"
             onClick={() => {

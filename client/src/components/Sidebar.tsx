@@ -91,6 +91,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           { id: 'faculty', path: '/admin/faculty', label: 'Faculty & HR', icon: Users },
           { id: 'id-cards', path: '/admin/id-cards', label: 'Virtual ID Cards & QR', icon: IdCard },
           { id: 'admit-cards', path: '/admin/admit-cards', label: 'Admit Cards & Hall Tickets', icon: FileText },
+          { id: 'marksheets', path: '/admin/marksheets', label: 'Marksheets & Report Cards', icon: Award },
           { id: 'attendance', path: '/admin/attendance', label: 'Daily Attendance', icon: CalendarCheck },
           { id: 'fees', path: '/admin/fees', label: 'Fees & Invoices', icon: CreditCard },
           { id: 'events-notices', path: '/admin/events-notices', label: 'Events & Notices', icon: Bell },
@@ -105,6 +106,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           { id: 'faculty', path: '/admin/faculty', label: 'Faculty & HR', icon: Users },
           { id: 'id-cards', path: '/admin/id-cards', label: 'Virtual ID Cards & QR', icon: IdCard },
           { id: 'admit-cards', path: '/admin/admit-cards', label: 'Admit Cards & Hall Tickets', icon: FileText },
+          { id: 'marksheets', path: '/admin/marksheets', label: 'Marksheets & Report Cards', icon: Award },
           { id: 'attendance', path: '/admin/attendance', label: 'Daily Attendance', icon: CalendarCheck },
           { id: 'fees', path: '/admin/fees', label: 'Fees & Invoices', icon: CreditCard },
           { id: 'events-notices', path: '/admin/events-notices', label: 'Events & Notices', icon: Bell },
@@ -161,6 +163,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           { id: 'marks-audit', path: '/examinations/marks-audit', label: 'Marks Entry Audit', icon: ShieldCheck },
           { id: 'grading', path: '/examinations/grading', label: 'Grading Schemes', icon: Layers },
           { id: 'publish', path: '/examinations/publish', label: 'Publish Results', icon: CheckCircle2 },
+          { id: 'marksheets', path: '/examinations/marksheets', label: 'Official Marksheets & Report Cards', icon: Award },
         ];
       case 'HR_STAFF':
         return [

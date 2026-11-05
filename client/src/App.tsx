@@ -83,6 +83,8 @@ import { ParentAdmitCardsPage } from './modules/parent/ParentAdmitCardsPage.js';
 import { ExamOverviewPage } from './modules/examinations/ExamOverviewPage.js';
 import { ExamSchedulesPage } from './modules/examinations/ExamSchedulesPage.js';
 import { AdmitCardManagementPage } from './modules/examinations/AdmitCardManagementPage.js';
+import { MarksheetManagementPage } from './modules/examinations/MarksheetManagementPage.js';
+import { PublicMarksheetVerification } from './modules/public/PublicMarksheetVerification.js';
 import { ExamMarksEntryPage } from './modules/examinations/ExamMarksEntryPage.js';
 import { ExamMarksAuditPage } from './modules/examinations/ExamMarksAuditPage.js';
 import { ExamGradingSchemesPage } from './modules/examinations/ExamGradingSchemesPage.js';
@@ -140,6 +142,9 @@ export const App: React.FC = () => {
         <Route path="/verify-id/:token" element={<PublicIdCardVerification />} />
         <Route path="/verify-admit-card" element={<PublicAdmitCardVerification />} />
         <Route path="/verify-admit-card/:token" element={<PublicAdmitCardVerification />} />
+        <Route path="/verify-marksheet" element={<PublicMarksheetVerification />} />
+        <Route path="/verify-marksheet/:token" element={<PublicMarksheetVerification />} />
+        <Route path="/verify/marksheets/:token" element={<PublicMarksheetVerification />} />
 
         {/* ================================================================ */}
         {/* 3. ROLE-SPECIFIC ERP PAGE HIERARCHY                              */}
@@ -179,6 +184,8 @@ export const App: React.FC = () => {
           <Route path="/admin/staff" element={<Navigate to="/admin/faculty" replace />} />
           <Route path="/admin/id-cards" element={<VirtualIdCardsPage />} />
           <Route path="/admin/admit-cards" element={<AdmitCardManagementPage />} />
+          <Route path="/admin/marksheets" element={<MarksheetManagementPage />} />
+          <Route path="/admin/report-cards" element={<Navigate to="/admin/marksheets" replace />} />
           <Route path="/admin/attendance" element={<DailyAttendancePage />} />
           <Route path="/admin/fees" element={<FeesInvoicesPage />} />
           <Route path="/admin/finance" element={<Navigate to="/admin/fees" replace />} />
@@ -271,6 +278,8 @@ export const App: React.FC = () => {
           <Route path="/examinations/audit" element={<ExamMarksAuditPage />} />
           <Route path="/examinations/grading" element={<ExamGradingSchemesPage />} />
           <Route path="/examinations/publish" element={<ExamPublishResultsPage />} />
+          <Route path="/examinations/marksheets" element={<MarksheetManagementPage />} />
+          <Route path="/examinations/report-cards" element={<Navigate to="/examinations/marksheets" replace />} />
         </Route>
 
         {/* HR & Staff Admin Workspace */}

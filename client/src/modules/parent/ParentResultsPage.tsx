@@ -11,8 +11,9 @@ import {
   BookOpen,
   FileText,
 } from 'lucide-react';
-import { coreApi, academicApi } from '../../services/api.js';
+import { coreApi, academicApi, marksheetsApi } from '../../services/api.js';
 import { downloadReportCardPdf } from '../../services/pdfGenerator.js';
+import { downloadIndividualMarksheetPdf, MarksheetPdfData } from '../../utils/marksheetPdf.js';
 import { Breadcrumbs } from '../../components/Breadcrumbs.js';
 
 interface Ward {
@@ -33,6 +34,7 @@ export const ParentResultsPage: React.FC = () => {
   const [errorChildren, setErrorChildren] = useState<string | null>(null);
 
   const [reportCard, setReportCard] = useState<any>(null);
+  const [officialMarksheets, setOfficialMarksheets] = useState<any[]>([]);
   const [loadingReportCard, setLoadingReportCard] = useState(false);
   const [reportCardError, setReportCardError] = useState<string | null>(null);
 
@@ -68,8 +70,12 @@ export const ParentResultsPage: React.FC = () => {
     try {
       setLoadingReportCard(true);
       setReportCardError(null);
-      const data = await academicApi.getReportCard(childId);
+      const [data, ms] = await Promise.all([
+        academicApi.getReportCard(childId).catch(() => null),
+        marksheetsApi.getChildMarksheets(childId).catch(() => []),
+      ]);
       setReportCard(data);
+      setOfficialMarksheets(ms || []);
     } catch (err: any) {
       console.warn('Report card fetch notice:', err);
       setReportCard(null);
@@ -147,6 +153,43 @@ export const ParentResultsPage: React.FC = () => {
             >
               <RefreshCw size={14} className={loadingReportCard ? 'animate-spin' : ''} /> Refresh
             </button>
+            {officialMarksheets.length > 0 && (
+              <button
+                className="ed-btn ed-btn-primary"
+                onClick={() => {
+                  const latest = officialMarksheets[0];
+                  const st = latest.studentSnapshot || {};
+                  const pdfData: MarksheetPdfData = {
+                    marksheetNumber: latest.marksheetNumber,
+                    examTitle: latest.examTitle,
+                    examType: latest.examType,
+                    sessionName: latest.academicSession?.name || '2026–2027 Academic Year',
+                    studentName: st.fullName || selectedChild?.name || 'Candidate',
+                    admissionNumber: st.admissionNumber || selectedChild?.admissionNumber || 'ADM-2026',
+                    rollNumber: String(st.rollNumber || selectedChild?.rollNumber || '01'),
+                    className: latest.className || selectedChild?.className || 'Grade 10',
+                    sectionName: latest.sectionName || selectedChild?.sectionName || 'A',
+                    fatherName: st.fatherName,
+                    motherName: st.motherName,
+                    totalMaxMarks: latest.totalMaxMarks,
+                    totalMarksObtained: latest.totalMarksObtained,
+                    overallPercentage: latest.overallPercentage,
+                    grade: latest.grade,
+                    division: latest.division,
+                    isPassed: latest.isPassed,
+                    version: latest.version,
+                    qrToken: latest.qrToken,
+                    classTeacherRemarks: latest.classTeacherRemarks,
+                    principalRemarks: latest.principalRemarks,
+                    subjects: (latest.subjectMarksSnapshot as any[]) || [],
+                  };
+                  downloadIndividualMarksheetPdf(pdfData);
+                }}
+                title="Download official school-branded CBSE marksheet"
+              >
+                <Award size={15} /> Official CBSE Marksheet (PDF)
+              </button>
+            )}
             {reportCard && reportCard.subjects && reportCard.subjects.length > 0 && (
               <>
                 <button

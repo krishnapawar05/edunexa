@@ -1966,3 +1966,168 @@ export const assessmentApi = {
     return apiRequest<any[]>(`/api/v1/assessments/results/student${qs}`);
   },
 };
+
+export const marksheetsApi = {
+  // Stats & Telemetry
+  async getStats(): Promise<any> {
+    const res = await apiRequest<any>('/api/v1/marksheets/admin/stats');
+    return res?.data ?? res;
+  },
+
+  // Templates
+  async getTemplates(): Promise<any[]> {
+    const res = await apiRequest<any>('/api/v1/marksheets/admin/templates');
+    return res?.data ?? res;
+  },
+
+  async createTemplate(data: any): Promise<any> {
+    const res = await apiRequest<any>('/api/v1/marksheets/admin/templates', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    return res?.data ?? res;
+  },
+
+  async updateTemplate(id: string, data: any): Promise<any> {
+    const res = await apiRequest<any>(`/api/v1/marksheets/admin/templates/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+    return res?.data ?? res;
+  },
+
+  async deleteTemplate(id: string): Promise<any> {
+    const res = await apiRequest<any>(`/api/v1/marksheets/admin/templates/${id}`, {
+      method: 'DELETE',
+    });
+    return res?.data ?? res;
+  },
+
+  // Grading Criteria
+  async getGrading(): Promise<any> {
+    const res = await apiRequest<any>('/api/v1/marksheets/admin/grading');
+    return res?.data ?? res;
+  },
+
+  async updateGrading(data: any): Promise<any> {
+    const res = await apiRequest<any>('/api/v1/marksheets/admin/grading', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+    return res?.data ?? res;
+  },
+
+  // Marksheets Roster & Management
+  async listMarksheets(params?: {
+    search?: string;
+    classId?: string;
+    className?: string;
+    examTitle?: string;
+    status?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<{ items: any[]; total: number; page: number; limit: number; totalPages: number }> {
+    const q = new URLSearchParams();
+    if (params?.search) q.set('search', params.search);
+    if (params?.classId) q.set('classId', params.classId);
+    if (params?.className) q.set('className', params.className);
+    if (params?.examTitle) q.set('examTitle', params.examTitle);
+    if (params?.status && params.status !== 'ALL') q.set('status', params.status);
+    if (params?.page) q.set('page', String(params.page));
+    if (params?.limit) q.set('limit', String(params.limit));
+
+    const qs = q.toString() ? `?${q.toString()}` : '';
+    const res = await apiRequest<any>(`/api/v1/marksheets/admin/list${qs}`);
+    return res?.data ?? res;
+  },
+
+  async getMarksheetById(id: string): Promise<any> {
+    const res = await apiRequest<any>(`/api/v1/marksheets/admin/cards/${id}`);
+    return res?.data ?? res;
+  },
+
+  async generateIndividual(data: {
+    studentProfileId: string;
+    examTitle: string;
+    examType?: string;
+    academicSessionId?: string;
+    templateId?: string;
+    subjectMarks?: any[];
+    classTeacherRemarks?: string;
+    principalRemarks?: string;
+  }): Promise<any> {
+    const res = await apiRequest<any>('/api/v1/marksheets/admin/generate-individual', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    return res?.data ?? res;
+  },
+
+  async bulkGenerate(data: {
+    examTitle: string;
+    examType?: string;
+    academicSessionId?: string;
+    classId?: string;
+    sectionId?: string;
+    allEligible?: boolean;
+    templateId?: string;
+    publishImmediately?: boolean;
+  }): Promise<any> {
+    const res = await apiRequest<any>('/api/v1/marksheets/admin/bulk-generate', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    return res?.data ?? res;
+  },
+
+  async publishMarksheets(data: {
+    marksheetIds?: string[];
+    action: 'PUBLISH' | 'UNPUBLISH' | 'WITHHOLD';
+    examTitle?: string;
+    className?: string;
+  }): Promise<any> {
+    const res = await apiRequest<any>('/api/v1/marksheets/admin/publish', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    return res;
+  },
+
+  async correctMarksheet(data: {
+    marksheetId: string;
+    reason: string;
+    updatedSubjectMarks?: any[];
+    classTeacherRemarks?: string;
+    principalRemarks?: string;
+  }): Promise<any> {
+    const res = await apiRequest<any>('/api/v1/marksheets/admin/correct', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    return res?.data ?? res;
+  },
+
+  async getAudits(marksheetId?: string): Promise<any[]> {
+    const qs = marksheetId ? `?marksheetId=${encodeURIComponent(marksheetId)}` : '';
+    const res = await apiRequest<any>(`/api/v1/marksheets/admin/audits${qs}`);
+    return res?.data ?? res;
+  },
+
+  // Student & Parent Self-Service
+  async getMyMarksheets(): Promise<any[]> {
+    const res = await apiRequest<any>('/api/v1/marksheets/my-marksheets');
+    return res?.data ?? res;
+  },
+
+  async getChildMarksheets(studentProfileId?: string): Promise<any[]> {
+    const qs = studentProfileId ? `?studentProfileId=${encodeURIComponent(studentProfileId)}` : '';
+    const res = await apiRequest<any>(`/api/v1/marksheets/child-marksheets${qs}`);
+    return res?.data ?? res;
+  },
+
+  // Public QR Verification
+  async verifyPublicToken(token: string): Promise<any> {
+    const res = await apiRequest<any>(`/api/v1/marksheets/public/verify/${encodeURIComponent(token)}`);
+    return res?.data ?? res;
+  },
+};

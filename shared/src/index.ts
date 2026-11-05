@@ -1678,6 +1678,138 @@ export const PublishAssessmentResultsSchema = z.object({
 });
 export type PublishAssessmentResultsDTO = z.infer<typeof PublishAssessmentResultsSchema>;
 
+// ============================================================================
+// SECTION 7: PROFESSIONAL MARKSHEET & REPORT CARD GENERATION
+// ============================================================================
+
+export const MarksheetStatus = {
+  DRAFT: 'DRAFT',
+  ISSUED: 'ISSUED',
+  PUBLISHED: 'PUBLISHED',
+  WITHHELD: 'WITHHELD',
+  CORRECTED: 'CORRECTED',
+  CANCELLED: 'CANCELLED',
+} as const;
+export type MarksheetStatusType = (typeof MarksheetStatus)[keyof typeof MarksheetStatus];
+
+export interface SubjectMarksEntry {
+  subjectCode: string;
+  subjectName: string;
+  theoryMaxMarks: number;
+  theoryMarksObtained: number;
+  practicalMaxMarks?: number;
+  practicalMarksObtained?: number;
+  totalMaxMarks: number;
+  totalMarksObtained: number;
+  percentage: number;
+  grade: string;
+  remarks?: string;
+}
+
+export const CreateMarksheetTemplateSchema = z.object({
+  name: z.string().min(1, 'Template name is required'),
+  examType: z.string().optional().default('ALL'),
+  isDefault: z.boolean().optional().default(false),
+  layoutStyle: z.string().default('FORMAL_CBSE'),
+  primaryColor: z.string().default('#1e3a8a'),
+  secondaryColor: z.string().default('#d97706'),
+  headerTextColor: z.string().default('#ffffff'),
+  logoUrl: z.string().optional(),
+  stampUrl: z.string().optional(),
+  principalSignatureUrl: z.string().optional(),
+  teacherSignatureUrl: z.string().optional(),
+  showStudentPhoto: z.boolean().default(true),
+  showAttendance: z.boolean().default(true),
+  showRank: z.boolean().default(false),
+  showDivision: z.boolean().default(true),
+  showPracticalMarks: z.boolean().default(true),
+  gradingScaleJson: z.any().optional(),
+  passingCriteriaJson: z.any().optional(),
+  customRemarks: z.string().optional(),
+});
+export type CreateMarksheetTemplateDTO = z.infer<typeof CreateMarksheetTemplateSchema>;
+
+export const UpdateMarksheetTemplateSchema = CreateMarksheetTemplateSchema.partial();
+export type UpdateMarksheetTemplateDTO = z.infer<typeof UpdateMarksheetTemplateSchema>;
+
+export const GenerateIndividualMarksheetSchema = z.object({
+  studentProfileId: z.string().min(1, 'Student ID is required'),
+  examTitle: z.string().min(1, 'Examination title is required'),
+  examType: z.string().optional().default('ANNUAL'),
+  academicSessionId: z.string().optional(),
+  templateId: z.string().optional(),
+  classTeacherRemarks: z.string().optional(),
+  principalRemarks: z.string().optional(),
+});
+export type GenerateIndividualMarksheetDTO = z.infer<typeof GenerateIndividualMarksheetSchema>;
+
+export const BulkGenerateMarksheetsSchema = z.object({
+  examTitle: z.string().min(1, 'Examination title is required'),
+  examType: z.string().optional().default('ANNUAL'),
+  academicSessionId: z.string().optional(),
+  className: z.string().optional(),
+  sectionName: z.string().optional(),
+  allEligible: z.boolean().optional().default(true),
+  templateId: z.string().optional(),
+  studentProfileIds: z.array(z.string()).optional(),
+  classTeacherRemarks: z.string().optional(),
+  principalRemarks: z.string().optional(),
+});
+export type BulkGenerateMarksheetsDTO = z.infer<typeof BulkGenerateMarksheetsSchema>;
+
+export const PublishMarksheetsSchema = z.object({
+  marksheetIds: z.array(z.string()).optional(),
+  action: z.enum(['PUBLISH', 'UNPUBLISH', 'WITHHOLD']).default('PUBLISH'),
+  examTitle: z.string().optional(),
+  className: z.string().optional(),
+});
+export type PublishMarksheetsDTO = z.infer<typeof PublishMarksheetsSchema>;
+
+export const CorrectMarksheetSchema = z.object({
+  marksheetId: z.string().min(1, 'Marksheet ID is required'),
+  reason: z.string().min(3, 'Correction justification reason is required'),
+  updatedSubjectMarks: z
+    .array(
+      z.object({
+        subjectCode: z.string(),
+        subjectName: z.string(),
+        theoryMarksObtained: z.number().min(0).optional(),
+        practicalMarksObtained: z.number().min(0).optional(),
+        remarks: z.string().optional(),
+      })
+    )
+    .optional(),
+  classTeacherRemarks: z.string().optional(),
+  principalRemarks: z.string().optional(),
+});
+export type CorrectMarksheetDTO = z.infer<typeof CorrectMarksheetSchema>;
+
+export const UpdateGradingCriteriaSchema = z.object({
+  schemeName: z.string().optional(),
+  passingPercentage: z.number().min(0).max(100).default(33),
+  divisionCriteria: z
+    .object({
+      distinction: z.number().default(75),
+      firstDivision: z.number().default(60),
+      secondDivision: z.number().default(45),
+      thirdDivision: z.number().default(33),
+    })
+    .optional(),
+  grades: z
+    .array(
+      z.object({
+        grade: z.string(),
+        minPercentage: z.number().min(0).max(100),
+        maxPercentage: z.number().min(0).max(100),
+        gradePoint: z.number().default(0),
+        description: z.string().optional(),
+      })
+    )
+    .min(1, 'At least one grade boundary is required'),
+});
+export type UpdateGradingCriteriaDTO = z.infer<typeof UpdateGradingCriteriaSchema>;
+
+
 
 
 

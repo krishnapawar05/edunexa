@@ -211,6 +211,9 @@ model School {
   questionBankItems   QuestionBankItem[]
   questionPapers      QuestionPaper[]
   assessmentAttempts  AssessmentAttempt[]
+  marksheetTemplates  MarksheetTemplate[]
+  marksheets          Marksheet[]
+  marksheetAudits     MarksheetCorrectionAudit[]
 
   @@index([slug])
   @@index([status])
@@ -356,6 +359,7 @@ model AcademicSession {
   enrollments StudentEnrollment[]
   examSchedules ExamSchedule[]
   admitCards    AdmitCard[]
+  marksheets    Marksheet[]
 
   @@unique([schoolId, name])
   @@index([schoolId, isCurrent])
@@ -453,6 +457,7 @@ model StudentProfile {
   submissions     AssignmentSubmission[]
   admitCards      AdmitCard[]
   assessmentAttempts AssessmentAttempt[]
+  marksheets      Marksheet[]
 
   @@index([admissionNumber])
   @@index([status])
@@ -1464,4 +1469,122 @@ model AssessmentAnswer {
 
   @@unique([attemptId, paperItemId])
   @@index([attemptId])
+}
+
+// ============================================================================
+// SECTION 7: PROFESSIONAL MARKSHEET & REPORT CARD GENERATION
+// ============================================================================
+
+enum MarksheetStatus {
+  DRAFT
+  ISSUED
+  PUBLISHED
+  WITHHELD
+  CORRECTED
+  CANCELLED
+}
+
+model MarksheetTemplate {
+  id                    String      @id @default(uuid())
+  schoolId              String
+  name                  String
+  examType              String?     @default("ALL")
+  isDefault             Boolean     @default(false)
+  isActive              Boolean     @default(true)
+  layoutStyle           String      @default("FORMAL_CBSE")
+  primaryColor          String      @default("#1e3a8a")
+  secondaryColor        String      @default("#d97706")
+  headerTextColor       String      @default("#ffffff")
+  logoUrl               String?
+  stampUrl              String?
+  principalSignatureUrl String?
+  teacherSignatureUrl   String?
+  showStudentPhoto      Boolean     @default(true)
+  showAttendance        Boolean     @default(true)
+  showRank              Boolean     @default(false)
+  showDivision          Boolean     @default(true)
+  showPracticalMarks    Boolean     @default(true)
+  gradingScaleJson      Json?
+  passingCriteriaJson   Json?
+  customRemarks         String?
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+
+  school                School      @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  marksheets            Marksheet[]
+
+  @@index([schoolId, isDefault])
+}
+
+model Marksheet {
+  id                   String          @id @default(uuid())
+  schoolId             String
+  studentProfileId     String
+  academicSessionId    String
+  templateId           String?
+  examTitle            String
+  examType             String          @default("ANNUAL")
+  marksheetNumber      String          @unique
+  version              Int             @default(1)
+  isLatest             Boolean         @default(true)
+  className            String
+  sectionName          String?
+  rollNumber           String?
+  status               MarksheetStatus @default(ISSUED)
+  totalMaxMarks        Float
+  totalMarksObtained   Float
+  overallPercentage    Float
+  grade                String
+  division             String?
+  isPassed             Boolean         @default(true)
+  attendancePercentage Float?
+  totalPresentDays     Int?
+  totalWorkingDays     Int?
+  classTeacherRemarks  String?
+  principalRemarks     String?
+  subjectMarksSnapshot Json
+  studentSnapshot      Json?
+  schoolSnapshot       Json?
+  qrToken              String          @unique
+  correctionReason     String?
+  correctedByUserId    String?
+  originalMarksheetId  String?
+  publishedAt          DateTime?
+  publishedByUserId    String?
+  issuedAt             DateTime        @default(now())
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+
+  school               School                     @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  student              StudentProfile             @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  academicSession      AcademicSession            @relation(fields: [academicSessionId], references: [id], onDelete: Cascade)
+  template             MarksheetTemplate?         @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  audits               MarksheetCorrectionAudit[]
+
+  @@index([schoolId, status])
+  @@index([schoolId, examTitle])
+  @@index([studentProfileId])
+  @@index([academicSessionId])
+  @@index([qrToken])
+}
+
+model MarksheetCorrectionAudit {
+  id                String    @id @default(uuid())
+  schoolId          String
+  marksheetId       String
+  initiatedByUserId String
+  approvedByUserId  String?
+  reason            String
+  previousSnapshot  Json
+  updatedSnapshot   Json
+  previousVersion   Int
+  newVersion        Int
+  status            String    @default("APPROVED")
+  createdAt         DateTime  @default(now())
+
+  school            School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  marksheet         Marksheet @relation(fields: [marksheetId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId])
+  @@index([marksheetId])
 }
