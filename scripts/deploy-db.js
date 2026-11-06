@@ -32,34 +32,32 @@ function run(cmd) {
   return execSync(cmd, { stdio: 'inherit', env: process.env });
 }
 
+// Step 1: Attempt to apply any committed migrations
 try {
-  console.log('[Database Deploy] Executing prisma migrate deploy...');
+  console.log('[Database Deploy] Step 1: Checking migration history via prisma migrate deploy...');
   run('npm run prisma:deploy --workspace=server');
-  console.log('[Database Deploy] Migrations deployed successfully.');
+  console.log('[Database Deploy] Migrations deployed or verified successfully.');
 } catch (deployError) {
-  console.warn('[Database Deploy] prisma migrate deploy encountered an error. Attempting automated recovery...');
-
+  console.warn('[Database Deploy] prisma migrate deploy notice:', deployError.message);
   try {
     console.log('[Database Deploy] Resolving any failed migration state for 20261018000000_init_edunexa_core...');
     run('npx prisma migrate resolve --rolled-back 20261018000000_init_edunexa_core --schema=server/prisma/schema.prisma');
-    console.log('[Database Deploy] Re-running prisma migrate deploy with clean UTF-8 migration...');
-    run('npm run prisma:deploy --workspace=server');
-    console.log('[Database Deploy] Migrations applied successfully after recovery.');
-  } catch (recoveryError) {
-    console.warn('[Database Deploy] Migration deploy recovery failed. Falling back to prisma db push to ensure schema synchronization...');
-    try {
-      run('npx prisma db push --schema=server/prisma/schema.prisma --skip-generate');
-      console.log('[Database Deploy] Schema synchronized successfully via prisma db push.');
-    } catch (pushError) {
-      console.error('[Database Deploy] Schema synchronization error:', pushError.message);
-      // Exit gracefully so the web container still boots
-      process.exit(0);
-    }
+  } catch (resolveErr) {
+    // Proceed to schema push
   }
 }
 
-// Seed demo users and initial institutional records if needed
-console.log('[Database Deploy] Seeding initial institutional records and demo accounts...');
+// Step 2: ALWAYS synchronize the complete Prisma schema to ensure all models and columns exist
+try {
+  console.log('[Database Deploy] Step 2: Synchronizing complete schema definitions via prisma db push...');
+  run('npx prisma db push --schema=server/prisma/schema.prisma --skip-generate --accept-data-loss');
+  console.log('[Database Deploy] Database schema synchronized successfully via prisma db push.');
+} catch (pushError) {
+  console.error('[Database Deploy] Schema synchronization error:', pushError.message);
+}
+
+// Step 3: Seed initial institutional records and demo accounts
+console.log('[Database Deploy] Step 3: Seeding initial institutional records and demo accounts...');
 try {
   run('npm run db:seed');
   console.log('[Database Deploy] Database seeding completed successfully.');

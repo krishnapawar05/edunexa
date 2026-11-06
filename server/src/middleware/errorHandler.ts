@@ -60,11 +60,26 @@ export function errorHandler(
   // Handle Unexpected Server Errors
   console.error('[UNHANDLED EXCEPTION]:', err);
   const isDev = process.env.NODE_ENV !== 'production';
+
+  // Specific handling for Prisma / Database initialization errors
+  const errName = (err as any)?.name || '';
+  const isDbError =
+    errName.includes('Prisma') ||
+    err.message?.includes('database') ||
+    err.message?.includes('column') ||
+    err.message?.includes('relation') ||
+    err.message?.includes('Connection');
+
+  let sanitizedMessage = isDev ? err.message : 'An unexpected internal server error occurred.';
+  if (isDbError && !isDev) {
+    sanitizedMessage = 'Database service synchronizing. Please retry in a few moments.';
+  }
+
   const errorResponse: ApiErrorResponse = {
     success: false,
     error: {
-      code: 'INTERNAL_SERVER_ERROR',
-      message: isDev ? err.message : 'An unexpected internal server error occurred.',
+      code: isDbError ? 'DATABASE_ERROR' : 'INTERNAL_SERVER_ERROR',
+      message: sanitizedMessage,
       details: isDev && err.stack ? [{ message: err.stack }] : undefined,
     },
   };

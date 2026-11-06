@@ -24,9 +24,9 @@ export async function checkDatabaseConnection(): Promise<{ connected: boolean; l
 
   const start = Date.now();
   try {
-    // Fast timeout of 500ms so we don't stall requests if Postgres isn't running
+    // 4000ms timeout for reliable connections across cloud containers and cold starts
     const timeoutPromise = new Promise<{ connected: false; error: string }>((_, reject) =>
-      setTimeout(() => reject(new Error('Database connection check timed out (500ms)')), 500)
+      setTimeout(() => reject(new Error('Database connection check timed out (4000ms)')), 4000)
     );
 
     await Promise.race([
