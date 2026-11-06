@@ -513,7 +513,7 @@ Respond ONLY with valid JSON. Do not wrap in markdown backticks or commentary.`;
   /**
    * Internal low-level provider caller with timeouts and error wrapping
    */
-  private async callAiProvider(prompt: string): Promise<string> {
+  public async callAiProvider(prompt: string): Promise<string> {
     // Check if test override is registered
     if (this.testProviderOverride) {
       return this.testProviderOverride(prompt);

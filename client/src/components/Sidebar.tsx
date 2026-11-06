@@ -32,6 +32,12 @@ import {
   Database,
   CheckSquare,
   X,
+  Video,
+  Library,
+  MessageSquare,
+  BarChart3,
+  Bot,
+  TrendingUp,
 } from 'lucide-react';
 import { useSchoolBranding } from '../context/SchoolBrandingContext.js';
 import { getStoredUser, clearAuthSession } from '../services/api.js';
@@ -76,14 +82,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
       case 'SUPER_ADMIN':
         return [
           { id: 'overview', path: '/superadmin', label: 'Platform Telemetry', icon: LayoutDashboard },
+          { id: 'users', path: '/superadmin/users', label: 'All Users & Admins', icon: KeyRound },
+          { id: 'permissions', path: '/superadmin/permissions', label: 'RBAC & Module Access', icon: ShieldCheck },
+          { id: 'governance', path: '/superadmin/governance', label: 'Governance & Approvals', icon: Award },
           { id: 'schools', path: '/superadmin/schools', label: 'School Tenants', icon: Building2 },
           { id: 'subscriptions', path: '/superadmin/subscriptions', label: 'Subscriptions & Plans', icon: CreditCard },
+          { id: 'chatbot', path: '/admin/chatbot', label: 'AI Chatbot & FAQs', icon: Bot },
+          { id: 'communication', path: '/superadmin/communication', label: 'Communication Oversight', icon: MessageSquare },
           { id: 'audit', path: '/superadmin/audit-logs', label: 'Administrative Audit Logs', icon: Layers },
           { id: 'settings', path: '/superadmin/settings', label: 'Platform Settings', icon: Settings },
         ];
       case 'SCHOOL_ADMIN':
         return [
           { id: 'overview', path: '/admin', label: 'School Overview', icon: LayoutDashboard },
+          { id: 'messages', path: '/admin/messages', label: 'Internal Messages', icon: MessageSquare },
+          { id: 'calendar', path: '/admin/calendar', label: 'School Calendar & Meet', icon: Calendar },
+          { id: 'chatbot', path: '/admin/chatbot', label: 'AI Chatbot & FAQs', icon: Bot },
+          { id: 'marketing', path: '/admin/marketing', label: 'SEO & Digital Marketing', icon: TrendingUp },
           { id: 'website', path: '/admin/website', label: 'Website CMS & Gallery', icon: Globe },
           { id: 'users', path: '/admin/users', label: 'User & Access Management', icon: KeyRound },
           { id: 'students', path: '/admin/students', label: 'Student Directory & SIS', icon: GraduationCap },
@@ -92,6 +107,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           { id: 'id-cards', path: '/admin/id-cards', label: 'Virtual ID Cards & QR', icon: IdCard },
           { id: 'admit-cards', path: '/admin/admit-cards', label: 'Admit Cards & Hall Tickets', icon: FileText },
           { id: 'marksheets', path: '/admin/marksheets', label: 'Marksheets & Report Cards', icon: Award },
+          { id: 'library', path: '/admin/library', label: 'Library Management', icon: Library },
           { id: 'attendance', path: '/admin/attendance', label: 'Daily Attendance', icon: CalendarCheck },
           { id: 'fees', path: '/admin/fees', label: 'Fees & Invoices', icon: CreditCard },
           { id: 'events-notices', path: '/admin/events-notices', label: 'Events & Notices', icon: Bell },
@@ -99,6 +115,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
       case 'PRINCIPAL':
         return [
           { id: 'overview', path: '/admin', label: 'Academic Overview', icon: LayoutDashboard },
+          { id: 'messages', path: '/admin/messages', label: 'Internal Messages', icon: MessageSquare },
+          { id: 'calendar', path: '/admin/calendar', label: 'School Calendar & Meet', icon: Calendar },
+          { id: 'chatbot', path: '/admin/chatbot', label: 'AI Chatbot & FAQs', icon: Bot },
+          { id: 'marketing', path: '/admin/marketing', label: 'SEO & Digital Marketing', icon: TrendingUp },
           { id: 'website', path: '/admin/website', label: 'Website CMS & Gallery', icon: Globe },
           { id: 'users', path: '/admin/users', label: 'User & Access Management', icon: KeyRound },
           { id: 'students', path: '/admin/students', label: 'Student Directory & SIS', icon: GraduationCap },
@@ -107,6 +127,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           { id: 'id-cards', path: '/admin/id-cards', label: 'Virtual ID Cards & QR', icon: IdCard },
           { id: 'admit-cards', path: '/admin/admit-cards', label: 'Admit Cards & Hall Tickets', icon: FileText },
           { id: 'marksheets', path: '/admin/marksheets', label: 'Marksheets & Report Cards', icon: Award },
+          { id: 'library', path: '/admin/library', label: 'Library Management', icon: Library },
           { id: 'attendance', path: '/admin/attendance', label: 'Daily Attendance', icon: CalendarCheck },
           { id: 'fees', path: '/admin/fees', label: 'Fees & Invoices', icon: CreditCard },
           { id: 'events-notices', path: '/admin/events-notices', label: 'Events & Notices', icon: Bell },
@@ -114,6 +135,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       case 'TEACHER':
         return [
           { id: 'overview', path: '/teacher', label: 'Teacher Schedule', icon: LayoutDashboard },
+          { id: 'messages', path: '/teacher/messages', label: 'Internal Chat & Groups', icon: MessageSquare },
+          { id: 'calendar', path: '/teacher/calendar', label: 'Academic Calendar & Meet', icon: Calendar },
+          { id: 'academic-reports', path: '/teacher/academic-reports', label: 'Academic Analytics', icon: BarChart3 },
+          { id: 'meetings', path: '/teacher/meetings', label: 'PTM & Consultations', icon: Video },
+          { id: 'remarks', path: '/teacher/remarks', label: 'Student Remarks', icon: MessageSquare },
           { id: 'id-card', path: '/teacher/id-card', label: 'My Virtual ID Card', icon: IdCard },
           { id: 'attendance', path: '/teacher/attendance', label: 'Mark Attendance', icon: CalendarCheck },
           { id: 'question-bank', path: '/teacher/question-bank', label: 'Question Bank (10 Types)', icon: Database },
@@ -130,10 +156,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
       case 'STUDENT':
         return [
           { id: 'overview', path: '/student', label: 'Student Dashboard', icon: LayoutDashboard },
+          { id: 'messages', path: '/student/messages', label: 'Class Messages & Groups', icon: MessageSquare },
+          { id: 'calendar', path: '/student/calendar', label: 'Academic Calendar', icon: Calendar },
           { id: 'id-card', path: '/student/id-card', label: 'My Virtual ID Card', icon: IdCard },
           { id: 'admit-cards', path: '/student/admit-cards', label: 'Exam Admit Cards', icon: FileText },
           { id: 'assessments', path: '/student/assessments', label: 'Assessments & Quizzes', icon: FileQuestion },
           { id: 'results', path: '/student/results', label: 'Academic Results', icon: Award },
+          { id: 'library', path: '/student/library', label: 'Library Lending', icon: Library },
+          { id: 'admission', path: '/student/admission', label: 'Admission Dossier', icon: UserCheck },
+          { id: 'meetings', path: '/student/meetings', label: 'Teacher Meetings', icon: Video },
           { id: 'timetable', path: '/student/timetable', label: 'Class Timetable', icon: Calendar },
           { id: 'homework', path: '/student/homework', label: 'Homework & Tasks', icon: BookOpen },
           { id: 'attendance', path: '/student/attendance', label: 'Attendance Record', icon: CalendarCheck },
@@ -145,10 +176,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
       case 'PARENT':
         return [
           { id: 'overview', path: '/parent', label: 'Parent Dashboard', icon: LayoutDashboard },
+          { id: 'messages', path: '/parent/messages', label: 'Teacher Messaging', icon: MessageSquare },
+          { id: 'calendar', path: '/parent/calendar', label: 'School Calendar & Events', icon: Calendar },
+          { id: 'homework', path: '/parent/homework', label: 'Homework & Tasks', icon: BookOpen },
           { id: 'admit-cards', path: '/parent/admit-cards', label: 'Ward Admit Cards', icon: FileText },
           { id: 'results', path: '/parent/results', label: 'Published Report Cards', icon: Award },
           { id: 'attendance', path: '/parent/attendance', label: 'Attendance Records', icon: CalendarCheck },
           { id: 'fees', path: '/parent/fees', label: 'Fee Payments & Invoices', icon: CreditCard },
+          { id: 'receipts', path: '/parent/receipts', label: 'Payment Receipts', icon: Receipt },
+          { id: 'library', path: '/parent/library', label: 'Library Ledger', icon: Library },
+          { id: 'meetings', path: '/parent/meetings', label: 'PTM Consultations', icon: Video },
+          { id: 'admission', path: '/parent/admission', label: 'Admission Dossier', icon: UserCheck },
           { id: 'notices', path: '/parent/notices', label: 'School Notices', icon: Bell },
         ];
       case 'EXAM_COORDINATOR':
@@ -178,6 +216,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
           { id: 'invoices', path: '/accounts/invoices', label: 'Student Invoices', icon: CreditCard },
           { id: 'structures', path: '/accounts/structures', label: 'Fee Structures', icon: FileSpreadsheet },
           { id: 'reconciliation', path: '/accounts/reconciliation', label: 'Bank Reconciliations', icon: Receipt },
+        ];
+      case 'LIBRARIAN':
+        return [
+          { id: 'library', path: '/library', label: 'Library Management', icon: Library },
+          { id: 'inventory', path: '/library', label: 'Book Inventory', icon: BookOpen },
         ];
       default:
         return [

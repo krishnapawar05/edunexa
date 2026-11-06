@@ -21,6 +21,14 @@ import admitCardsRouter from './modules/admitcards/admitcards.routes.js';
 import assessmentRouter from './modules/assessment/assessment.routes.js';
 import marksheetsRouter from './modules/marksheets/marksheets.routes.js';
 import aiRouter from './modules/ai/ai.routes.js';
+import portalsRouter from './modules/portals/portals.routes.js';
+import communicationRouter from './modules/communication/communication.routes.js';
+import documentsRouter from './modules/documents/documents.routes.js';
+import { libraryRouter } from './modules/library/library.routes.js';
+import { marketingController } from './modules/website/marketing.controller.js';
+import notificationsRouter from './modules/notifications/notifications.routes.js';
+import governanceRouter from './modules/superadmin/governance.routes.js';
+import storageRouter from './modules/storage/storage.routes.js';
 
 export function createApp(): express.Application {
   const app = express();
@@ -75,9 +83,14 @@ export function createApp(): express.Application {
   // Health and Diagnostic Routes
   app.use('/api/health', healthRouter);
 
+  // SEO & Web Crawler Endpoints (Root level)
+  app.get('/sitemap.xml', (req, res, next) => marketingController.getSitemapXml(req, res, next));
+  app.get('/robots.txt', (req, res, next) => marketingController.getRobotsTxt(req, res, next));
+
   // Modular API Endpoints (v1)
   app.use('/api/v1/auth', authRouter);
   app.use('/api/v1/superadmin', superAdminRouter);
+  app.use('/api/v1/superadmin/governance', governanceRouter);
   app.use('/api/v1/core', coreRouter);
   app.use('/api/v1/academic', academicRouter);
   app.use('/api/v1/operations', operationsRouter);
@@ -89,6 +102,15 @@ export function createApp(): express.Application {
   app.use('/api/v1/assessments', assessmentRouter);
   app.use('/api/v1/marksheets', marksheetsRouter);
   app.use('/api/v1/ai', aiRouter);
+  app.use('/api/v1/portals', portalsRouter);
+  app.use('/api/v1/communication', communicationRouter);
+  app.use('/api/v1/documents', documentsRouter);
+  app.use('/api/v1/library', libraryRouter);
+  app.use('/api/v1/notifications', notificationsRouter);
+  app.use('/api/v1/storage', storageRouter);
+
+  // Serve strictly public assets from /uploads/public
+  app.use('/uploads/public', express.static(path.resolve(process.cwd(), 'uploads/public')));
   if (env.nodeEnv !== 'production') {
     app.use('/api/v1/security-test', securityTestRouter);
   }

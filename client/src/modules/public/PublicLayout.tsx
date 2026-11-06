@@ -23,11 +23,17 @@ import {
   Compass,
   GraduationCap,
   Sparkles,
+  PhoneCall,
+  Send,
+  ExternalLink,
 } from 'lucide-react';
 import { useSchoolBranding } from '../../context/SchoolBrandingContext.js';
 import { ThemeSwitcher } from '../../components/ThemeSwitcher.js';
-import { coreApi } from '../../services/api.js';
+import { coreApi, marketingApi } from '../../services/api.js';
 import { AdmissionEnquiryModal } from '../../components/AdmissionEnquiryModal.js';
+import { ChatbotWidget } from '../../components/ChatbotWidget.js';
+import { CallbackRequestModal } from '../../components/CallbackRequestModal.js';
+import { captureAndStoreUtmParams, trackGa4Event } from '../../utils/utmTracker.js';
 
 export const PublicLayout: React.FC = () => {
   const { branding } = useSchoolBranding();
@@ -50,6 +56,127 @@ export const PublicLayout: React.FC = () => {
     city: 'New Delhi',
     prevSchool: '',
   });
+
+  // Section 14 Marketing & SEO states
+  const [showCallbackModal, setShowCallbackModal] = useState(false);
+  const [activeBanners, setActiveBanners] = useState<any[]>([]);
+  const [dismissedBannerIds, setDismissedBannerIds] = useState<string[]>([]);
+  const [marketingConfig, setMarketingConfig] = useState<any>(null);
+  const [newsletterEmail, setNewsletterEmail] = useState('');
+  const [newsletterSubscribed, setNewsletterSubscribed] = useState(false);
+  const [newsletterLoading, setNewsletterLoading] = useState(false);
+  const [newsletterMsg, setNewsletterMsg] = useState<string | null>(null);
+
+  // 1. Capture UTM parameters from URL
+  useEffect(() => {
+    captureAndStoreUtmParams();
+  }, [location.pathname, location.search]);
+
+  // 2. Fetch SEO Metadata & Schema.org JSON-LD dynamically per route
+  useEffect(() => {
+    marketingApi
+      .getPageSeo(location.pathname)
+      .then((res) => {
+        if (res?.data) {
+          const seo = res.data;
+          document.title = seo.pageTitle || `${branding.schoolName} - Excellence in Education`;
+
+          // Update description
+          let metaDesc = document.querySelector('meta[name="description"]');
+          if (!metaDesc) {
+            metaDesc = document.createElement('meta');
+            metaDesc.setAttribute('name', 'description');
+            document.head.appendChild(metaDesc);
+          }
+          metaDesc.setAttribute('content', seo.metaDescription || '');
+
+          // Update canonical URL
+          let canonical = document.querySelector('link[rel="canonical"]');
+          if (!canonical && seo.canonicalUrl) {
+            canonical = document.createElement('link');
+            canonical.setAttribute('rel', 'canonical');
+            document.head.appendChild(canonical);
+          }
+          if (canonical && seo.canonicalUrl) {
+            canonical.setAttribute('href', seo.canonicalUrl);
+          }
+
+          // OpenGraph tags
+          const ogMap: Record<string, string | undefined> = {
+            'og:title': seo.ogTitle || seo.pageTitle,
+            'og:description': seo.ogDescription || seo.metaDescription,
+            'og:image': seo.ogImage || branding.logoUrl,
+            'og:url': window.location.href,
+          };
+          Object.entries(ogMap).forEach(([prop, val]) => {
+            if (val) {
+              let el = document.querySelector(`meta[property="${prop}"]`);
+              if (!el) {
+                el = document.createElement('meta');
+                el.setAttribute('property', prop);
+                document.head.appendChild(el);
+              }
+              el.setAttribute('content', val);
+            }
+          });
+        }
+      })
+      .catch((err) => console.debug('Page SEO fetch skipped', err));
+
+    // Structured Data JSON-LD
+    marketingApi
+      .getSchemaMarkup()
+      .then((res) => {
+        if (res?.data) {
+          let scriptEl = document.getElementById('school-schema-ld');
+          if (!scriptEl) {
+            scriptEl = document.createElement('script');
+            scriptEl.id = 'school-schema-ld';
+            scriptEl.setAttribute('type', 'application/ld+json');
+            document.head.appendChild(scriptEl);
+          }
+          scriptEl.textContent = JSON.stringify(res.data);
+        }
+      })
+      .catch((err) => console.debug('Schema LD skipped', err));
+  }, [location.pathname, branding.schoolName, branding.logoUrl]);
+
+  // 3. Fetch Active Marketing Banners & Integrations Config
+  useEffect(() => {
+    marketingApi
+      .listPublicBanners()
+      .then((banners) => {
+        if (Array.isArray(banners)) setActiveBanners(banners);
+      })
+      .catch(() => {});
+
+    marketingApi
+      .getMarketingConfig()
+      .then((res) => {
+        if (res?.data) setMarketingConfig(res.data);
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleNewsletterSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newsletterEmail || !newsletterEmail.includes('@')) {
+      setNewsletterMsg('Please provide a valid email address.');
+      return;
+    }
+    setNewsletterLoading(true);
+    setNewsletterMsg(null);
+    try {
+      await marketingApi.subscribeNewsletter(newsletterEmail);
+      setNewsletterSubscribed(true);
+      setNewsletterEmail('');
+      trackGa4Event('subscribe_newsletter', { source: 'FOOTER' });
+    } catch (err: any) {
+      setNewsletterMsg(err.message || 'Unable to subscribe. Please try again.');
+    } finally {
+      setNewsletterLoading(false);
+    }
+  };
 
   // Close mobile menu and dropdown on route change
   useEffect(() => {
@@ -148,6 +275,7 @@ export const PublicLayout: React.FC = () => {
 
   // Secondary links for "More" dropdown
   const secondaryNavLinks = [
+    { to: '/blog', label: 'School Blog & Hub', icon: BookOpen },
     { to: '/principal-message', label: "Principal's Desk", icon: Award },
     { to: '/departments', label: 'Laboratories & Depts', icon: Building },
     { to: '/events', label: 'School Events', icon: Sparkles },
@@ -156,10 +284,11 @@ export const PublicLayout: React.FC = () => {
     { to: '/careers', label: 'Career Opportunities', icon: Briefcase },
   ];
 
-  // All 13 navigation links for mobile drawer
+  // All navigation links for mobile drawer
   const allNavLinks = [
     { to: '/', label: 'Home', icon: Compass },
     { to: '/about', label: 'About School & Story', icon: Building },
+    { to: '/blog', label: 'School Blog & Knowledge Hub', icon: BookOpen },
     { to: '/principal-message', label: "Principal's Desk", icon: Award },
     { to: '/academics', label: 'Academics & Curriculum', icon: BookOpen },
     { to: '/departments', label: 'Laboratories & Depts', icon: Building },
@@ -177,6 +306,41 @@ export const PublicLayout: React.FC = () => {
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--academic-warm-white)', color: 'var(--text-primary)' }}>
+      {/* Dynamic Admission Open / Promotional Marketing Banner */}
+      {activeBanners
+        .filter((b) => b.isPublished && !dismissedBannerIds.includes(b.id) && b.displayPosition === 'TOP_BAR')
+        .slice(0, 1)
+        .map((banner) => (
+          <div
+            key={banner.id}
+            className="bg-gradient-to-r from-amber-600 via-amber-500 to-yellow-600 text-slate-950 px-4 py-2 text-xs font-semibold flex items-center justify-between shadow-md relative z-30"
+          >
+            <div className="max-w-6xl mx-auto flex items-center justify-center gap-3 flex-wrap text-center w-full">
+              <span className="px-2 py-0.5 bg-black/15 rounded text-[11px] font-black uppercase tracking-wider">
+                {banner.bannerType.replace('_', ' ')}
+              </span>
+              <span className="font-bold">{banner.title}</span>
+              {banner.description && <span className="opacity-90 hidden md:inline">— {banner.description}</span>}
+              {banner.ctaLink && (
+                <Link
+                  to={banner.ctaLink}
+                  onClick={() => trackGa4Event('banner_click', { banner_title: banner.title, banner_id: banner.id })}
+                  className="inline-flex items-center gap-1 px-3 py-1 bg-slate-950 text-white rounded-lg text-xs font-bold hover:bg-slate-800 transition"
+                >
+                  {banner.ctaText || 'Learn More'} <ArrowRight size={12} />
+                </Link>
+              )}
+            </div>
+            <button
+              onClick={() => setDismissedBannerIds((prev) => [...prev, banner.id])}
+              className="p-1 hover:bg-black/10 rounded text-slate-900 transition shrink-0"
+              title="Dismiss announcement"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        ))}
+
       {/* Top Contact Strip (Deep Forest Green with Gold Accent Border) */}
       <header className="ed-public-topbar">
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-5)', flexWrap: 'wrap' }}>
@@ -192,6 +356,27 @@ export const PublicLayout: React.FC = () => {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+          {/* Quick Callback Trigger */}
+          <button
+            onClick={() => setShowCallbackModal(true)}
+            style={{
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              border: 'none',
+              color: '#ffffff',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              fontWeight: 700,
+              padding: '3px 10px',
+              borderRadius: 'var(--radius-xs)',
+              fontSize: '0.74rem',
+              cursor: 'pointer',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
+            }}
+          >
+            <PhoneCall size={11} /> Request Callback
+          </button>
+
           <Link
             to="/verify-id"
             style={{
@@ -691,6 +876,58 @@ export const PublicLayout: React.FC = () => {
 
       {/* Official Institutional Footer (St. Joseph's Inspiration - Forest Green) */}
       <footer className="ed-academic-footer">
+        {/* Newsletter & Marketing Bar (Section 14) */}
+        <div className="ed-footer-newsletter-wrap">
+          <div className="ed-public-container">
+            <div className="ed-footer-newsletter-card">
+              <div className="ed-footer-newsletter-info">
+                <h3 className="ed-footer-newsletter-title">
+                  <Mail className="w-5 h-5" style={{ color: '#f59e0b' }} />
+                  <span>Subscribe to School Newsletter & Updates</span>
+                </h3>
+                <p className="ed-footer-newsletter-desc">
+                  Receive academic circulars, exam notifications, and parenting insights directly in your inbox.
+                </p>
+              </div>
+
+              {newsletterSubscribed ? (
+                <div className="ed-footer-newsletter-success">
+                  <CheckCircle size={16} style={{ color: '#34d399' }} />
+                  <span>Thank you for subscribing!</span>
+                </div>
+              ) : (
+                <form onSubmit={handleNewsletterSubmit} className="ed-footer-newsletter-form">
+                  <input
+                    type="email"
+                    required
+                    placeholder="Enter your email address..."
+                    value={newsletterEmail}
+                    onChange={(e) => setNewsletterEmail(e.target.value)}
+                    className="ed-footer-newsletter-input"
+                  />
+                  <button
+                    type="submit"
+                    disabled={newsletterLoading}
+                    className="ed-footer-newsletter-btn"
+                  >
+                    {newsletterLoading ? '...' : (
+                      <>
+                        <Send size={13} />
+                        <span>Subscribe</span>
+                      </>
+                    )}
+                  </button>
+                </form>
+              )}
+            </div>
+            {newsletterMsg && (
+              <p style={{ fontSize: '0.82rem', color: '#fde68a', textAlign: 'center', marginTop: '0.65rem' }}>
+                {newsletterMsg}
+              </p>
+            )}
+          </div>
+        </div>
+
         <div className="ed-public-container">
           <div className="ed-footer-columns">
             {/* School Profile Column */}
@@ -709,6 +946,28 @@ export const PublicLayout: React.FC = () => {
               <p style={{ color: '#cbd5e1', fontSize: '0.84rem', maxWidth: '360px', lineHeight: 1.65, marginBottom: '14px' }}>
                 A premier co-educational institution committed to academic excellence, discipline, scientific inquiry, and moral character. Affiliated to CBSE, New Delhi (Affiliation Code: {branding.code}).
               </p>
+
+              {/* Social Channels from Marketing Config */}
+              {marketingConfig && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+                  {marketingConfig.facebookUrl && (
+                    <a href={marketingConfig.facebookUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#cbd5e1' }} title="Facebook">
+                      <ExternalLink size={14} />
+                    </a>
+                  )}
+                  {marketingConfig.instagramUrl && (
+                    <a href={marketingConfig.instagramUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#cbd5e1' }} title="Instagram">
+                      <ExternalLink size={14} />
+                    </a>
+                  )}
+                  {marketingConfig.youtubeUrl && (
+                    <a href={marketingConfig.youtubeUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#cbd5e1' }} title="YouTube">
+                      <ExternalLink size={14} />
+                    </a>
+                  )}
+                </div>
+              )}
+
               <div style={{ fontSize: '0.76rem', color: '#94a3b8' }}>
                 © {new Date().getFullYear()} {branding.schoolName}. All institutional rights reserved.
               </div>
@@ -721,6 +980,7 @@ export const PublicLayout: React.FC = () => {
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <Link to="/about" className="ed-academic-footer-link">Our Heritage & Story</Link>
+                <Link to="/blog" className="ed-academic-footer-link">School Blog & Knowledge Hub</Link>
                 <Link to="/principal-message" className="ed-academic-footer-link">Principal's Desk</Link>
                 <Link to="/faculty" className="ed-academic-footer-link">Faculty & Mentors</Link>
                 <Link to="/gallery" className="ed-academic-footer-link">Campus Facilities</Link>
@@ -754,6 +1014,24 @@ export const PublicLayout: React.FC = () => {
                 <span style={{ color: '#cbd5e1', fontSize: '0.84rem' }}>
                   Phone: {branding.contactPhone}
                 </span>
+                <button
+                  onClick={() => setShowCallbackModal(true)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--academic-gold-500)',
+                    fontWeight: 600,
+                    fontSize: '0.84rem',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    padding: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
+                >
+                  <PhoneCall size={12} /> Request an Admissions Callback →
+                </button>
                 <Link to="/login" style={{ color: 'var(--academic-gold-500)', fontWeight: 600, fontSize: '0.84rem', textDecoration: 'none', marginTop: '4px' }}>
                   Staff & Student ERP Portal →
                 </Link>
@@ -768,6 +1046,16 @@ export const PublicLayout: React.FC = () => {
 
       {/* Dynamic Admission Enquiry Popup Modal */}
       <AdmissionEnquiryModal />
+
+      {/* Quick Callback Request Modal (Section 14) */}
+      <CallbackRequestModal
+        isOpen={showCallbackModal}
+        onClose={() => setShowCallbackModal(false)}
+        schoolName={branding.schoolName}
+      />
+
+      {/* Floating Public AI Chatbot & WhatsApp Integration */}
+      <ChatbotWidget schoolIdentifier={branding?.schoolName} />
     </div>
   );
 };

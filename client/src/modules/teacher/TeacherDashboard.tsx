@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import {
   CalendarCheck,
   FileQuestion,
@@ -17,6 +18,11 @@ import {
   Edit3,
   Loader2,
   RefreshCw,
+  BarChart3,
+  Video,
+  MessageSquare,
+  IdCard,
+  FileText,
 } from 'lucide-react';
 import {
   academicApi,
@@ -321,6 +327,49 @@ export const TeacherDashboard: React.FC = () => {
           <span className="value" style={{ color: 'var(--success-solid)' }}>Connected</span>
           <span className="subtitle">Real PostgreSQL Persistence</span>
         </div>
+      </div>
+
+      {/* Quick Action Navigation Hub */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+        <Link to="/teacher/academic-reports" className="ed-card" style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', color: 'inherit', transition: 'all 0.15s ease' }}>
+          <BarChart3 size={18} style={{ color: 'var(--color-primary)' }} />
+          <div>
+            <div style={{ fontSize: '0.84rem', fontWeight: 700 }}>Academic Analytics</div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Class Averages & Ranks</div>
+          </div>
+        </Link>
+
+        <Link to="/teacher/meetings" className="ed-card" style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', color: 'inherit', transition: 'all 0.15s ease' }}>
+          <Video size={18} style={{ color: 'var(--color-primary)' }} />
+          <div>
+            <div style={{ fontSize: '0.84rem', fontWeight: 700 }}>PTM Consultations</div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Google Meet & Schedule</div>
+          </div>
+        </Link>
+
+        <Link to="/teacher/remarks" className="ed-card" style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', color: 'inherit', transition: 'all 0.15s ease' }}>
+          <MessageSquare size={18} style={{ color: 'var(--color-primary)' }} />
+          <div>
+            <div style={{ fontSize: '0.84rem', fontWeight: 700 }}>Student Remarks</div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Observations & Feedback</div>
+          </div>
+        </Link>
+
+        <Link to="/teacher/id-card" className="ed-card" style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', color: 'inherit', transition: 'all 0.15s ease' }}>
+          <IdCard size={18} style={{ color: 'var(--color-primary)' }} />
+          <div>
+            <div style={{ fontSize: '0.84rem', fontWeight: 700 }}>Teacher Virtual ID</div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>QR Card & Section 4 Pass</div>
+          </div>
+        </Link>
+
+        <Link to="/teacher/evaluations" className="ed-card" style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', color: 'inherit', transition: 'all 0.15s ease' }}>
+          <FileText size={18} style={{ color: 'var(--color-primary)' }} />
+          <div>
+            <div style={{ fontSize: '0.84rem', fontWeight: 700 }}>Exam Evaluations</div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Section 6 Grading Studio</div>
+          </div>
+        </Link>
       </div>
 
       {/* Main Grid: Today's Schedule & Fast Attendance */}

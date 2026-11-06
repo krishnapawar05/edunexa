@@ -21,6 +21,7 @@ enum PlatformRole {
   HR_STAFF
   ACCOUNTS
   EXAM_COORDINATOR
+  LIBRARIAN
 }
 
 enum TenantStatus {
@@ -145,6 +146,9 @@ enum EnquiryStatus {
   NEW
   CONTACTED
   FOLLOW_UP_REQUIRED
+  INTERESTED
+  APPLICATION_STARTED
+  APPLICATION_SUBMITTED
   CONVERTED
   CLOSED
 }
@@ -214,6 +218,47 @@ model School {
   marksheetTemplates  MarksheetTemplate[]
   marksheets          Marksheet[]
   marksheetAudits     MarksheetCorrectionAudit[]
+  libraryBooks        LibraryBook[]
+  bookIssues          BookIssue[]
+  meetings            Meeting[]
+  communicationMsgs   CommunicationMessage[]
+  studentRemarks      StudentRemark[]
+  conversations       Conversation[]
+  messageReports      MessageReport[]
+  communicationAudits CommunicationAuditLog[]
+  commPermissionConfig CommunicationPermissionConfig?
+  calendarEvents      CalendarEvent[]
+  googleIntegration   GoogleWorkspaceIntegration?
+  studentCertificates StudentCertificate[]
+  documentAccessLogs  DocumentAccessLog[]
+  librarySetting      LibrarySetting?
+  staffPayrolls       StaffPayroll[]
+  transportVehicles   TransportVehicle[]
+  transportDrivers    TransportDriver[]
+  transportRoutes     TransportRoute[]
+  transportAllocations StudentTransportAllocation[]
+  inventoryCategories InventoryCategory[]
+  inventoryItems      InventoryItem[]
+  inventoryTransactions InventoryTransaction[]
+  chatbotFaqs         ChatbotFAQ[]
+  chatbotConfig       ChatbotConfiguration?
+  chatbotEscalations  ChatbotEscalation[]
+  pageSeos            PageSEO[]
+  marketingConfig     MarketingIntegration?
+  blogArticles        BlogArticle[]
+  marketingBanners    MarketingBanner[]
+  callbackRequests    CallbackRequest[]
+  newsletterSubscribers NewsletterSubscriber[]
+  leadFollowUps       LeadFollowUp[]
+  analyticsEvents     AnalyticsEvent[]
+  notificationEventConfigs   NotificationEventConfig[]
+  notificationTemplates      NotificationTemplate[]
+  notificationDeliveryLogs   NotificationDeliveryLog[]
+  notificationProviderConfig NotificationProviderConfig?
+  modulePermissions          ModulePermission[]
+  backupRecords              BackupRecord[]
+  marksheetPublicationRequests MarksheetPublicationRequest[]
+  secureFiles                SecureFile[]
 
   @@index([slug])
   @@index([status])
@@ -238,6 +283,14 @@ model User {
   lockoutUntil       DateTime?
   tokenVersion       Int          @default(0)
 
+  // Section 17 MFA / OTP Security
+  mfaEnabled         Boolean      @default(false)
+  mfaSecret          String?
+  mfaOtpCode         String?
+  mfaOtpExpiresAt    DateTime?
+  mfaRecoveryCodes   String[]     @default([])
+  mfaMethod          String       @default("EMAIL_OTP")
+
   createdAt          DateTime     @default(now())
   updatedAt          DateTime     @updatedAt
 
@@ -247,6 +300,20 @@ model User {
   invitations        AccountInvitation[]
   passwordResetTokens PasswordResetToken[]
   paymentTransactions PaymentTransaction[]
+  conversationParticipants ConversationParticipant[]
+  chatMessages             ChatMessage[]
+  chatMessageReceipts      ChatMessageReceipt[]
+  reportedMessages         MessageReport[]          @relation("ReportedByUser")
+  moderatedMessages        MessageReport[]          @relation("ModeratedByUser")
+  communicationAudits      CommunicationAuditLog[]
+  calendarEventsCreated    CalendarEvent[]
+  conversationsCreated     Conversation[]
+  documentsUploaded        DownloadableDocument[]   @relation("DocumentsUploadedByUser")
+  certificatesIssued       StudentCertificate[]     @relation("CertificatesIssuedByUser")
+  documentAccessLogs       DocumentAccessLog[]
+  bookIssuesIssued         BookIssue[]              @relation("BookIssuesIssuedByUser")
+  backupsInitiated         BackupRecord[]
+  filesUploaded            SecureFile[]             @relation("FilesUploadedByUser")
 
   @@index([email])
   @@index([username])
@@ -360,6 +427,8 @@ model AcademicSession {
   examSchedules ExamSchedule[]
   admitCards    AdmitCard[]
   marksheets    Marksheet[]
+  downloadableDocs DownloadableDocument[]
+  certificates     StudentCertificate[]
 
   @@unique([schoolId, name])
   @@index([schoolId, isCurrent])
@@ -391,6 +460,7 @@ model Class {
   feeStructures FeeStructure[]
   questionBankItems QuestionBankItem[]
   questionPapers    QuestionPaper[]
+  downloadableDocs  DownloadableDocument[]
 
   @@unique([schoolId, code])
   @@index([schoolId])
@@ -458,6 +528,12 @@ model StudentProfile {
   admitCards      AdmitCard[]
   assessmentAttempts AssessmentAttempt[]
   marksheets      Marksheet[]
+  bookIssues      BookIssue[]
+  meetings        Meeting[]
+  certificates    StudentCertificate[]
+  communicationMsgs CommunicationMessage[]
+  remarks         StudentRemark[]
+  transportAllocations StudentTransportAllocation[]
 
   @@index([admissionNumber])
   @@index([status])
@@ -525,10 +601,17 @@ model AdmissionEnquiry {
   status        EnquiryStatus @default(NEW)
   internalNotes String?
   source        String        @default("WEBSITE_POPUP")
+  utmSource     String?
+  utmMedium     String?
+  utmCampaign   String?
+  utmTerm       String?
+  utmContent    String?
+  assignedStaffId String?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
   school        School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  leadFollowUps LeadFollowUp[]
 
   @@index([schoolId, status])
   @@index([enquiryNumber])
@@ -573,6 +656,7 @@ model StaffProfile {
   staffAttendance StaffAttendance[]
   leaveRequests   StaffLeaveRequest[]
   staffQuizAttempts StaffQuizAttempt[]
+  payrolls        StaffPayroll[]
 
   @@index([employeeId])
 }
@@ -1047,7 +1131,10 @@ model Notification {
   title     String
   message   String
   type      String   @default("INFO")
+  category  String   @default("GENERAL")
+  priority  String   @default("MEDIUM")
   link      String?
+  metadata  Json?
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
 
@@ -1056,24 +1143,120 @@ model Notification {
 
   @@index([userId, isRead])
   @@index([schoolId, userId])
+  @@index([schoolId, category])
 }
 
 model AuditLog {
-  id         String   @id @default(uuid())
-  schoolId   String?
-  userId     String?
-  action     String
-  entityType String
-  entityId   String?
-  ipAddress  String?
-  details    Json?
-  createdAt  DateTime @default(now())
+  id               String   @id @default(uuid())
+  schoolId         String?
+  userId           String?
+  action           String
+  entityType       String
+  entityId         String?
+  module           String   @default("GENERAL")
+  actorRole        String?
+  targetEntityName String?
+  ipAddress        String?
+  details          Json?
+  previousState    Json?
+  newState         Json?
+  status           String   @default("SUCCESS")
+  createdAt        DateTime @default(now())
 
-  school     School?  @relation(fields: [schoolId], references: [id], onDelete: SetNull)
-  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  school           School?  @relation(fields: [schoolId], references: [id], onDelete: SetNull)
+  user             User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([schoolId, createdAt])
   @@index([action])
+  @@index([module, createdAt])
+}
+
+// ============================================================================
+// SECTION 16: SUPER ADMIN GOVERNANCE, RBAC, SYSTEM CONFIG & BACKUPS
+// ============================================================================
+
+model PlatformSystemConfig {
+  id                          String   @id @default("global")
+  platformName                String   @default("EduNexa Global Multi-Academy Platform")
+  supportEmail                String   @default("support@edunexa.org")
+  maintenanceMode             Boolean  @default(false)
+  maintenanceMessage          String?
+  sessionTimeoutMinutes       Int      @default(60)
+  maxLoginAttempts            Int      @default(5)
+  lockoutDurationMinutes      Int      @default(30)
+  enforcePasswordChangeDays   Int      @default(90)
+  allowSelfRegistration       Boolean  @default(false)
+  globalAnnouncements         Json?
+  featureFlags                Json?
+  backupSettings              Json?
+  updatedAt                   DateTime @updatedAt
+  createdAt                   DateTime @default(now())
+}
+
+model ModulePermission {
+  id          String       @id @default(uuid())
+  schoolId    String?      // null = global platform baseline
+  role        PlatformRole
+  moduleKey   String       // STUDENTS, STAFF, ACADEMIC, ATTENDANCE, FEES, EXAMINATIONS, MARKSHEETS, ID_CARDS, CERTIFICATES, LIBRARY, TRANSPORT, INVENTORY, COMMUNICATION, NOTIFICATIONS, WEBSITE, ANALYTICS, BACKUP, SETTINGS
+  canView     Boolean      @default(true)
+  canCreate   Boolean      @default(false)
+  canEdit     Boolean      @default(false)
+  canDelete   Boolean      @default(false)
+  canApprove  Boolean      @default(false)
+  canPublish  Boolean      @default(false)
+  canExport   Boolean      @default(false)
+  canManage   Boolean      @default(false)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  school      School?      @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, role, moduleKey])
+  @@index([role, moduleKey])
+}
+
+model BackupRecord {
+  id           String    @id @default(uuid())
+  schoolId     String?   // null = entire platform instance backup
+  backupType   String    // FULL, TENANT_DATA, DATABASE_SQL, MEDIA_METADATA
+  fileName     String
+  fileSizeBytes BigInt   @default(0)
+  status       String    @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED, FAILED
+  checksum     String?
+  storagePath  String?
+  metadata     Json?
+  initiatedBy  String?
+  startedAt    DateTime  @default(now())
+  completedAt  DateTime?
+  errorDetails String?
+
+  school       School?   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  initiator    User?     @relation(fields: [initiatedBy], references: [id], onDelete: SetNull)
+
+  @@index([schoolId, backupType])
+  @@index([status, startedAt])
+}
+
+model MarksheetPublicationRequest {
+  id             String    @id @default(uuid())
+  schoolId       String
+  examScheduleId String?
+  termName       String
+  academicYear   String
+  className      String
+  totalStudents  Int       @default(0)
+  status         String    @default("PENDING_REVIEW") // PENDING_REVIEW, APPROVED, REJECTED, PUBLISHED
+  requestedBy    String
+  reviewedBy     String?
+  reviewNotes    String?
+  submittedAt    DateTime  @default(now())
+  reviewedAt     DateTime?
+  publishedAt    DateTime?
+  metadata       Json?
+
+  school         School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, status])
 }
 
 // ============================================================================
@@ -1223,22 +1406,101 @@ model ParentTestimonial {
 }
 
 model DownloadableDocument {
-  id           String   @id @default(uuid())
-  schoolId     String
-  title        String
-  description  String?
-  category     String   @default("GENERAL") // ADMISSION_FORM, CURRICULUM, PROSPECTUS, CALENDAR
-  fileUrl      String
-  fileSize     String?
-  fileType     String   @default("PDF")
-  displayOrder Int      @default(0)
-  isPublished  Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                String           @id @default(uuid())
+  schoolId          String
+  title             String
+  description       String?
+  category          String           @default("GENERAL") // ADMISSION_FORM, PROSPECTUS, FEE_STRUCTURE, ACADEMIC_CALENDAR, GUIDELINES, UNIFORM_INFO, HOLIDAY_LIST, SYLLABUS, GENERAL
+  fileUrl           String
+  fileSize          String?
+  fileType          String           @default("PDF")
+  targetAudience    String           @default("PUBLIC") // PUBLIC, ALL_STUDENTS, CLASS_SPECIFIC, TEACHERS_ONLY, STAFF_ONLY
+  academicSessionId String?
+  classId           String?
+  uploadedById      String?
+  displayOrder      Int              @default(0)
+  isPublished       Boolean          @default(true)
+  publicationStatus String           @default("PUBLISHED") // DRAFT, PUBLISHED, ARCHIVED
+  downloadCount     Int              @default(0)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
 
-  school       School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  school            School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  academicSession   AcademicSession? @relation(fields: [academicSessionId], references: [id], onDelete: SetNull)
+  class             Class?           @relation(fields: [classId], references: [id], onDelete: SetNull)
+  uploadedBy        User?            @relation("DocumentsUploadedByUser", fields: [uploadedById], references: [id], onDelete: SetNull)
 
   @@index([schoolId, category])
+  @@index([schoolId, targetAudience])
+  @@index([schoolId, isPublished])
+}
+
+model StudentCertificate {
+  id                String            @id @default(uuid())
+  schoolId          String
+  studentProfileId  String
+  certificateType   CertificateType   @default(BONAFIDE) // BONAFIDE, TRANSFER_CERTIFICATE, CHARACTER, MIGRATION, MERIT
+  certificateNumber String            @unique
+  academicSessionId String?
+  issueDate         DateTime          @default(now())
+  status            CertificateStatus @default(ISSUED) // DRAFT, ISSUED, REVOKED
+  qrToken           String            @unique @default(uuid())
+  reason            String?
+  remarks           String?
+  metadata          Json?
+  issuedById        String?
+  rejectionReason   String?
+  requestedDate     DateTime?         @default(now())
+  approvalDate      DateTime?
+
+  school            School            @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  studentProfile    StudentProfile    @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  academicSession   AcademicSession?  @relation(fields: [academicSessionId], references: [id], onDelete: SetNull)
+  issuedBy          User?             @relation("CertificatesIssuedByUser", fields: [issuedById], references: [id], onDelete: SetNull)
+
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  @@index([schoolId, studentProfileId])
+  @@index([schoolId, certificateType])
+}
+
+enum CertificateType {
+  BONAFIDE
+  TRANSFER_CERTIFICATE
+  CHARACTER
+  MIGRATION
+  MERIT
+}
+
+enum CertificateStatus {
+  DRAFT
+  REQUESTED
+  APPROVED
+  ISSUED
+  REJECTED
+  REVOKED
+}
+
+model DocumentAccessLog {
+  id              String   @id @default(uuid())
+  schoolId        String
+  documentType    String   // PUBLIC_DOCUMENT, STUDENT_ID, ADMIT_CARD, MARKSHEET, REPORT_CARD, FEE_RECEIPT, CERTIFICATE, STUDY_MATERIAL
+  documentId      String
+  documentTitle   String
+  accessedById    String?
+  accessorRole    String?  // PUBLIC, STUDENT, PARENT, TEACHER, SCHOOL_ADMIN
+  targetStudentId String?
+  ipAddress       String?
+  userAgent       String?
+  action          String   @default("DOWNLOAD") // PREVIEW, DOWNLOAD, PRINT
+  createdAt       DateTime @default(now())
+
+  school          School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  accessedBy      User?    @relation(fields: [accessedById], references: [id], onDelete: SetNull)
+
+  @@index([schoolId, documentType])
+  @@index([schoolId, accessedById])
 }
 
 model GalleryCategory {
@@ -1588,3 +1850,954 @@ model MarksheetCorrectionAudit {
   @@index([schoolId])
   @@index([marksheetId])
 }
+
+// ==============================================================================
+// SECTION 8: LIBRARY, MEETINGS, COMMUNICATION & REMARKS
+// ==============================================================================
+
+model LibraryBook {
+  id              String         @id @default(uuid())
+  schoolId        String
+  title           String
+  author          String
+  isbn            String?
+  category        String?
+  publisher       String?
+  edition         String?
+  publicationYear Int?
+  language        String?        @default("English")
+  description     String?
+  coverUrl        String?
+  totalCopies     Int            @default(1)
+  availableCopies Int            @default(1)
+  shelfLocation   String?
+  status          String         @default("AVAILABLE") // AVAILABLE, OUT_OF_STOCK, ARCHIVED
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  school          School         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  issues          BookIssue[]
+
+  @@index([schoolId, title])
+  @@index([schoolId, category])
+  @@index([schoolId, isbn])
+}
+
+model BookIssue {
+  id               String         @id @default(uuid())
+  schoolId         String
+  bookId           String
+  studentProfileId String
+  issuedById       String?
+  issueDate        DateTime       @default(now())
+  dueDate          DateTime
+  returnDate       DateTime?
+  status           String         @default("ISSUED") // ISSUED, RETURNED, OVERDUE, LOST
+  fineAmount       Float          @default(0)
+  finePaid         Boolean        @default(false)
+  fineStatus       String         @default("NONE") // NONE, PENDING, PAID, WAIVED
+  returnCondition  String?        @default("GOOD") // GOOD, DAMAGED, LOST
+  notes            String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  school           School         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  book             LibraryBook    @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  student          StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  issuedBy         User?          @relation("BookIssuesIssuedByUser", fields: [issuedById], references: [id], onDelete: SetNull)
+
+  @@index([schoolId, studentProfileId])
+  @@index([bookId])
+  @@index([status])
+  @@index([dueDate])
+}
+
+model LibrarySetting {
+  id                 String   @id @default(uuid())
+  schoolId           String   @unique
+  finePerDay         Float    @default(2.0)
+  gracePeriodDays    Int      @default(0)
+  maxFineAmount      Float    @default(200.0)
+  maxBooksPerStudent Int      @default(3)
+  loanDurationDays   Int      @default(14)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  school             School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+}
+
+model Meeting {
+  id               String          @id @default(uuid())
+  schoolId         String
+  title            String
+  description      String?
+  meetingType      String          @default("PARENT_TEACHER") // PARENT_TEACHER, STAFF_INTERNAL, STUDENT_COUNSELING
+  hostUserId       String
+  studentProfileId String?
+  guardianUserId   String?
+  scheduledDate    DateTime
+  startTime        String          // e.g. "10:00 AM"
+  endTime          String          // e.g. "10:30 AM"
+  meetingMode      String          @default("ONLINE") // ONLINE, IN_PERSON
+  locationOrRoom   String?
+  joiningUrl       String?
+  status           String          @default("SCHEDULED") // SCHEDULED, COMPLETED, CANCELLED, RESCHEDULED
+  notes            String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  school           School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  student          StudentProfile? @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, meetingType])
+  @@index([studentProfileId])
+  @@index([hostUserId])
+  @@index([guardianUserId])
+}
+
+model CommunicationMessage {
+  id               String          @id @default(uuid())
+  schoolId         String
+  senderUserId     String
+  recipientUserId  String?
+  studentProfileId String?
+  channel          String          @default("PARENT_TEACHER") // PARENT_TEACHER, STUDENT_TEACHER, ANNOUNCEMENT
+  subject          String?
+  messageContent   String
+  attachmentUrl    String?
+  isRead           Boolean         @default(false)
+  readAt           DateTime?
+  createdAt        DateTime        @default(now())
+
+  school           School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  student          StudentProfile? @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, senderUserId])
+  @@index([schoolId, recipientUserId])
+  @@index([studentProfileId])
+}
+
+model StudentRemark {
+  id                String         @id @default(uuid())
+  schoolId          String
+  studentProfileId  String
+  teacherUserId     String
+  academicSessionId String?
+  category          String         @default("GENERAL") // GENERAL, ACADEMIC, DISCIPLINE, REPORT_CARD, ATTENDANCE
+  remark            String
+  isPrivate         Boolean        @default(false)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  school            School         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  student           StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, studentProfileId])
+  @@index([teacherUserId])
+}
+
+// -------------------------------------------------------------
+// SECTION 9: INTERNAL CHAT, MESSAGING, MEETINGS & CALENDAR
+// -------------------------------------------------------------
+
+model Conversation {
+  id              String                    @id @default(uuid())
+  schoolId        String
+  type            String                    @default("DIRECT") // DIRECT, GROUP
+  title           String?
+  groupType       String?                   // CLASS_GROUP, SUBJECT_GROUP, DEPARTMENT_GROUP, ADMIN_GROUP, PTM_GROUP
+  createdById     String
+  lastMessageAt   DateTime                  @default(now())
+  isArchived      Boolean                   @default(false)
+  metadata        Json?
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+
+  school          School                    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  createdBy       User                      @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  participants    ConversationParticipant[]
+  messages        ChatMessage[]
+
+  @@index([schoolId, type])
+  @@index([createdById])
+  @@index([lastMessageAt])
+}
+
+model ConversationParticipant {
+  id                String       @id @default(uuid())
+  conversationId    String
+  userId            String
+  role              String       @default("MEMBER") // ADMIN, MEMBER
+  lastReadMessageId String?
+  lastReadAt        DateTime?
+  joinedAt          DateTime     @default(now())
+
+  conversation      Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+  @@index([userId])
+}
+
+model ChatMessage {
+  id              String               @id @default(uuid())
+  conversationId  String
+  senderId        String
+  content         String
+  messageType     String               @default("TEXT") // TEXT, FILE, SYSTEM
+  status          String               @default("SENT") // SENT, DELIVERED, READ
+  isEdited        Boolean              @default(false)
+  isDeleted       Boolean              @default(false)
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  conversation    Conversation         @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender          User                 @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  attachments     ChatAttachment[]
+  receipts        ChatMessageReceipt[]
+  reports         MessageReport[]
+
+  @@index([conversationId, createdAt])
+  @@index([senderId])
+}
+
+model ChatAttachment {
+  id          String      @id @default(uuid())
+  messageId   String
+  fileName    String
+  fileUrl     String
+  fileType    String
+  fileSize    Int
+  createdAt   DateTime    @default(now())
+
+  message     ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+}
+
+model ChatMessageReceipt {
+  id          String      @id @default(uuid())
+  messageId   String
+  userId      String
+  status      String      @default("DELIVERED") // DELIVERED, READ
+  deliveredAt DateTime?
+  readAt      DateTime?
+
+  message     ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@index([userId])
+}
+
+model MessageReport {
+  id                String      @id @default(uuid())
+  schoolId          String
+  messageId         String
+  reportedById      String
+  reason            String
+  status            String      @default("PENDING") // PENDING, REVIEWED, ACTION_TAKEN, DISMISSED
+  moderatedById     String?
+  moderationAction  String?     // WARNING, MESSAGE_REMOVED, DISMISSED
+  moderatorNotes    String?
+  createdAt         DateTime    @default(now())
+  resolvedAt        DateTime?
+
+  school            School      @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  message           ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  reportedBy        User        @relation("ReportedByUser", fields: [reportedById], references: [id], onDelete: Cascade)
+  moderatedBy       User?       @relation("ModeratedByUser", fields: [moderatedById], references: [id], onDelete: SetNull)
+
+  @@index([schoolId, status])
+  @@index([messageId])
+  @@index([reportedById])
+}
+
+model CommunicationAuditLog {
+  id            String   @id @default(uuid())
+  schoolId      String
+  actorUserId   String
+  action        String   // EXPORT_CHAT_PDF, EXPORT_CHAT_CSV, REVIEW_RECORDS, MODERATE_MESSAGE, UPDATE_PERMISSIONS
+  targetType    String   // CONVERSATION, MESSAGE, PERMISSION
+  targetId      String?
+  metadata      Json?
+  ipAddress     String?
+  createdAt     DateTime @default(now())
+
+  school        School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  actor         User     @relation(fields: [actorUserId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, createdAt])
+  @@index([actorUserId])
+}
+
+model CommunicationPermissionConfig {
+  id                    String   @id @default(uuid())
+  schoolId              String   @unique
+  allowStudentToStudent Boolean  @default(false)
+  allowParentToParent   Boolean  @default(false)
+  allowTeacherToStudent Boolean  @default(true)
+  allowTeacherToParent  Boolean  @default(true)
+  allowAdminToAll       Boolean  @default(true)
+  allowFileSharing      Boolean  @default(true)
+  maxAttachmentSizeBytes Int     @default(10485760) // 10MB
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  school                School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+}
+
+model CalendarEvent {
+  id                    String   @id @default(uuid())
+  schoolId              String
+  title                 String
+  description           String?
+  category              String   @default("ACADEMIC") // ACADEMIC, EXAM, MEETING, HOLIDAY, SPORTS, PTM
+  startDate             DateTime
+  endDate               DateTime
+  isAllDay              Boolean  @default(false)
+  location              String?
+  createdById           String
+  googleCalendarEventId String?
+  targetAudience        String   @default("ALL") // ALL, TEACHERS_ONLY, STUDENTS_ONLY, PARENTS_ONLY
+  classId               String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  school                School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  createdBy             User     @relation(fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, startDate])
+  @@index([createdById])
+}
+
+model GoogleWorkspaceIntegration {
+  id                     String    @id @default(uuid())
+  schoolId               String    @unique
+  clientId               String?
+  clientSecret           String?
+  redirectUri            String?
+  connectedEmail         String?
+  accessToken            String?
+  refreshToken           String?
+  tokenExpiry            DateTime?
+  calendarSyncEnabled    Boolean   @default(false)
+  meetIntegrationEnabled Boolean   @default(false)
+  primaryCalendarId      String?
+  status                 String    @default("DISCONNECTED") // CONNECTED, DISCONNECTED, ERROR
+  lastSyncAt             DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  school                 School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+}
+
+// ============================================================================
+// SECTION 12: STAFF PAYROLL MODULE
+// ============================================================================
+
+enum PayrollStatus {
+  PENDING
+  PROCESSING
+  PAID
+  CANCELLED
+}
+
+model StaffPayroll {
+  id              String         @id @default(uuid())
+  schoolId        String
+  staffProfileId  String
+  month           Int            // 1 - 12
+  year            Int            // e.g. 2026
+  basicSalary     Float
+  allowances      Float          @default(0)
+  deductions      Float          @default(0)
+  netSalary       Float
+  status          PayrollStatus  @default(PENDING) // PENDING, PROCESSING, PAID, CANCELLED
+  paymentMethod   String?        // BANK_TRANSFER, CHEQUE, CASH, UPI
+  paymentDate     DateTime?
+  referenceNumber String?
+  notes           String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  school          School         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  staffProfile    StaffProfile   @relation(fields: [staffProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, staffProfileId, month, year])
+  @@index([schoolId, month, year])
+  @@index([staffProfileId])
+}
+
+// ============================================================================
+// SECTION 12: TRANSPORT MANAGEMENT MODULE
+// ============================================================================
+
+enum TransportStatus {
+  ACTIVE
+  MAINTENANCE
+  INACTIVE
+}
+
+enum PickupType {
+  BOTH
+  PICKUP_ONLY
+  DROP_ONLY
+}
+
+model TransportVehicle {
+  id                 String           @id @default(uuid())
+  schoolId           String
+  registrationNumber String           // e.g. DL-01-AB-1234
+  vehicleModel       String           // e.g. Tata Marcopolo 42-Seater
+  capacity           Int              @default(40)
+  driverId           String?
+  insuranceExpiry    DateTime?
+  fitnessExpiry      DateTime?
+  status             TransportStatus  @default(ACTIVE)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  school             School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  driver             TransportDriver? @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  routes             TransportRoute[]
+
+  @@unique([schoolId, registrationNumber])
+  @@index([schoolId])
+}
+
+model TransportDriver {
+  id               String             @id @default(uuid())
+  schoolId         String
+  name             String
+  licenseNumber    String
+  phone            String
+  emergencyContact String?
+  status           TransportStatus    @default(ACTIVE)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  school           School             @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  vehicles         TransportVehicle[]
+
+  @@unique([schoolId, licenseNumber])
+  @@index([schoolId])
+}
+
+model TransportRoute {
+  id            String                       @id @default(uuid())
+  schoolId      String
+  routeName     String                       // e.g. Route 12 - South Delhi Express
+  routeCode     String                       // e.g. R-12
+  vehicleId     String?
+  startLocation String                       // e.g. Saket Metro
+  endLocation   String                       // e.g. Apex Academy Main Gate
+  monthlyFare   Float                        @default(1500)
+  status        TransportStatus              @default(ACTIVE)
+  createdAt     DateTime                     @default(now())
+  updatedAt     DateTime                     @updatedAt
+
+  school        School                       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  vehicle       TransportVehicle?            @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  stops         TransportRouteStop[]
+  allocations   StudentTransportAllocation[]
+
+  @@unique([schoolId, routeCode])
+  @@index([schoolId])
+}
+
+model TransportRouteStop {
+  id          String                       @id @default(uuid())
+  routeId     String
+  stopName    String                       // e.g. Hauz Khas Junction
+  stopOrder   Int                          // 1, 2, 3...
+  pickupTime  String                       // e.g. "07:15 AM"
+  dropTime    String                       // e.g. "02:45 PM"
+  fare        Float?                       @default(0)
+  createdAt   DateTime                     @default(now())
+  updatedAt   DateTime                     @updatedAt
+
+  route       TransportRoute               @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  allocations StudentTransportAllocation[]
+
+  @@index([routeId, stopOrder])
+}
+
+model StudentTransportAllocation {
+  id               String              @id @default(uuid())
+  schoolId         String
+  studentProfileId String
+  routeId          String
+  stopId           String?
+  pickupType       PickupType          @default(BOTH)
+  status           TransportStatus     @default(ACTIVE)
+  startDate        DateTime            @default(now())
+  endDate          DateTime?
+  monthlyFare      Float               @default(1500)
+  notes            String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  school           School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  studentProfile   StudentProfile      @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  route            TransportRoute      @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  stop             TransportRouteStop? @relation(fields: [stopId], references: [id], onDelete: SetNull)
+
+  @@unique([schoolId, studentProfileId, routeId])
+  @@index([schoolId, studentProfileId])
+  @@index([routeId])
+}
+
+// ============================================================================
+// SECTION 12: INVENTORY & ASSET MANAGEMENT MODULE
+// ============================================================================
+
+enum InventoryItemStatus {
+  IN_STOCK
+  LOW_STOCK
+  OUT_OF_STOCK
+  DISCONTINUED
+}
+
+enum InventoryTransactionType {
+  PURCHASE
+  ISSUE
+  RETURN
+  DISPOSAL
+  ADJUSTMENT
+}
+
+model InventoryCategory {
+  id          String          @id @default(uuid())
+  schoolId    String
+  name        String          // e.g. Stationery, Science Lab, Sports, IT Hardware, Furniture
+  code        String          // e.g. STAT, LAB, SPT, IT, FURN
+  description String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  school      School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  items       InventoryItem[]
+
+  @@unique([schoolId, code])
+  @@index([schoolId])
+}
+
+model InventoryItem {
+  id            String                 @id @default(uuid())
+  schoolId      String
+  categoryId    String
+  itemName      String                 // e.g. Microscope Olympus CX21
+  itemCode      String                 // e.g. LAB-MIC-001
+  quantity      Int                    @default(0)
+  unit          String                 @default("Units") // Pieces, Boxes, Packets, Units
+  minStockAlert Int                    @default(5)
+  unitPrice     Float                  @default(0)
+  location      String?                // e.g. Physics Lab Cabinet 3
+  status        InventoryItemStatus    @default(IN_STOCK)
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+
+  school        School                 @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  category      InventoryCategory      @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  transactions  InventoryTransaction[]
+
+  @@unique([schoolId, itemCode])
+  @@index([schoolId, categoryId])
+  @@index([status])
+}
+
+model InventoryTransaction {
+  id              String                   @id @default(uuid())
+  schoolId        String
+  itemId          String
+  transactionType InventoryTransactionType
+  quantity        Int
+  unitPrice       Float?                   @default(0)
+  totalAmount     Float?                   @default(0)
+  issuedToName    String?                  // e.g. Dr. Julian Thorne / Grade 10 Chemistry
+  recipientRole   String?                  // TEACHER, STAFF, DEPARTMENT
+  referenceNumber String?                  // PO or Issue Voucher #
+  notes           String?
+  transactionDate DateTime                 @default(now())
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+
+  school          School                   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  item            InventoryItem            @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, transactionDate])
+  @@index([itemId])
+}
+
+// ============================================================================
+// SECTION 13: AI CHATBOT, FAQ & ENQUIRY ESCALATION MANAGEMENT
+// ============================================================================
+
+enum EscalationStatus {
+  PENDING
+  IN_PROGRESS
+  RESOLVED
+  DISMISSED
+}
+
+model ChatbotFAQ {
+  id           String   @id @default(uuid())
+  schoolId     String
+  question     String
+  answer       String   @db.Text
+  category     String   @default("GENERAL") // ADMISSIONS, FEES, ACADEMICS, FACILITIES, TIMINGS, EXAMINATIONS, CONTACT, GENERAL
+  displayOrder Int      @default(0)
+  isPublished  Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  school       School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, isPublished])
+  @@index([schoolId, category])
+}
+
+model ChatbotConfiguration {
+  id                     String   @id @default(uuid())
+  schoolId               String   @unique
+  botName                String   @default("EduNexa Assistant")
+  welcomeMessage         String   @default("Hello! Welcome to our school. I'm your virtual school assistant. I can help you with admissions, classes, fees, facilities, academic programs, timings, and other school-related enquiries.")
+  suggestedQuestions     Json?    // ["Tell me about admission criteria", "What are the school timings?", "How much is the fee structure?", "What facilities are available?", "Are scholarships offered?"]
+  fallbackMessage        String   @default("I couldn't find the exact information in the school's available records. You can contact the school administration for confirmation.")
+  whatsappNumber         String?  @default("+91 98100 23456")
+  whatsappPrefillText    String?  @default("Hello! I would like to enquire about admission at your school.")
+  whatsappEnabled        Boolean  @default(true)
+  escalationEnabled      Boolean  @default(true)
+  escalationContactName  String?  @default("Admissions Counseling Desk")
+  escalationEmail        String?  @default("admissions@apexacademy.edu")
+  escalationPhone        String?  @default("+91 11 2659 1000")
+  escalationAvailability String?  @default("Monday - Friday, 8:00 AM - 4:00 PM")
+  escalationMessage      String?  @default("I have notified our admissions counseling team. A counselor will review your inquiry and follow up shortly.")
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  school                 School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+}
+
+model ChatbotEscalation {
+  id                   String           @id @default(uuid())
+  schoolId             String
+  visitorName          String?
+  visitorPhone         String?
+  visitorEmail         String?
+  query                String           @db.Text
+  reason               String           // BOT_UNABLE_TO_ANSWER, VISITOR_REQUESTED_HUMAN, ADMISSION_FOLLOWUP, URGENT_ASSISTANCE
+  status               EscalationStatus @default(PENDING)
+  assignedToStaffId    String?
+  staffNotes           String?
+  conversationSnapshot Json?            // Array of { sender: 'user'|'bot', text: string, timestamp: string }
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+
+  school               School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, status])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// SECTION 14: SEO, DIGITAL MARKETING & LEAD GENERATION MODELS
+// ============================================================================
+
+model PageSEO {
+  id              String   @id @default(uuid())
+  schoolId        String
+  pagePath        String   // e.g. "/", "/about", "/admissions", "/academics", "/faculty", "/facilities", "/events", "/news", "/gallery", "/contact", "/blog"
+  pageTitle       String
+  metaDescription String?  @db.Text
+  metaKeywords    String?
+  canonicalUrl    String?
+  ogTitle         String?
+  ogDescription   String?  @db.Text
+  ogImage         String?
+  twitterCard     String?  @default("summary_large_image")
+  structuredData  Json?
+  imageAltText    String?
+  isPublished     Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  school          School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, pagePath])
+  @@index([schoolId, isPublished])
+}
+
+model MarketingIntegration {
+  id                            String   @id @default(uuid())
+  schoolId                      String   @unique
+  googleAnalyticsId             String?  // GA4 Measurement ID: G-XXXXXXXXXX
+  ga4TrackingEnabled            Boolean  @default(false)
+  searchConsoleProperty         String?  // Search Console Domain/URL property
+  searchConsoleVerificationCode String?  // HTML tag or DNS verification token
+  searchConsoleConnected        Boolean  @default(false)
+  facebookUrl                   String?
+  instagramUrl                  String?
+  youtubeUrl                    String?
+  linkedinUrl                   String?
+  twitterUrl                    String?
+  prospectusFileUrl             String?
+  prospectusTitle               String?  @default("Official School Prospectus 2026-27")
+  prospectusPublished           Boolean  @default(true)
+  createdAt                     DateTime @default(now())
+  updatedAt                     DateTime @updatedAt
+
+  school                        School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+}
+
+model BlogArticle {
+  id              String    @id @default(uuid())
+  schoolId        String
+  title           String
+  slug            String
+  summary         String?   @db.Text
+  content         String    @db.Text
+  coverImageUrl   String?
+  authorName      String    @default("School Editorial Board")
+  category        String    @default("ACADEMICS") // ACADEMICS, CAMPUS_LIFE, ADMISSIONS, STEM, ARTS_CULTURE, COUNSELING, GENERAL
+  tags            Json?     // Array of strings
+  isPublished     Boolean   @default(false)
+  publishedAt     DateTime?
+  seoTitle        String?
+  metaDescription String?   @db.Text
+  imageAltText    String?
+  viewCount       Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  school          School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, slug])
+  @@index([schoolId, isPublished])
+  @@index([schoolId, category])
+}
+
+model MarketingBanner {
+  id              String    @id @default(uuid())
+  schoolId        String
+  title           String
+  description     String?
+  bannerType      String    @default("ADMISSION_OPEN") // ADMISSION_OPEN, PROMOTIONAL, EVENT, ANNOUNCEMENT
+  imageUrl        String?
+  ctaText         String?   @default("Apply for Admissions")
+  ctaLink         String?   @default("/admissions")
+  startDate       DateTime?
+  endDate         DateTime?
+  displayPosition String    @default("TOP_BANNER") // TOP_BANNER, HERO_POPUP, SIDEBAR, FOOTER
+  displayOrder    Int       @default(0)
+  isPublished     Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  school          School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, isPublished])
+  @@index([schoolId, bannerType])
+}
+
+model CallbackRequest {
+  id              String         @id @default(uuid())
+  schoolId        String
+  requestNumber   String         @unique // CB-2026-XXXX
+  fullName        String
+  phone           String
+  email           String?
+  applyingClass   String?
+  preferredTime   String?
+  message         String?        @db.Text
+  status          String         @default("PENDING") // PENDING, CONTACTED, SCHEDULED, CONVERTED, DISMISSED
+  assignedStaffId String?
+  staffNotes      String?        @db.Text
+  utmSource       String?
+  utmMedium       String?
+  utmCampaign     String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  school          School         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  leadFollowUps   LeadFollowUp[]
+
+  @@index([schoolId, status])
+  @@index([createdAt])
+}
+
+model NewsletterSubscriber {
+  id             String    @id @default(uuid())
+  schoolId       String
+  email          String
+  status         String    @default("SUBSCRIBED") // SUBSCRIBED, UNSUBSCRIBED
+  source         String    @default("WEBSITE_FOOTER")
+  subscribedAt   DateTime  @default(now())
+  unsubscribedAt DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  school         School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, email])
+  @@index([schoolId, status])
+}
+
+model LeadFollowUp {
+  id             String            @id @default(uuid())
+  schoolId       String
+  enquiryId      String?
+  callbackId     String?
+  counsellorId   String?
+  counsellorName String?
+  followUpDate   DateTime
+  followUpTime   String?
+  description    String            @db.Text
+  status         String            @default("PENDING") // PENDING, COMPLETED, OVERDUE, RESCHEDULED
+  outcomeNotes   String?           @db.Text
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  school         School            @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  enquiry        AdmissionEnquiry? @relation(fields: [enquiryId], references: [id], onDelete: Cascade)
+  callback       CallbackRequest?  @relation(fields: [callbackId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, counsellorId, status])
+  @@index([schoolId, followUpDate])
+}
+
+model AnalyticsEvent {
+  id          String   @id @default(uuid())
+  schoolId    String
+  eventType   String   // PAGE_VIEW, BANNER_CLICK, ENQUIRY_SUBMIT, APPLICATION_VISIT, PROSPECTUS_DOWNLOAD, WHATSAPP_CLICK, CALLBACK_SUBMIT, NEWSLETTER_SUBMIT
+  pagePath    String
+  source      String?
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
+  referrer    String?
+  userAgent   String?
+  timestamp   DateTime @default(now())
+
+  school      School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, eventType])
+  @@index([schoolId, timestamp])
+}
+
+// ============================================================================
+// SECTION 15: NOTIFICATION & ALERT MANAGEMENT MODELS
+// ============================================================================
+
+model NotificationEventConfig {
+  id             String   @id @default(uuid())
+  schoolId       String
+  eventKey       String   // e.g. ADMISSION_ENQUIRY_RECEIVED, ADMISSION_STATUS_UPDATED, FEE_PAYMENT_REMINDER, FEE_PAYMENT_SUCCESS, ATTENDANCE_ABSENT_ALERT, HOMEWORK_ASSIGNED, EXAMINATION_ANNOUNCED, ADMIT_CARD_PUBLISHED, RESULT_PUBLISHED, MEETING_SCHEDULED, CHAT_MESSAGE_RECEIVED, SCHOOL_ANNOUNCEMENT
+  eventName      String
+  description    String?
+  isEnabled      Boolean  @default(true)
+  channels       Json     // Array of channels enabled: ["IN_APP", "EMAIL", "SMS", "WHATSAPP"]
+  recipientRoles Json     // Array of target roles: ["STUDENT", "PARENT", "TEACHER", "SCHOOL_ADMIN", "ACCOUNTS"]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  school         School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, eventKey])
+  @@index([schoolId, isEnabled])
+}
+
+model NotificationTemplate {
+  id        String   @id @default(uuid())
+  schoolId  String
+  eventKey  String
+  channel   String   // IN_APP, EMAIL, SMS, WHATSAPP
+  name      String
+  subject   String?
+  body      String   @db.Text
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  school    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, eventKey, channel])
+  @@index([schoolId, eventKey])
+}
+
+model NotificationDeliveryLog {
+  id                 String   @id @default(uuid())
+  schoolId           String
+  notificationId     String?
+  eventKey           String
+  channel            String   // IN_APP, EMAIL, SMS, WHATSAPP
+  recipientId        String?
+  recipientContact   String   // Email, Phone, or User ID
+  recipientName      String?
+  subject            String?
+  content            String   @db.Text
+  status             String   @default("SENT") // PENDING, SENT, DELIVERED, FAILED
+  errorDetails       String?  @db.Text
+  providerMessageId  String?
+  retryCount         Int      @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  school             School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, channel, status])
+  @@index([schoolId, eventKey])
+  @@index([schoolId, createdAt])
+}
+
+model NotificationProviderConfig {
+  id                    String   @id @default(uuid())
+  schoolId              String   @unique
+  emailProvider         String   @default("SYSTEM_DEFAULT") // SYSTEM_DEFAULT, SMTP, RESEND, SENDGRID
+  emailSenderName       String   @default("Apex Academy Notifications")
+  emailSenderAddress    String   @default("notifications@apexacademy.edu.in")
+  emailApiKey           String?
+  smsProvider           String   @default("SIMULATED") // SIMULATED, TWILIO, MSG91, FAST2SMS
+  smsSenderId           String?  @default("EDUNEX")
+  smsApiKey             String?
+  whatsAppProvider      String   @default("SIMULATED") // SIMULATED, META_CLOUD, TWILIO_WHATSAPP
+  whatsAppPhoneNumberId String?
+  whatsAppApiKey        String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  school                School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+}
+
+// ============================================================================
+// SECTION 17: SECURE FILE STORAGE & INTEGRITY ARCHITECTURE
+// ============================================================================
+model SecureFile {
+  id               String   @id @default(uuid())
+  schoolId         String
+  uploaderId       String?
+  originalName     String
+  sanitizedName    String
+  storagePath      String
+  mimeType         String
+  fileSizeBytes    Int      @default(0)
+  isPublic         Boolean  @default(false)
+  category         String   @default("DOCUMENT") // STUDENT_PHOTO, STAFF_PHOTO, ADMISSION_DOC, ASSIGNMENT, EXAM_PAPER, MARKSHEET_ATTACHMENT, FEE_RECEIPT, DOCUMENT
+  checksum         String
+  metadata         Json?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  school           School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  uploader         User?    @relation("FilesUploadedByUser", fields: [uploaderId], references: [id], onDelete: SetNull)
+
+  @@index([schoolId, isPublic])
+  @@index([schoolId, category])
+  @@index([checksum])
+}
+
+
+
+
+

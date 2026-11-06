@@ -2,6 +2,7 @@ import { app } from './app.js';
 import { env } from './config/env.js';
 import { prisma } from './config/db.js';
 import { seedInstitutionalData } from './db/seedData.js';
+import { initSocketIO } from './socket.js';
 
 const HOST = '0.0.0.0';
 
@@ -32,6 +33,9 @@ async function bootstrap() {
     console.log(`Allowed client origin: ${env.clientOrigin}`);
     console.log(`====================================================`);
   });
+
+  // Attach Socket.IO Real-time Engine
+  initSocketIO(server);
 
   server.on('error', (err: any) => {
     if (err.code === 'EADDRINUSE') {

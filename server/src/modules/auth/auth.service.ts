@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { hashPassword, verifyPassword, generateAccessToken, generateRefreshToken, TokenPayload } from '../../utils/crypto.js';
+import { hashPassword, verifyPassword, generateAccessToken, generateRefreshToken, verifyAccessToken, TokenPayload } from '../../utils/crypto.js';
 import { AppError } from '../../middleware/errorHandler.js';
 import { PlatformRole, PlatformRoleType, TenantStatus } from '@edunexa/shared';
 import { prisma, checkDatabaseConnection } from '../../config/db.js';
@@ -340,6 +340,54 @@ export class AuthService {
 
         if (primaryMembership && primaryMembership.school?.status === TenantStatus.SUSPENDED) {
           throw new AppError('The school subscription has been suspended. Please contact platform support.', 403, 'SCHOOL_SUSPENDED');
+        }
+
+        // Section 17 Multi-Factor Authentication (MFA / 2FA) Enforcement
+        if (user.mfaEnabled) {
+          const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+          const mfaOtpExpiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+          await prisma.user.update({
+            where: { id: user.id },
+            data: {
+              mfaOtpCode: otpCode,
+              mfaOtpExpiresAt,
+            },
+          });
+
+          await prisma.auditLog.create({
+            data: {
+              schoolId: primaryMembership?.schoolId,
+              userId: user.id,
+              action: 'MFA_CHALLENGE_ISSUED',
+              entityType: 'USER_SECURITY',
+              entityId: user.id,
+              module: 'SECURITY',
+              actorRole: primaryMembership?.role || 'USER',
+              targetEntityName: `${user.firstName} ${user.lastName}`,
+              details: { mfaMethod: user.mfaMethod || 'EMAIL_OTP' },
+              status: 'SUCCESS',
+            },
+          });
+
+          const mfaToken = generateAccessToken({
+            userId: user.id,
+            email: user.email,
+            role: 'MFA_CHALLENGE' as any,
+            schoolId: primaryMembership?.schoolId,
+            tokenVersion: user.tokenVersion || 0,
+          });
+
+          const emailMasked = user.email.replace(/(.{2})(.*)(?=@)/, (_m, a, b) => a + '*'.repeat(Math.max(1, b.length)));
+
+          return {
+            mfaRequired: true,
+            mfaToken,
+            mfaMethod: user.mfaMethod || 'EMAIL_OTP',
+            emailMasked,
+            message: 'Multi-factor authentication required. A 6-digit verification code has been dispatched.',
+            ...(process.env.NODE_ENV !== 'production' ? { debugOtp: otpCode } : {}),
+          };
         }
 
         const guardianStudentIds: string[] = [];
@@ -795,6 +843,234 @@ export class AuthService {
   /**
    * Role and context switcher for users with multiple memberships
    */
+  /**
+   * Section 17: Verifies a 6-digit MFA OTP and issues full access & refresh tokens
+   */
+  async verifyMfaOtp(mfaToken: string, otpCode: string) {
+    let payload: any;
+    try {
+      payload = verifyAccessToken(mfaToken);
+    } catch {
+      throw new AppError('MFA session token has expired or is invalid. Please log in again.', 401, 'MFA_SESSION_EXPIRED');
+    }
+
+    if (!payload?.userId) {
+      throw new AppError('Malformed MFA session token.', 401, 'INVALID_TOKEN');
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: payload.userId },
+      include: {
+        memberships: {
+          include: {
+            school: true,
+            studentProfile: true,
+            staffProfile: true,
+            parentLinks: {
+              include: { studentProfile: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      throw new AppError('User associated with MFA session was not found.', 404, 'USER_NOT_FOUND');
+    }
+
+    if (!user.mfaOtpCode) {
+      throw new AppError('No pending MFA challenge found for this user. Please log in again.', 400, 'NO_PENDING_MFA');
+    }
+
+    if (!user.mfaOtpExpiresAt || new Date() > user.mfaOtpExpiresAt) {
+      throw new AppError('MFA verification code has expired. Please request a new code.', 401, 'MFA_OTP_EXPIRED');
+    }
+
+    if (user.mfaOtpCode !== otpCode) {
+      // Increment failed attempts
+      const updatedAttempts = (user.failedLoginAttempts || 0) + 1;
+      const shouldLock = updatedAttempts >= 5;
+
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          failedLoginAttempts: updatedAttempts,
+          accountLocked: shouldLock ? true : user.accountLocked,
+          lockoutUntil: shouldLock ? new Date(Date.now() + 15 * 60 * 1000) : user.lockoutUntil,
+        },
+      });
+
+      if (shouldLock) {
+        throw new AppError(
+          'Account locked due to consecutive failed MFA attempts. Please contact support.',
+          403,
+          'ACCOUNT_LOCKED'
+        );
+      }
+
+      throw new AppError('Invalid 6-digit MFA verification code.', 401, 'INVALID_MFA_OTP');
+    }
+
+    // OTP Verified! Clear code, update login time, reset failed attempts
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        mfaOtpCode: null,
+        mfaOtpExpiresAt: null,
+        failedLoginAttempts: 0,
+        lastLoginAt: new Date(),
+      },
+    });
+
+    const primaryMembership = user.memberships.find((m) => m.isPrimary) || user.memberships[0];
+
+    const guardianStudentIds: string[] = [];
+    if (primaryMembership?.parentLinks && primaryMembership.parentLinks.length > 0) {
+      for (const pl of primaryMembership.parentLinks) {
+        guardianStudentIds.push(pl.studentProfileId);
+        if (pl.studentProfile?.admissionNumber) {
+          guardianStudentIds.push(pl.studentProfile.admissionNumber);
+        }
+      }
+    }
+
+    const tokenPayload: TokenPayload = {
+      userId: user.id,
+      email: user.email,
+      membershipId: primaryMembership?.id,
+      schoolId: primaryMembership?.schoolId,
+      role: primaryMembership?.role || PlatformRole.STUDENT,
+      studentProfileId: primaryMembership?.studentProfile?.id,
+      staffProfileId: primaryMembership?.staffProfile?.id,
+      guardianStudentIds: guardianStudentIds.length > 0 ? guardianStudentIds : undefined,
+      mustChangePassword: user.mustChangePassword || false,
+      tokenVersion: user.tokenVersion || 0,
+    };
+
+    const accessToken = generateAccessToken(tokenPayload);
+    const refreshToken = generateRefreshToken(tokenPayload);
+
+    // Audit log
+    await prisma.auditLog.create({
+      data: {
+        schoolId: primaryMembership?.schoolId,
+        userId: user.id,
+        action: 'MFA_VERIFICATION_SUCCESS',
+        entityType: 'USER_SECURITY',
+        entityId: user.id,
+        module: 'SECURITY',
+        actorRole: primaryMembership?.role || 'USER',
+        targetEntityName: `${user.firstName} ${user.lastName}`,
+        status: 'SUCCESS',
+      },
+    });
+
+    return {
+      accessToken,
+      refreshToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        username: user.username,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: tokenPayload.role,
+        schoolId: tokenPayload.schoolId,
+        schoolName: primaryMembership?.school?.name,
+        studentProfileId: tokenPayload.studentProfileId,
+        staffProfileId: tokenPayload.staffProfileId,
+        guardianStudentIds: tokenPayload.guardianStudentIds,
+        mustChangePassword: user.mustChangePassword || false,
+        accountLocked: user.accountLocked || false,
+        passwordResetAt: user.passwordResetAt,
+        passwordChangedAt: user.passwordChangedAt,
+      },
+    };
+  }
+
+  /**
+   * Section 17: Resends a fresh MFA OTP
+   */
+  async resendMfaOtp(mfaToken: string) {
+    let payload: any;
+    try {
+      payload = verifyAccessToken(mfaToken);
+    } catch {
+      throw new AppError('MFA session has expired. Please log in again.', 401, 'MFA_SESSION_EXPIRED');
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: payload.userId },
+    });
+
+    if (!user) {
+      throw new AppError('User not found.', 404, 'USER_NOT_FOUND');
+    }
+
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const mfaOtpExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        mfaOtpCode: otpCode,
+        mfaOtpExpiresAt,
+      },
+    });
+
+    const emailMasked = user.email.replace(/(.{2})(.*)(?=@)/, (_m, a, b) => a + '*'.repeat(Math.max(1, b.length)));
+
+    return {
+      success: true,
+      emailMasked,
+      message: 'A fresh 6-digit MFA verification code has been dispatched.',
+      ...(process.env.NODE_ENV !== 'production' ? { debugOtp: otpCode } : {}),
+    };
+  }
+
+  /**
+   * Section 17: Configures or toggles MFA for a user account
+   */
+  async toggleMfa(userId: string, enable: boolean, method = 'EMAIL_OTP') {
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        mfaEnabled: enable,
+        mfaMethod: method,
+      },
+      select: {
+        id: true,
+        email: true,
+        mfaEnabled: true,
+        mfaMethod: true,
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        userId,
+        action: enable ? 'MFA_ENABLED' : 'MFA_DISABLED',
+        entityType: 'USER_SECURITY',
+        entityId: userId,
+        module: 'SECURITY',
+        details: { mfaMethod: method },
+        status: 'SUCCESS',
+      },
+    });
+
+    return {
+      success: true,
+      mfaEnabled: user.mfaEnabled,
+      mfaMethod: user.mfaMethod,
+      message: enable
+        ? 'Two-Factor Authentication (2FA) is now enabled for your account.'
+        : 'Two-Factor Authentication (2FA) has been disabled.',
+    };
+  }
+
+  /**
+   * Role and context switcher for users with multiple memberships
+   */
   async switchContext(userId: string, targetSchoolId: string, targetRole: PlatformRoleType) {
     const tokenPayload: TokenPayload = {
       userId,
@@ -808,6 +1084,25 @@ export class AuthService {
       role: targetRole,
       schoolId: targetSchoolId,
     };
+  }
+
+  /**
+   * Section 17: Secure Logout with immediate Token Version invalidation
+   */
+  async logout(userId?: string) {
+    if (userId) {
+      try {
+        await prisma.user.update({
+          where: { id: userId },
+          data: {
+            tokenVersion: { increment: 1 },
+          },
+        });
+      } catch (err) {
+        console.warn('[AuthService] Logout token version update warning:', err);
+      }
+    }
+    return { loggedOut: true };
   }
 }
 

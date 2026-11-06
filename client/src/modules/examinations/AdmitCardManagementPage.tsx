@@ -267,9 +267,12 @@ export const AdmitCardManagementPage: React.FC = () => {
   };
 
   // Launch Bulk Generation
-  const handleLaunchBulkGeneration = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!bulkExamTitle.trim()) {
+  const handleLaunchBulkGeneration = async (e?: React.FormEvent | React.MouseEvent) => {
+    if (e && e.preventDefault) {
+      e.preventDefault();
+    }
+    if (generating) return;
+    if (!bulkExamTitle || !bulkExamTitle.trim()) {
       setFeedbackMsg({ type: 'error', text: 'Please specify an examination title.' });
       return;
     }
@@ -277,15 +280,16 @@ export const AdmitCardManagementPage: React.FC = () => {
     try {
       setGenerating(true);
       setBulkResult(null);
+      setFeedbackMsg(null);
       const payload: any = {
         examTitle: bulkExamTitle.trim(),
         examType: bulkExamType,
         className: bulkClass || undefined,
         sectionName: bulkSection || undefined,
         allEligible: !bulkClass,
-        centerName: bulkCenterName,
-        defaultRoomNumber: bulkRoomNumber,
-        candidateInstructions: bulkInstructions,
+        centerName: bulkCenterName || undefined,
+        defaultRoomNumber: bulkRoomNumber || undefined,
+        candidateInstructions: bulkInstructions || undefined,
         skipUnpaidFees: enforceFeeCheck,
         feeThresholdAmount: feeThreshold,
         skipLowAttendance: enforceAttendanceCheck,
@@ -301,11 +305,12 @@ export const AdmitCardManagementPage: React.FC = () => {
 
       setFeedbackMsg({
         type: 'success',
-        text: `Batch generation complete! Generated/Updated: ${genCount} hall tickets (Skipped: ${skipCount}).`,
+        text: `Batch generation complete! Generated/Updated: ${genCount} hall ticket(s)${skipCount > 0 ? ` (${skipCount} skipped)` : ''}.`,
       });
       await Promise.all([loadStats(), loadCards()]);
     } catch (err: any) {
-      setFeedbackMsg({ type: 'error', text: err.message || 'Bulk generation encountered an error.' });
+      console.error('Batch generation failed:', err);
+      setFeedbackMsg({ type: 'error', text: err.message || 'Bulk generation encountered an error. Please try again.' });
     } finally {
       setGenerating(false);
     }
@@ -906,7 +911,7 @@ export const AdmitCardManagementPage: React.FC = () => {
               </p>
             </div>
 
-            <form onSubmit={handleLaunchBulkGeneration} style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <form onSubmit={(e) => { e.preventDefault(); handleLaunchBulkGeneration(e); }} style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '6px' }}>
@@ -1064,7 +1069,7 @@ export const AdmitCardManagementPage: React.FC = () => {
               {feedbackMsg && (
                 <div
                   style={{
-                    padding: '12px 16px',
+                    padding: '14px 18px',
                     borderRadius: 'var(--radius-sm)',
                     fontSize: '0.85rem',
                     fontWeight: 500,
@@ -1073,15 +1078,29 @@ export const AdmitCardManagementPage: React.FC = () => {
                     border: `1px solid ${feedbackMsg.type === 'success' ? '#bbf7d0' : '#fecaca'}`,
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '10px',
+                    justifyContent: 'space-between',
+                    gap: '12px',
                   }}
                 >
-                  {feedbackMsg.type === 'success' ? (
-                    <CheckCircle2 size={18} style={{ color: '#16a34a', flexShrink: 0 }} />
-                  ) : (
-                    <AlertTriangle size={18} style={{ color: '#dc2626', flexShrink: 0 }} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    {feedbackMsg.type === 'success' ? (
+                      <CheckCircle2 size={20} style={{ color: '#16a34a', flexShrink: 0 }} />
+                    ) : (
+                      <AlertTriangle size={20} style={{ color: '#dc2626', flexShrink: 0 }} />
+                    )}
+                    <span>{feedbackMsg.text}</span>
+                  </div>
+                  {feedbackMsg.type === 'success' && (
+                    <Button
+                      type="button"
+                      variant="primary"
+                      size="sm"
+                      onClick={() => setActiveTab('directory')}
+                      style={{ flexShrink: 0 }}
+                    >
+                      View in Directory
+                    </Button>
                   )}
-                  <span>{feedbackMsg.text}</span>
                 </div>
               )}
 
@@ -1089,8 +1108,18 @@ export const AdmitCardManagementPage: React.FC = () => {
                 <Button
                   type="submit"
                   variant="primary"
+                  isLoading={generating}
                   disabled={generating}
-                  style={{ width: '100%', padding: '12px', fontSize: '0.95rem' }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleLaunchBulkGeneration(e);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '14px',
+                    fontSize: '0.95rem',
+                    cursor: generating ? 'not-allowed' : 'pointer',
+                  }}
                 >
                   {generating ? (
                     <>

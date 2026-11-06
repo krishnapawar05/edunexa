@@ -1,6 +1,8 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { authenticateUser, requireRole } from '../../middleware/auth.middleware.js';
 import { aiController } from './ai.controller.js';
+import { chatbotController } from './chatbot.controller.js';
+import { PlatformRole } from '@edunexa/shared';
 
 const router = Router();
 
@@ -17,6 +19,45 @@ const asyncHandler = (fn: (req: Request, res: Response, next: NextFunction) => P
  * Returns honest status of AI provider configuration
  */
 router.get('/status', asyncHandler(aiController.getStatus));
+
+// ============================================================================
+// SECTION 13: PUBLIC WEBSITE AI CHATBOT & ENQUIRY WORKFLOWS
+// ============================================================================
+
+// Public chatbot configuration, branding, and published FAQs
+router.get('/chatbot/public-data', asyncHandler(chatbotController.getPublicData));
+
+// Public chatbot intelligent conversation message
+router.post('/chatbot/message', asyncHandler(chatbotController.processPublicMessage));
+
+// Public chatbot admission enquiry submission
+router.post('/chatbot/enquiry', asyncHandler(chatbotController.submitPublicEnquiry));
+
+// Public chatbot escalation to human admissions counselor
+router.post('/chatbot/escalate', asyncHandler(chatbotController.submitPublicEscalation));
+router.post('/chatbot/escalation', asyncHandler(chatbotController.submitPublicEscalation));
+
+// ============================================================================
+// SECTION 13: ADMIN FAQ & CHATBOT RESPONSE / ESCALATION MANAGEMENT
+// ============================================================================
+
+const adminRoles = [PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.SUPER_ADMIN];
+
+// FAQ CRUD & Reordering
+router.get('/admin/faqs', authenticateUser, requireRole(...adminRoles), asyncHandler(chatbotController.listAdminFAQs));
+router.post('/admin/faqs', authenticateUser, requireRole(...adminRoles), asyncHandler(chatbotController.createAdminFAQ));
+router.patch('/admin/faqs/:id', authenticateUser, requireRole(...adminRoles), asyncHandler(chatbotController.updateAdminFAQ));
+router.put('/admin/faqs/:id', authenticateUser, requireRole(...adminRoles), asyncHandler(chatbotController.updateAdminFAQ));
+router.delete('/admin/faqs/:id', authenticateUser, requireRole(...adminRoles), asyncHandler(chatbotController.deleteAdminFAQ));
+router.post('/admin/faqs/reorder', authenticateUser, requireRole(...adminRoles), asyncHandler(chatbotController.reorderAdminFAQs));
+
+// Chatbot Configuration & Escalation Management
+router.get('/admin/config', authenticateUser, requireRole(...adminRoles), asyncHandler(chatbotController.getAdminConfig));
+router.patch('/admin/config', authenticateUser, requireRole(...adminRoles), asyncHandler(chatbotController.updateAdminConfig));
+router.put('/admin/config', authenticateUser, requireRole(...adminRoles), asyncHandler(chatbotController.updateAdminConfig));
+router.get('/admin/escalations', authenticateUser, requireRole(...adminRoles), asyncHandler(chatbotController.listAdminEscalations));
+router.patch('/admin/escalations/:id/status', authenticateUser, requireRole(...adminRoles), asyncHandler(chatbotController.updateAdminEscalationStatus));
+router.delete('/admin/escalations/:id', authenticateUser, requireRole(...adminRoles), asyncHandler(chatbotController.deleteAdminEscalation));
 
 /**
  * FEATURE 1: School Information Assistant

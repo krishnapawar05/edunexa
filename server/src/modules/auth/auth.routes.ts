@@ -16,6 +16,20 @@ router.post('/login', authRateLimiter, validateRequest({ body: LoginRequestSchem
   authController.login(req, res, next);
 });
 
+// Section 17: Multi-Factor Authentication Endpoints (Public Challenge Completion)
+router.post('/mfa/verify', authRateLimiter, (req, res, next) => {
+  authController.verifyMfa(req, res, next);
+});
+
+router.post('/mfa/resend', authRateLimiter, (req, res, next) => {
+  authController.resendMfa(req, res, next);
+});
+
+// Authenticated MFA Management
+router.post('/mfa/toggle', authenticateUser, (req, res, next) => {
+  authController.toggleMfa(req, res, next);
+});
+
 // Password Recovery Endpoints (Public)
 router.post(
   '/forgot-password',

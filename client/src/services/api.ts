@@ -62,7 +62,7 @@ export function clearAuthSession(): void {
   localStorage.removeItem('edunexa_user');
 }
 
-export async function loginApi(email: string, password: string): Promise<{ accessToken: string; user: StoredUser }> {
+export async function loginApi(email: string, password: string): Promise<any> {
   const res = await fetch(getApiUrl('/api/v1/auth/login'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -78,9 +78,53 @@ export async function loginApi(email: string, password: string): Promise<{ acces
   if (!res.ok || !json?.success) {
     throw new Error(json?.error?.message || 'Login failed. Please verify credentials.');
   }
+  if (json.data?.mfaRequired) {
+    return json.data;
+  }
   setAuthSession(json.data.accessToken, json.data.user);
   return json.data;
 }
+
+export const authApi = {
+  verifyMfa: (data: { mfaToken: string; otpCode: string }) =>
+    apiRequest<any>('/api/v1/auth/mfa/verify', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  resendMfa: (data: { mfaToken: string }) =>
+    apiRequest<any>('/api/v1/auth/mfa/resend', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  toggleMfa: (data: { enable: boolean; method?: string }) =>
+    apiRequest<any>('/api/v1/auth/mfa/toggle', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+};
+
+export const storageApi = {
+  uploadFile: (data: { originalName: string; mimeType: string; category?: string; isPublic?: boolean; base64Data: string; metadata?: any }) =>
+    apiRequest<any>('/api/v1/storage/upload', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  listFiles: (params?: { category?: string; isPublic?: boolean; search?: string; page?: number; limit?: number }) => {
+    const q = new URLSearchParams();
+    if (params?.category) q.set('category', params.category);
+    if (params?.isPublic !== undefined) q.set('isPublic', String(params.isPublic));
+    if (params?.search) q.set('search', params.search);
+    if (params?.page) q.set('page', String(params.page));
+    if (params?.limit) q.set('limit', String(params.limit));
+    const qs = q.toString() ? `?${q.toString()}` : '';
+    return apiRequest<any>(`/api/v1/storage/files${qs}`);
+  },
+  getFileMetadata: (id: string) => apiRequest<any>(`/api/v1/storage/files/${encodeURIComponent(id)}/meta`),
+  deleteFile: (id: string) =>
+    apiRequest<any>(`/api/v1/storage/files/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    }),
+};
 
 // ============================================================================
 // TYPED FETCH WRAPPER
@@ -2131,3 +2175,1121 @@ export const marksheetsApi = {
     return res?.data ?? res;
   },
 };
+
+// ============================================================================
+// SECTION 8: ROLE-BASED PORTALS API (STUDENT, PARENT, TEACHER)
+// ============================================================================
+
+export const portalsApi = {
+  // Student Portal
+  async getStudentDashboard(): Promise<any> {
+    const res = await apiRequest<any>('/api/v1/portals/student/dashboard');
+    return res?.data ?? res;
+  },
+
+  async getStudentAdmissionDetails(): Promise<any> {
+    const res = await apiRequest<any>('/api/v1/portals/student/admission-details');
+    return res?.data ?? res;
+  },
+
+  async getStudentLibrary(): Promise<any[]> {
+    const res = await apiRequest<any>('/api/v1/portals/student/library');
+    return res?.data ?? res ?? [];
+  },
+
+  async getStudentMeetings(): Promise<any[]> {
+    const res = await apiRequest<any>('/api/v1/portals/student/meetings');
+    return res?.data ?? res ?? [];
+  },
+
+  // Parent Portal (Multi-Child)
+  async getParentChildren(): Promise<any[]> {
+    const res = await apiRequest<any>('/api/v1/portals/parent/children');
+    return res?.data ?? res ?? [];
+  },
+
+  async getParentChildDashboard(studentProfileId: string): Promise<any> {
+    const res = await apiRequest<any>(`/api/v1/portals/parent/child/${encodeURIComponent(studentProfileId)}/dashboard`);
+    return res?.data ?? res;
+  },
+
+  async getParentChildHomework(studentProfileId: string): Promise<any[]> {
+    const res = await apiRequest<any>(`/api/v1/portals/parent/child/${encodeURIComponent(studentProfileId)}/homework`);
+    return res?.data ?? res ?? [];
+  },
+
+  async getParentChildReceipts(studentProfileId: string): Promise<any[]> {
+    const res = await apiRequest<any>(`/api/v1/portals/parent/child/${encodeURIComponent(studentProfileId)}/receipts`);
+    return res?.data ?? res ?? [];
+  },
+
+  async getParentChildMeetings(studentProfileId: string): Promise<any[]> {
+    const res = await apiRequest<any>(`/api/v1/portals/parent/child/${encodeURIComponent(studentProfileId)}/meetings`);
+    return res?.data ?? res ?? [];
+  },
+
+  async getParentChildAdmission(studentProfileId: string): Promise<any> {
+    const res = await apiRequest<any>(`/api/v1/portals/parent/child/${encodeURIComponent(studentProfileId)}/dashboard`);
+    return res?.data?.student ?? res?.student ?? res;
+  },
+
+  async getParentMessages(studentProfileId: string): Promise<any[]> {
+    const res = await apiRequest<any>(`/api/v1/portals/parent/child/${encodeURIComponent(studentProfileId)}/messages`);
+    return res?.data ?? res ?? [];
+  },
+
+  async getMessages(studentProfileId?: string): Promise<any[]> {
+    if (studentProfileId) {
+      return this.getParentMessages(studentProfileId);
+    }
+    const res = await apiRequest<any>('/api/v1/portals/parent/messages');
+    return res?.data ?? res ?? [];
+  },
+
+  async sendParentMessage(studentProfileId: string, data: { subject?: string; messageContent: string; recipientUserId?: string }): Promise<any> {
+    const res = await apiRequest<any>(`/api/v1/portals/parent/child/${encodeURIComponent(studentProfileId)}/messages`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    return res?.data ?? res;
+  },
+
+  async sendMessage(data: { studentProfileId?: string; subject?: string; messageContent: string; channel?: string; recipientUserId?: string }): Promise<any> {
+    if (data.studentProfileId) {
+      return this.sendParentMessage(data.studentProfileId, data);
+    }
+    const res = await apiRequest<any>('/api/v1/portals/parent/messages', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    return res?.data ?? res;
+  },
+
+  // Teacher Portal
+  async getTeacherDashboard(): Promise<any> {
+    const res = await apiRequest<any>('/api/v1/portals/teacher/dashboard');
+    return res?.data ?? res;
+  },
+
+  async getTeacherAcademicReports(params?: { classId?: string; subjectId?: string; className?: string; sectionName?: string }): Promise<any> {
+    const qs = new URLSearchParams();
+    if (params?.classId) qs.set('classId', params.classId);
+    if (params?.subjectId) qs.set('subjectId', params.subjectId);
+    if (params?.className) qs.set('className', params.className);
+    if (params?.sectionName) qs.set('sectionName', params.sectionName);
+    const queryString = qs.toString() ? `?${qs.toString()}` : '';
+    const res = await apiRequest<any>(`/api/v1/portals/teacher/academic-reports${queryString}`);
+    return res?.data ?? res;
+  },
+
+  async getTeacherAcademicReport(params?: { classId?: string; subjectId?: string; className?: string; sectionName?: string }): Promise<any> {
+    return this.getTeacherAcademicReports(params);
+  },
+
+  async getTeacherMeetings(): Promise<any[]> {
+    const res = await apiRequest<any>('/api/v1/portals/student/meetings');
+    return res?.data ?? res ?? [];
+  },
+
+  async getTeacherRemarks(studentProfileId?: string): Promise<any[]> {
+    if (studentProfileId) {
+      return this.getStudentRemarks(studentProfileId);
+    }
+    const res = await apiRequest<any>('/api/v1/portals/student/dashboard');
+    return res?.data?.remarks ?? res?.remarks ?? [];
+  },
+
+  async getStudentRemarks(studentProfileId: string): Promise<any[]> {
+    const res = await apiRequest<any>(`/api/v1/portals/teacher/students/${encodeURIComponent(studentProfileId)}/remarks`);
+    return res?.data ?? res ?? [];
+  },
+
+  async addStudentRemark(data: { studentProfileId: string; remark: string; category?: string; academicSessionId?: string; isPrivate?: boolean }): Promise<any> {
+    const res = await apiRequest<any>(`/api/v1/portals/teacher/students/${encodeURIComponent(data.studentProfileId)}/remarks`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    return res?.data ?? res;
+  },
+
+  async scheduleMeeting(data: any): Promise<any> {
+    const res = await apiRequest<any>('/api/v1/portals/teacher/meetings', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    return res?.data ?? res;
+  },
+
+  async updateMeetingStatus(meetingId: string, data: { status: string; notes?: string; joiningUrl?: string }): Promise<any> {
+    const res = await apiRequest<any>(`/api/v1/portals/teacher/meetings/${encodeURIComponent(meetingId)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+    return res?.data ?? res;
+  },
+
+  // Library Module
+  async listLibraryBooks(params?: { search?: string; category?: string }): Promise<any[]> {
+    const qs = new URLSearchParams();
+    if (params?.search) qs.set('search', params.search);
+    if (params?.category) qs.set('category', params.category);
+    const queryString = qs.toString() ? `?${qs.toString()}` : '';
+    const res = await apiRequest<any>(`/api/v1/portals/library/books${queryString}`);
+    return res?.data ?? res ?? [];
+  },
+
+  async createLibraryBook(data: any): Promise<any> {
+    const res = await apiRequest<any>('/api/v1/portals/library/books', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    return res?.data ?? res;
+  },
+
+  async issueLibraryBook(data: { bookId: string; studentProfileId: string; dueDate: string; notes?: string }): Promise<any> {
+    const res = await apiRequest<any>('/api/v1/portals/library/issue', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    return res?.data ?? res;
+  },
+
+  async returnLibraryBook(issueId: string, fineAmount: number = 0): Promise<any> {
+    const res = await apiRequest<any>(`/api/v1/portals/library/return/${encodeURIComponent(issueId)}`, {
+      method: 'POST',
+      body: JSON.stringify({ fineAmount }),
+    });
+    return res?.data ?? res;
+  },
+};
+
+// ============================================================================
+// SECTION 9: INTERNAL CHAT, MESSAGING, MEETINGS & CALENDAR API
+// ============================================================================
+
+export const communicationApi = {
+  // 1. One-to-One and Group Chat
+  async getOrCreateDirectConversation(targetUserId: string): Promise<any> {
+    const res = await apiRequest<any>('/api/v1/communication/direct', {
+      method: 'POST',
+      body: JSON.stringify({ targetUserId }),
+    });
+    return res?.data ?? res;
+  },
+
+  async createGroupConversation(data: {
+    title: string;
+    participantIds: string[];
+    groupType?: string;
+    initialMessage?: string;
+  }): Promise<any> {
+    const res = await apiRequest<any>('/api/v1/communication/groups', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    return res?.data ?? res;
+  },
+
+  async listUserConversations(query?: string): Promise<any[]> {
+    const qs = query ? `?q=${encodeURIComponent(query)}` : '';
+    const res = await apiRequest<any>(`/api/v1/communication/conversations${qs}`);
+    return res?.data ?? res ?? [];
+  },
+
+  async getConversationDetails(id: string): Promise<any> {
+    const res = await apiRequest<any>(`/api/v1/communication/conversations/${encodeURIComponent(id)}`);
+    return res?.data ?? res;
+  },
+
+  async addGroupParticipants(id: string, userIds: string[]): Promise<any> {
+    const res = await apiRequest<any>(`/api/v1/communication/groups/${encodeURIComponent(id)}/participants`, {
+      method: 'POST',
+      body: JSON.stringify({ userIds }),
+    });
+    return res?.data ?? res;
+  },
+
+  async removeGroupParticipant(id: string, targetUserId: string): Promise<any> {
+    const res = await apiRequest<any>(
+      `/api/v1/communication/groups/${encodeURIComponent(id)}/participants/${encodeURIComponent(targetUserId)}`,
+      { method: 'DELETE' }
+    );
+    return res?.data ?? res;
+  },
+
+  // 2. Messages, Receipts & Search
+  async sendMessage(data: {
+    conversationId: string;
+    content: string;
+    messageType?: string;
+    attachments?: Array<{ fileName: string; fileUrl: string; fileType: string; fileSize: number }>;
+  }): Promise<any> {
+    const res = await apiRequest<any>('/api/v1/communication/messages', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    return res?.data ?? res;
+  },
+
+  async getConversationMessages(id: string, limit = 50, before?: string): Promise<any[]> {
+    const qs = new URLSearchParams();
+    qs.set('limit', String(limit));
+    if (before) qs.set('before', before);
+    const res = await apiRequest<any>(`/api/v1/communication/conversations/${encodeURIComponent(id)}/messages?${qs.toString()}`);
+    return res?.data ?? res ?? [];
+  },
+
+  async markMessageRead(conversationId: string, messageId: string): Promise<any> {
+    const res = await apiRequest<any>(
+      `/api/v1/communication/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/read`,
+      { method: 'POST' }
+    );
+    return res?.data ?? res;
+  },
+
+  async searchMessages(query: string): Promise<any[]> {
+    const res = await apiRequest<any>(`/api/v1/communication/messages/search?q=${encodeURIComponent(query)}`);
+    return res?.data ?? res ?? [];
+  },
+
+  // 3. Reporting & Moderation
+  async reportMessage(data: { messageId: string; reason: string }): Promise<any> {
+    const res = await apiRequest<any>('/api/v1/communication/messages/report', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    return res?.data ?? res;
+  },
+
+  async listReportedMessages(): Promise<any[]> {
+    const res = await apiRequest<any>('/api/v1/communication/moderation/reports');
+    return res?.data ?? res ?? [];
+  },
+
+  async moderateReport(reportId: string, data: { action: string; moderatorNotes?: string }): Promise<any> {
+    const res = await apiRequest<any>(`/api/v1/communication/moderation/reports/${encodeURIComponent(reportId)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+    return res?.data ?? res;
+  },
+
+  // 4. Super Admin Monitoring & Export
+  async getSuperAdminMonitoringTelemetry(): Promise<any> {
+    const res = await apiRequest<any>('/api/v1/communication/superadmin/telemetry');
+    return res?.data ?? res;
+  },
+
+  async listMonitoredConversations(filters?: { schoolId?: string; role?: string; userId?: string; search?: string }): Promise<any[]> {
+    const qs = new URLSearchParams();
+    if (filters?.schoolId) qs.set('schoolId', filters.schoolId);
+    if (filters?.role) qs.set('role', filters.role);
+    if (filters?.userId) qs.set('userId', filters.userId);
+    if (filters?.search) qs.set('search', filters.search);
+    const queryString = qs.toString() ? `?${qs.toString()}` : '';
+    const res = await apiRequest<any>(`/api/v1/communication/superadmin/conversations${queryString}`);
+    return res?.data ?? res ?? [];
+  },
+
+  async exportConversationRecords(id: string, format: 'PDF' | 'CSV' = 'CSV'): Promise<any> {
+    const res = await apiRequest<any>(`/api/v1/communication/superadmin/conversations/${encodeURIComponent(id)}/export?format=${format}`);
+    return res?.data ?? res;
+  },
+
+  async getCommunicationAuditLogs(schoolId?: string): Promise<any[]> {
+    const qs = schoolId ? `?schoolId=${encodeURIComponent(schoolId)}` : '';
+    const res = await apiRequest<any>(`/api/v1/communication/superadmin/audit-logs${qs}`);
+    return res?.data ?? res ?? [];
+  },
+
+  async getPermissionConfig(): Promise<any> {
+    const res = await apiRequest<any>('/api/v1/communication/permissions/config');
+    return res?.data ?? res;
+  },
+
+  async updatePermissionConfig(data: any): Promise<any> {
+    const res = await apiRequest<any>('/api/v1/communication/permissions/config', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+    return res?.data ?? res;
+  },
+
+  // 5. Google Workspace & Meet
+  async getGoogleIntegration(): Promise<any> {
+    const res = await apiRequest<any>('/api/v1/communication/google/config');
+    return res?.data ?? res;
+  },
+
+  async configureGoogleWorkspace(data: any): Promise<any> {
+    const res = await apiRequest<any>('/api/v1/communication/google/config', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    return res?.data ?? res;
+  },
+
+  async scheduleMeetingWithGoogleMeet(data: any): Promise<any> {
+    const res = await apiRequest<any>('/api/v1/communication/meetings/schedule', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    return res?.data ?? res;
+  },
+
+  // 6. Calendar Events
+  async listCalendarEvents(month?: number, year?: number): Promise<any[]> {
+    const qs = new URLSearchParams();
+    if (month) qs.set('month', String(month));
+    if (year) qs.set('year', String(year));
+    const queryString = qs.toString() ? `?${qs.toString()}` : '';
+    const res = await apiRequest<any>(`/api/v1/communication/calendar/events${queryString}`);
+    return res?.data ?? res ?? [];
+  },
+
+  async createCalendarEvent(data: any): Promise<any> {
+    const res = await apiRequest<any>('/api/v1/communication/calendar/events', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    return res?.data ?? res;
+  },
+
+  // Ergonomic Aliases
+  getConversations(query?: string) {
+    return this.listUserConversations(query);
+  },
+  getMessages(id: string, opts?: { limit?: number; before?: string }) {
+    return this.getConversationMessages(id, opts?.limit ?? 50, opts?.before);
+  },
+  markMessageAsRead(conversationId: string, messageId: string) {
+    return this.markMessageRead(conversationId, messageId);
+  },
+  createGroup(data: { title: string; groupType?: string; participantUserIds: string[] }) {
+    return this.createGroupConversation({
+      title: data.title,
+      groupType: data.groupType,
+      participantIds: data.participantUserIds,
+    });
+  },
+  getReportedMessages() {
+    return this.listReportedMessages();
+  },
+  moderateReportedMessage(id: string, data: { status: string; moderatorNotes?: string }) {
+    return this.moderateReport(id, { action: data.status, moderatorNotes: data.moderatorNotes });
+  },
+  getSuperAdminTelemetry() {
+    return this.getSuperAdminMonitoringTelemetry();
+  },
+  getSuperAdminConversations(filters?: any) {
+    return this.listMonitoredConversations(filters);
+  },
+  getSuperAdminAuditLogs(schoolId?: string) {
+    return this.getCommunicationAuditLogs(schoolId);
+  },
+  exportConversation(id: string, format: 'PDF' | 'CSV' = 'CSV') {
+    return this.exportConversationRecords(id, format);
+  },
+  getCalendarEvents(params?: any) {
+    return this.listCalendarEvents(params?.month, params?.year);
+  },
+  getGoogleWorkspaceConfig() {
+    return this.getGoogleIntegration();
+  },
+  scheduleMeeting(data: any) {
+    return this.scheduleMeetingWithGoogleMeet(data);
+  },
+};
+
+// ============================================================================
+// SECTION 11: LIBRARY MANAGEMENT SYSTEM API CLIENT
+// ============================================================================
+export const libraryApi = {
+  getDashboardStats(): Promise<any> {
+    return apiRequest<any>('/api/v1/library/dashboard/stats');
+  },
+  listBooks(params?: {
+    search?: string;
+    category?: string;
+    status?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<any> {
+    const query = new URLSearchParams();
+    if (params?.search) query.append('search', params.search);
+    if (params?.category) query.append('category', params.category);
+    if (params?.status) query.append('status', params.status);
+    if (params?.page) query.append('page', String(params.page));
+    if (params?.limit) query.append('limit', String(params.limit));
+    const qs = query.toString();
+    return apiRequest<any>(
+      `/api/v1/library/books${qs ? `?${qs}` : ''}`
+    );
+  },
+  getBookById(id: string): Promise<any> {
+    return apiRequest<any>(`/api/v1/library/books/${id}`);
+  },
+  createBook(data: any): Promise<any> {
+    return apiRequest<any>('/api/v1/library/books', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  updateBook(id: string, data: any): Promise<any> {
+    return apiRequest<any>(`/api/v1/library/books/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+  deleteBook(id: string): Promise<any> {
+    return apiRequest<any>(`/api/v1/library/books/${id}`, {
+      method: 'DELETE',
+    });
+  },
+  listIssues(params?: {
+    studentProfileId?: string;
+    bookId?: string;
+    status?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<any> {
+    const query = new URLSearchParams();
+    if (params?.studentProfileId) query.append('studentProfileId', params.studentProfileId);
+    if (params?.bookId) query.append('bookId', params.bookId);
+    if (params?.status) query.append('status', params.status);
+    if (params?.page) query.append('page', String(params.page));
+    if (params?.limit) query.append('limit', String(params.limit));
+    const qs = query.toString();
+    return apiRequest<any>(
+      `/api/v1/library/issues${qs ? `?${qs}` : ''}`
+    );
+  },
+  issueBook(data: { bookId: string; studentProfileId: string; dueDate: string; notes?: string }): Promise<any> {
+    return apiRequest<any>('/api/v1/library/issues', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  returnBook(issueId: string, data: { returnCondition?: string; notes?: string; waiveFine?: boolean }): Promise<any> {
+    return apiRequest<any>(`/api/v1/library/issues/${issueId}/return`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  getOverdueBooks(params?: { page?: number; limit?: number }): Promise<any> {
+    const query = new URLSearchParams();
+    if (params?.page) query.append('page', String(params.page));
+    if (params?.limit) query.append('limit', String(params.limit));
+    const qs = query.toString();
+    return apiRequest<any>(
+      `/api/v1/library/overdue${qs ? `?${qs}` : ''}`
+    );
+  },
+  updateFineStatus(issueId: string, data: { fineStatus: 'PAID' | 'WAIVED' | 'PENDING'; notes?: string }): Promise<any> {
+    return apiRequest<any>(`/api/v1/library/issues/${issueId}/fine`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+  getStudentHistory(studentProfileId: string): Promise<any> {
+    return apiRequest<any>(`/api/v1/library/students/${studentProfileId}/history`);
+  },
+  getMyHistory(): Promise<any> {
+    return apiRequest<any>('/api/v1/library/my-history');
+  },
+  getSettings(): Promise<any> {
+    return apiRequest<any>('/api/v1/library/settings');
+  },
+  updateSettings(data: any): Promise<any> {
+    return apiRequest<any>('/api/v1/library/settings', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+  generateReport(params: {
+    reportType: string;
+    startDate?: string;
+    endDate?: string;
+    category?: string;
+  }): Promise<any> {
+    const query = new URLSearchParams();
+    query.append('reportType', params.reportType);
+    if (params.startDate) query.append('startDate', params.startDate);
+    if (params.endDate) query.append('endDate', params.endDate);
+    if (params.category) query.append('category', params.category);
+    return apiRequest<any>(`/api/v1/library/reports?${query.toString()}`);
+  },
+  seedSampleBooks(): Promise<any> {
+    return apiRequest<any>('/api/v1/library/seed-sample-books', {
+      method: 'POST',
+    });
+  },
+};
+
+// ============================================================================
+// 13. AI CHATBOT, FAQ & ENQUIRY APIS
+// ============================================================================
+
+export const chatbotApi = {
+  // Public Chatbot APIs
+  getPublicData(schoolIdentifier?: string): Promise<{
+    school: { id: string; name: string; slug?: string; contactPhone?: string; contactEmail?: string; address?: string };
+    config: {
+      botName: string;
+      welcomeMessage: string;
+      suggestedQuestions: string[];
+      fallbackMessage: string;
+      whatsappNumber?: string;
+      whatsappPrefillText?: string;
+      whatsappEnabled: boolean;
+      escalationEnabled: boolean;
+      escalationMessage?: string;
+      escalationPhone?: string;
+      escalationEmail?: string;
+      escalationAvailability?: string;
+    };
+    faqs: Array<{ id: string; question: string; answer: string; category: string; displayOrder: number }>;
+  }> {
+    const query = schoolIdentifier ? `?schoolIdentifier=${encodeURIComponent(schoolIdentifier)}` : '';
+    return apiRequest(`/api/v1/ai/chatbot/public-data${query}`);
+  },
+
+  sendMessage(data: {
+    message?: string;
+    question?: string;
+    history?: Array<{ sender: 'user' | 'bot'; text: string }>;
+    conversationHistory?: Array<{ sender: 'user' | 'bot'; text: string }>;
+    schoolIdentifier?: string;
+  }): Promise<any> {
+    const text = data.message || data.question || '';
+    const hist = data.history || data.conversationHistory || [];
+    return apiRequest('/api/v1/ai/chatbot/message', {
+      method: 'POST',
+      body: JSON.stringify({
+        message: text,
+        question: text,
+        history: hist,
+        conversationHistory: hist,
+        schoolIdentifier: data.schoolIdentifier,
+      }),
+    });
+  },
+
+  submitEnquiry(data: {
+    schoolIdentifier?: string;
+    parentName: string;
+    studentName: string;
+    phone: string;
+    email?: string;
+    classApplying: string;
+    previousSchool?: string;
+    message?: string;
+  }): Promise<{
+    success: boolean;
+    enquiryNumber: string;
+    message: string;
+    applyUrl: string;
+  }> {
+    return apiRequest('/api/v1/ai/chatbot/enquiry', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  submitEscalation(data: {
+    schoolIdentifier?: string;
+    visitorName: string;
+    visitorPhone: string;
+    visitorEmail?: string;
+    query: string;
+    reason?: string;
+    conversationSnapshot?: any;
+  }): Promise<{
+    escalationId: string;
+    message: string;
+  }> {
+    return apiRequest('/api/v1/ai/chatbot/escalation', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  // Admin FAQ Management APIs
+  listFaqs(params?: { category?: string; search?: string; isPublished?: boolean }): Promise<any> {
+    const q = new URLSearchParams();
+    if (params?.category && params.category !== 'ALL') q.set('category', params.category);
+    if (params?.search) q.set('search', params.search);
+    if (params?.isPublished !== undefined) q.set('isPublished', String(params.isPublished));
+    const qs = q.toString() ? `?${q.toString()}` : '';
+    return apiRequest<any>(`/api/v1/ai/admin/faqs${qs}`).then((res) => (res && Array.isArray(res.items) ? res.items : Array.isArray(res) ? res : []));
+  },
+
+  createFaq(data: {
+    question: string;
+    answer: string;
+    category: string;
+    displayOrder?: number;
+    isPublished?: boolean;
+  }): Promise<any> {
+    return apiRequest('/api/v1/ai/admin/faqs', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  updateFaq(id: string, data: {
+    question?: string;
+    answer?: string;
+    category?: string;
+    displayOrder?: number;
+    isPublished?: boolean;
+  }): Promise<any> {
+    return apiRequest(`/api/v1/ai/admin/faqs/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  deleteFaq(id: string): Promise<any> {
+    return apiRequest(`/api/v1/ai/admin/faqs/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  reorderFaqs(faqIds: string[]): Promise<any> {
+    return apiRequest('/api/v1/ai/admin/faqs/reorder', {
+      method: 'POST',
+      body: JSON.stringify({ faqIds }),
+    });
+  },
+
+  // Admin Chatbot Config APIs
+  getConfig(): Promise<any> {
+    return apiRequest('/api/v1/ai/admin/config');
+  },
+
+  updateConfig(data: any): Promise<any> {
+    return apiRequest('/api/v1/ai/admin/config', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  // Admin Escalation Management APIs
+  listEscalations(params?: { status?: string; search?: string }): Promise<any> {
+    const q = new URLSearchParams();
+    if (params?.status && params.status !== 'ALL') q.set('status', params.status);
+    if (params?.search) q.set('search', params.search);
+    const qs = q.toString() ? `?${q.toString()}` : '';
+    return apiRequest<any>(`/api/v1/ai/admin/escalations${qs}`).then((res) => (res && Array.isArray(res.items) ? res.items : Array.isArray(res) ? res : []));
+  },
+
+  updateEscalationStatus(id: string, data: {
+    status?: 'PENDING' | 'IN_PROGRESS' | 'RESOLVED' | 'DISMISSED';
+    staffNotes?: string;
+    assignedToStaffId?: string;
+  }): Promise<any> {
+    return apiRequest(`/api/v1/ai/admin/escalations/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
+  deleteEscalation(id: string): Promise<any> {
+    return apiRequest(`/api/v1/ai/admin/escalations/${id}`, {
+      method: 'DELETE',
+    });
+  },
+};
+
+// ============================================================================
+// SECTION 14: MARKETING, SEO & CONVERSION API
+// ============================================================================
+
+export const marketingApi = {
+  // Public SEO & Schema
+  getPageSeo(path = '/'): Promise<any> {
+    return apiRequest(`/api/v1/website/seo?path=${encodeURIComponent(path)}`);
+  },
+
+  getSchemaMarkup(): Promise<any> {
+    return apiRequest('/api/v1/website/schema-markup');
+  },
+
+  getMarketingConfig(): Promise<any> {
+    return apiRequest('/api/v1/website/marketing/config');
+  },
+
+  // Public Blogs
+  listPublicBlogs(params?: { category?: string; tag?: string; search?: string; page?: number; limit?: number }): Promise<any> {
+    const q = new URLSearchParams();
+    if (params?.category && params.category !== 'ALL') q.set('category', params.category);
+    if (params?.tag) q.set('tag', params.tag);
+    if (params?.search) q.set('search', params.search);
+    if (params?.page) q.set('page', String(params.page));
+    if (params?.limit) q.set('limit', String(params.limit));
+    const qs = q.toString() ? `?${q.toString()}` : '';
+    return apiRequest(`/api/v1/website/blogs${qs}`);
+  },
+
+  getPublicBlog(slug: string): Promise<any> {
+    return apiRequest(`/api/v1/website/blogs/${encodeURIComponent(slug)}`);
+  },
+
+  // Public Banners & Conversion
+  listPublicBanners(): Promise<any[]> {
+    return apiRequest<any[]>('/api/v1/website/banners').then((res) => (Array.isArray(res) ? res : []));
+  },
+
+  submitCallback(data: {
+    fullName: string;
+    phone: string;
+    email?: string;
+    applyingClass?: string;
+    preferredTime?: string;
+    message?: string;
+    utmSource?: string;
+    utmMedium?: string;
+    utmCampaign?: string;
+  }): Promise<any> {
+    return apiRequest('/api/v1/website/callback-requests', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  subscribeNewsletter(email: string, source = 'WEBSITE_FOOTER'): Promise<any> {
+    return apiRequest('/api/v1/website/newsletter/subscribe', {
+      method: 'POST',
+      body: JSON.stringify({ email, source }),
+    });
+  },
+
+  recordAnalyticsEvent(data: {
+    eventType: string;
+    pagePath: string;
+    source?: string;
+    utmSource?: string;
+    utmMedium?: string;
+    utmCampaign?: string;
+    referrer?: string;
+  }): Promise<any> {
+    return apiRequest('/api/v1/website/analytics/event', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  // Admin SEO & Integrations
+  listPageSeos(): Promise<any[]> {
+    return apiRequest<any[]>('/api/v1/website/admin/seo').then((res) => (Array.isArray(res) ? res : []));
+  },
+
+  upsertPageSeo(data: any): Promise<any> {
+    return apiRequest('/api/v1/website/admin/seo', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  updateMarketingConfig(data: any): Promise<any> {
+    return apiRequest('/api/v1/website/admin/marketing/config', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  // Admin Blogs
+  listAdminBlogs(params?: { category?: string; search?: string; page?: number; limit?: number }): Promise<any> {
+    const q = new URLSearchParams();
+    if (params?.category && params.category !== 'ALL') q.set('category', params.category);
+    if (params?.search) q.set('search', params.search);
+    if (params?.page) q.set('page', String(params.page));
+    if (params?.limit) q.set('limit', String(params.limit));
+    const qs = q.toString() ? `?${q.toString()}` : '';
+    return apiRequest(`/api/v1/website/admin/blogs${qs}`);
+  },
+
+  createBlog(data: any): Promise<any> {
+    return apiRequest('/api/v1/website/admin/blogs', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  updateBlog(id: string, data: any): Promise<any> {
+    return apiRequest(`/api/v1/website/admin/blogs/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  deleteBlog(id: string): Promise<any> {
+    return apiRequest(`/api/v1/website/admin/blogs/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // Admin Banners
+  listAdminBanners(): Promise<any[]> {
+    return apiRequest<any[]>('/api/v1/website/admin/banners').then((res) => (Array.isArray(res) ? res : []));
+  },
+
+  createBanner(data: any): Promise<any> {
+    return apiRequest('/api/v1/website/admin/banners', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  updateBanner(id: string, data: any): Promise<any> {
+    return apiRequest(`/api/v1/website/admin/banners/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  deleteBanner(id: string): Promise<any> {
+    return apiRequest(`/api/v1/website/admin/banners/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // Admin Callbacks & Subscribers
+  listCallbacks(params?: { status?: string; search?: string; page?: number; limit?: number }): Promise<any> {
+    const q = new URLSearchParams();
+    if (params?.status && params.status !== 'ALL') q.set('status', params.status);
+    if (params?.search) q.set('search', params.search);
+    if (params?.page) q.set('page', String(params.page));
+    if (params?.limit) q.set('limit', String(params.limit));
+    const qs = q.toString() ? `?${q.toString()}` : '';
+    return apiRequest(`/api/v1/website/admin/callbacks${qs}`);
+  },
+
+  updateCallbackStatus(id: string, data: { status: string; staffNotes?: string; assignedStaffId?: string }): Promise<any> {
+    return apiRequest(`/api/v1/website/admin/callbacks/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  listSubscribers(params?: { status?: string }): Promise<any[]> {
+    const q = new URLSearchParams();
+    if (params?.status && params.status !== 'ALL') q.set('status', params.status);
+    const qs = q.toString() ? `?${q.toString()}` : '';
+    return apiRequest<any[]>(`/api/v1/website/admin/newsletter/subscribers${qs}`).then((res) => (Array.isArray(res) ? res : []));
+  },
+
+  // Admin Leads & Follow-ups
+  listConsolidatedLeads(params?: { status?: string; search?: string; type?: string; page?: number; limit?: number }): Promise<any> {
+    const q = new URLSearchParams();
+    if (params?.status && params.status !== 'ALL') q.set('status', params.status);
+    if (params?.search) q.set('search', params.search);
+    if (params?.type && params.type !== 'ALL') q.set('type', params.type);
+    if (params?.page) q.set('page', String(params.page));
+    if (params?.limit) q.set('limit', String(params.limit));
+    const qs = q.toString() ? `?${q.toString()}` : '';
+    return apiRequest(`/api/v1/website/admin/leads${qs}`);
+  },
+
+  updateLeadStatus(leadType: 'ADMISSION_ENQUIRY' | 'CALLBACK_REQUEST', id: string, status: string, staffNotes?: string): Promise<any> {
+    return apiRequest(`/api/v1/website/admin/leads/${leadType}/${id}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status, staffNotes }),
+    });
+  },
+
+  listFollowUps(params?: { status?: string; upcomingOnly?: boolean }): Promise<any[]> {
+    const q = new URLSearchParams();
+    if (params?.status && params.status !== 'ALL') q.set('status', params.status);
+    if (params?.upcomingOnly) q.set('upcomingOnly', 'true');
+    const qs = q.toString() ? `?${q.toString()}` : '';
+    return apiRequest<any[]>(`/api/v1/website/admin/follow-ups${qs}`).then((res) => (Array.isArray(res) ? res : []));
+  },
+
+  createFollowUp(data: {
+    enquiryId?: string;
+    callbackId?: string;
+    counsellorId?: string;
+    counsellorName?: string;
+    followUpDate: string;
+    followUpTime?: string;
+    description: string;
+    status?: string;
+    outcomeNotes?: string;
+  }): Promise<any> {
+    return apiRequest('/api/v1/website/admin/follow-ups', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  updateFollowUp(id: string, data: any): Promise<any> {
+    return apiRequest(`/api/v1/website/admin/follow-ups/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  // Admin Marketing Analytics Dashboard
+  getMarketingAnalytics(): Promise<any> {
+    return apiRequest('/api/v1/website/admin/marketing/analytics');
+  },
+};
+
+// ============================================================================
+// SECTION 16: SUPER ADMIN GOVERNANCE, RBAC, SYSTEM CONTROLS & AUDIT APIS
+// ============================================================================
+
+export const governanceApi = {
+  // 1. User & Admin Account Management
+  listAccounts(params?: { search?: string; schoolId?: string; role?: string; status?: string; page?: number; limit?: number }): Promise<any> {
+    const q = new URLSearchParams();
+    if (params?.search) q.set('search', params.search);
+    if (params?.schoolId && params.schoolId !== 'ALL') q.set('schoolId', params.schoolId);
+    if (params?.role && params.role !== 'ALL') q.set('role', params.role);
+    if (params?.status && params.status !== 'ALL') q.set('status', params.status);
+    if (params?.page) q.set('page', String(params.page));
+    if (params?.limit) q.set('limit', String(params.limit));
+    const qs = q.toString() ? `?${q.toString()}` : '';
+    return apiRequest<any>(`/api/v1/superadmin/governance/accounts${qs}`);
+  },
+
+  createUser(data: any): Promise<any> {
+    return apiRequest<any>('/api/v1/superadmin/governance/accounts', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  updateUser(id: string, data: any): Promise<any> {
+    return apiRequest<any>(`/api/v1/superadmin/governance/accounts/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
+  resetPassword(id: string, data?: { temporaryPassword?: string; mustChangePassword?: boolean; reason?: string }): Promise<any> {
+    return apiRequest<any>(`/api/v1/superadmin/governance/accounts/${encodeURIComponent(id)}/reset-password`, {
+      method: 'POST',
+      body: JSON.stringify(data || {}),
+    });
+  },
+
+  unlockAccount(id: string): Promise<any> {
+    return apiRequest<any>(`/api/v1/superadmin/governance/accounts/${encodeURIComponent(id)}/unlock`, {
+      method: 'POST',
+    });
+  },
+
+  updateAccountStatus(id: string, action: 'ACTIVATE' | 'DEACTIVATE' | 'SUSPEND', reason?: string): Promise<any> {
+    return apiRequest<any>(`/api/v1/superadmin/governance/accounts/${encodeURIComponent(id)}/status`, {
+      method: 'POST',
+      body: JSON.stringify({ action, reason }),
+    });
+  },
+
+  // 2. Role & Module Permission Matrix
+  listPermissions(params?: { role?: string; schoolId?: string }): Promise<any[]> {
+    const q = new URLSearchParams();
+    if (params?.role) q.set('role', params.role);
+    if (params?.schoolId && params.schoolId !== 'ALL') q.set('schoolId', params.schoolId);
+    const qs = q.toString() ? `?${q.toString()}` : '';
+    return apiRequest<any[]>(`/api/v1/superadmin/governance/permissions${qs}`);
+  },
+
+  updatePermission(data: any): Promise<any> {
+    return apiRequest<any>('/api/v1/superadmin/governance/permissions', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  // 3. Admission Enquiries Centralized Monitoring
+  listAdmissionEnquiries(params?: { search?: string; schoolId?: string; status?: string; page?: number; limit?: number }): Promise<any> {
+    const q = new URLSearchParams();
+    if (params?.search) q.set('search', params.search);
+    if (params?.schoolId && params.schoolId !== 'ALL') q.set('schoolId', params.schoolId);
+    if (params?.status && params.status !== 'ALL') q.set('status', params.status);
+    if (params?.page) q.set('page', String(params.page));
+    if (params?.limit) q.set('limit', String(params.limit));
+    const qs = q.toString() ? `?${q.toString()}` : '';
+    return apiRequest<any>(`/api/v1/superadmin/governance/admissions/enquiries${qs}`);
+  },
+
+  // 4. Marksheet Publication Approval Controls
+  listMarksheetRequests(params?: { schoolId?: string; status?: string }): Promise<any[]> {
+    const q = new URLSearchParams();
+    if (params?.schoolId && params.schoolId !== 'ALL') q.set('schoolId', params.schoolId);
+    if (params?.status && params.status !== 'ALL') q.set('status', params.status);
+    const qs = q.toString() ? `?${q.toString()}` : '';
+    return apiRequest<any[]>(`/api/v1/superadmin/governance/marksheets/requests${qs}`);
+  },
+
+  reviewMarksheetRequest(id: string, data: { status: 'APPROVED' | 'REJECTED' | 'PUBLISHED'; reviewNotes?: string }): Promise<any> {
+    return apiRequest<any>(`/api/v1/superadmin/governance/marksheets/requests/${encodeURIComponent(id)}/review`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  // 5. ID Cards & Certificates Templates Oversight
+  listTemplates(schoolId?: string): Promise<any> {
+    const qs = schoolId && schoolId !== 'ALL' ? `?schoolId=${encodeURIComponent(schoolId)}` : '';
+    return apiRequest<any>(`/api/v1/superadmin/governance/templates${qs}`);
+  },
+
+  // 6. ERP Analytics
+  getAnalytics(schoolId?: string): Promise<any> {
+    const qs = schoolId && schoolId !== 'ALL' ? `?schoolId=${encodeURIComponent(schoolId)}` : '';
+    return apiRequest<any>(`/api/v1/superadmin/governance/analytics${qs}`);
+  },
+
+  // 7. Backup Management
+  listBackups(schoolId?: string): Promise<any[]> {
+    const qs = schoolId && schoolId !== 'ALL' ? `?schoolId=${encodeURIComponent(schoolId)}` : '';
+    return apiRequest<any[]>(`/api/v1/superadmin/governance/backups${qs}`);
+  },
+
+  initiateBackup(data: { backupType?: string; schoolId?: string; metadata?: any; notes?: string }): Promise<any> {
+    return apiRequest<any>('/api/v1/superadmin/governance/backups', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  // 8. Platform System Configuration
+  getSystemConfig(): Promise<any> {
+    return apiRequest<any>('/api/v1/superadmin/governance/system-config');
+  },
+
+  updateSystemConfig(data: any): Promise<any> {
+    return apiRequest<any>('/api/v1/superadmin/governance/system-config', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  // 9. Activity Logs & Auditing
+  listActivityLogs(params?: { search?: string; schoolId?: string; module?: string; action?: string; page?: number; limit?: number }): Promise<any> {
+    const q = new URLSearchParams();
+    if (params?.search) q.set('search', params.search);
+    if (params?.schoolId && params.schoolId !== 'ALL') q.set('schoolId', params.schoolId);
+    if (params?.module && params.module !== 'ALL') q.set('module', params.module);
+    if (params?.action && params.action !== 'ALL') q.set('action', params.action);
+    if (params?.page) q.set('page', String(params.page));
+    if (params?.limit) q.set('limit', String(params.limit));
+    const qs = q.toString() ? `?${q.toString()}` : '';
+    return apiRequest<any>(`/api/v1/superadmin/governance/activity-logs${qs}`);
+  },
+
+  exportActivityLogsCsvUrl(params?: any): string {
+    const q = new URLSearchParams();
+    if (params?.schoolId && params.schoolId !== 'ALL') q.set('schoolId', params.schoolId);
+    if (params?.module && params.module !== 'ALL') q.set('module', params.module);
+    if (params?.action && params.action !== 'ALL') q.set('action', params.action);
+    return getApiUrl(`/api/v1/superadmin/governance/activity-logs/export?${q.toString()}`);
+  },
+};
+
+

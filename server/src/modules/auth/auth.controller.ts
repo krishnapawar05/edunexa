@@ -166,8 +166,49 @@ export class AuthController {
     }
   }
 
+  async verifyMfa(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { mfaToken, otpCode } = req.body;
+      const result = await authService.verifyMfaOtp(mfaToken, otpCode);
+      res.status(200).json({
+        success: true,
+        data: result,
+        message: 'MFA verification successful. Authentication confirmed.',
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async resendMfa(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { mfaToken } = req.body;
+      const result = await authService.resendMfaOtp(mfaToken);
+      res.status(200).json({
+        success: true,
+        data: result,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async toggleMfa(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { enable, method } = req.body;
+      const result = await authService.toggleMfa(req.user!.userId, Boolean(enable), method);
+      res.status(200).json({
+        success: true,
+        data: result,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   async logout(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
+      await authService.logout(req.user?.userId);
       const response: ApiSuccessResponse<{ loggedOut: boolean }> = {
         success: true,
         data: { loggedOut: true },

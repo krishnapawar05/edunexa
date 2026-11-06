@@ -4,6 +4,7 @@ import { Lock, Mail, ArrowRight, ShieldCheck, KeyRound, CheckCircle2, AlertCircl
 import { useSchoolBranding } from '../../context/SchoolBrandingContext.js';
 import { getApiUrl, setAuthSession, forgotPasswordApi } from '../../services/api.js';
 import { ThemeSwitcher } from '../../components/ThemeSwitcher.js';
+import { MfaVerificationModal } from '../../components/ui/MfaVerificationModal.js';
 
 interface LoginPageProps {
   onLoginSuccess?: (role: string) => void;
@@ -19,6 +20,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGoToPubl
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Section 17 MFA state
+  const [mfaChallenge, setMfaChallenge] = useState<{ mfaToken: string; emailMasked?: string } | null>(null);
 
   // Forgot password modal state
   const [showForgotModal, setShowForgotModal] = useState(false);
@@ -85,6 +89,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGoToPubl
           throw new Error('Backend server is currently offline or unreachable at port 5000. Please start the backend server with "npm run dev".');
         }
         throw new Error(data.error?.message || 'Authentication failed. Please check your institutional credentials.');
+      }
+
+      // Check if MFA challenge is issued
+      if (data.data?.mfaRequired) {
+        setMfaChallenge({
+          mfaToken: data.data.mfaToken,
+          emailMasked: data.data.emailMasked,
+        });
+        setIsLoading(false);
+        return;
       }
 
       // Store verified token and session
@@ -582,6 +596,27 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGoToPubl
             </div>
           </div>
         </div>
+      )}
+      {/* Section 17 Two-Factor OTP Modal */}
+      {mfaChallenge && (
+        <MfaVerificationModal
+          isOpen={Boolean(mfaChallenge)}
+          mfaToken={mfaChallenge.mfaToken}
+          emailMasked={mfaChallenge.emailMasked}
+          onSuccess={(result) => {
+            setAuthSession(result.accessToken, result.user);
+            setMfaChallenge(null);
+            const userRole = result.user.role;
+            if (onLoginSuccess) {
+              onLoginSuccess(userRole);
+            } else {
+              const from = (location.state as any)?.from?.pathname;
+              const targetRoute = from || roleToRouteMap[userRole] || '/admin';
+              navigate(targetRoute, { replace: true });
+            }
+          }}
+          onCancel={() => setMfaChallenge(null)}
+        />
       )}
     </div>
   );

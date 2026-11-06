@@ -9,6 +9,7 @@ import {
   UpdateAdmissionConfigDTO,
 } from '@edunexa/shared';
 import { coreSchoolService } from '../core/core.service.js';
+import { notificationsService } from '../notifications/notifications.service.js';
 
 // Pre-configured standard document requirements for schools
 export const DEFAULT_REQUIRED_DOCUMENTS = [
@@ -223,6 +224,20 @@ export class AdmissionsService {
         source: data.source || 'WEBSITE_POPUP',
       },
     });
+
+    // Centralized Section 15 Notification Dispatch
+    notificationsService.dispatchNotification(school.id, 'ADMISSION_ENQUIRY_RECEIVED', {
+      title: `New Admission Enquiry: ${data.studentName}`,
+      priority: 'HIGH',
+      link: '/admin/admissions',
+      variables: {
+        studentName: data.studentName,
+        parentName: data.parentName,
+        className: data.applyingClass,
+        admissionNumber: enquiry.enquiryNumber,
+        message: `New admission enquiry for ${data.studentName} (${data.applyingClass}) received from ${data.parentName}.`,
+      },
+    }).catch(() => {});
 
     return {
       id: enquiry.id,
@@ -636,6 +651,22 @@ export class AdmissionsService {
         enrolledStudentProfileId,
       },
     });
+
+    // Centralized Section 15 Notification Dispatch
+    notificationsService.dispatchNotification(schoolId, 'ADMISSION_STATUS_UPDATED', {
+      title: `Admission Application ${updatedApp.applicationNumber}: ${updatedApp.status}`,
+      priority: 'HIGH',
+      recipientEmails: [app.guardianEmail],
+      recipientPhones: [app.guardianPhone],
+      variables: {
+        studentName: `${app.studentFirstName} ${app.studentLastName}`,
+        parentName: app.guardianName,
+        className: app.applyingClass,
+        admissionNumber: updatedApp.applicationNumber,
+        applicationStatus: updatedApp.status,
+        message: `The admission application for ${app.studentFirstName} ${app.studentLastName} has been updated to ${updatedApp.status}.`,
+      },
+    }).catch(() => {});
 
     return {
       application: updatedApp,

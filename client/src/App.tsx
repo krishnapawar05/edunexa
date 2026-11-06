@@ -30,6 +30,9 @@ import { GalleryPage } from './modules/public/pages/GalleryPage.js';
 import { ExaminationInfoPage } from './modules/public/pages/ExaminationInfoPage.js';
 import { ContactPage } from './modules/public/pages/ContactPage.js';
 import { CareersPage } from './modules/public/pages/CareersPage.js';
+import { BlogListPage } from './modules/public/pages/BlogListPage.js';
+import { BlogDetailPage } from './modules/public/pages/BlogDetailPage.js';
+import { SeoMarketingHubPage } from './modules/schooladmin/SeoMarketingHubPage.js';
 
 // ERP Role Dashboards & Pages
 import { TelemetryDashboard } from './modules/superadmin/TelemetryDashboard.js';
@@ -37,6 +40,9 @@ import { SchoolTenantsPage } from './modules/superadmin/SchoolTenantsPage.js';
 import { SubscriptionsPage } from './modules/superadmin/SubscriptionsPage.js';
 import { AuditLogsPage } from './modules/superadmin/AuditLogsPage.js';
 import { PlatformSettingsPage } from './modules/superadmin/PlatformSettingsPage.js';
+import { SuperAdminUsersPage } from './modules/superadmin/SuperAdminUsersPage.js';
+import { SuperAdminPermissionsPage } from './modules/superadmin/SuperAdminPermissionsPage.js';
+import { SuperAdminGovernanceHubPage } from './modules/superadmin/SuperAdminGovernanceHubPage.js';
 import { SchoolOverviewPage } from './modules/schooladmin/SchoolOverviewPage.js';
 import { UserManagementPage } from './modules/schooladmin/UserManagementPage.js';
 import { StudentDirectoryPage } from './modules/schooladmin/StudentDirectoryPage.js';
@@ -48,6 +54,7 @@ import { DailyAttendancePage } from './modules/schooladmin/DailyAttendancePage.j
 import { FeesInvoicesPage } from './modules/schooladmin/FeesInvoicesPage.js';
 import { EventsNoticesPage } from './modules/schooladmin/EventsNoticesPage.js';
 import { WebsiteCmsPage } from './modules/schooladmin/WebsiteCmsPage.js';
+import { ChatbotFaqManagementPage } from './modules/schooladmin/ChatbotFaqManagementPage.js';
 import { TeacherDashboard } from './modules/teacher/TeacherDashboard.js';
 import { TeacherSchedulePage } from './modules/teacher/TeacherSchedulePage.js';
 import { TeacherAttendancePage } from './modules/teacher/TeacherAttendancePage.js';
@@ -80,6 +87,20 @@ import { ParentAttendancePage } from './modules/parent/ParentAttendancePage.js';
 import { ParentFeesPage } from './modules/parent/ParentFeesPage.js';
 import { ParentNoticesPage } from './modules/parent/ParentNoticesPage.js';
 import { ParentAdmitCardsPage } from './modules/parent/ParentAdmitCardsPage.js';
+import { ParentHomeworkPage } from './modules/parent/ParentHomeworkPage.js';
+import { ParentReceiptsPage } from './modules/parent/ParentReceiptsPage.js';
+import { ParentMeetingsPage } from './modules/parent/ParentMeetingsPage.js';
+import { ParentCommunicationPage } from './modules/parent/ParentCommunicationPage.js';
+import { ParentAdmissionPage } from './modules/parent/ParentAdmissionPage.js';
+import { ParentChildProvider } from './context/ParentChildContext.js';
+import { StudentLibraryPage } from './modules/student/StudentLibraryPage.js';
+import { LibraryManagementPage } from './modules/schooladmin/LibraryManagementPage.js';
+import { ParentLibraryPage } from './modules/parent/ParentLibraryPage.js';
+import { StudentAdmissionPage } from './modules/student/StudentAdmissionPage.js';
+import { StudentMeetingsPage } from './modules/student/StudentMeetingsPage.js';
+import { TeacherAcademicReportsPage } from './modules/teacher/TeacherAcademicReportsPage.js';
+import { TeacherMeetingsPage } from './modules/teacher/TeacherMeetingsPage.js';
+import { TeacherRemarksPage } from './modules/teacher/TeacherRemarksPage.js';
 import { ExamOverviewPage } from './modules/examinations/ExamOverviewPage.js';
 import { ExamSchedulesPage } from './modules/examinations/ExamSchedulesPage.js';
 import { AdmitCardManagementPage } from './modules/examinations/AdmitCardManagementPage.js';
@@ -97,6 +118,9 @@ import { AccountsOverviewPage } from './modules/accounts/AccountsOverviewPage.js
 import { AccountsInvoicesPage } from './modules/accounts/AccountsInvoicesPage.js';
 import { AccountsFeeStructuresPage } from './modules/accounts/AccountsFeeStructuresPage.js';
 import { AccountsReconciliationPage } from './modules/accounts/AccountsReconciliationPage.js';
+import { ChatWorkspacePage } from './modules/communication/ChatWorkspacePage.js';
+import { CalendarWorkspacePage } from './modules/communication/CalendarWorkspacePage.js';
+import { SuperAdminCommunicationPage } from './modules/superadmin/SuperAdminCommunicationPage.js';
 
 export const App: React.FC = () => {
   return (
@@ -120,6 +144,8 @@ export const App: React.FC = () => {
           <Route path="examination-info" element={<ExaminationInfoPage />} />
           <Route path="contact" element={<ContactPage />} />
           <Route path="careers" element={<CareersPage />} />
+          <Route path="blog" element={<BlogListPage />} />
+          <Route path="blog/:slug" element={<BlogDetailPage />} />
         </Route>
 
         {/* ================================================================ */}
@@ -159,22 +185,33 @@ export const App: React.FC = () => {
           }
         >
           <Route path="/superadmin" element={<TelemetryDashboard />} />
+          <Route path="/superadmin/users" element={<SuperAdminUsersPage />} />
+          <Route path="/superadmin/permissions" element={<SuperAdminPermissionsPage />} />
+          <Route path="/superadmin/governance" element={<SuperAdminGovernanceHubPage />} />
+          <Route path="/superadmin/backups" element={<Navigate to="/superadmin/governance" replace />} />
+          <Route path="/superadmin/academic-governance" element={<Navigate to="/superadmin/governance" replace />} />
           <Route path="/superadmin/schools" element={<SchoolTenantsPage />} />
           <Route path="/superadmin/subscriptions" element={<SubscriptionsPage />} />
           <Route path="/superadmin/audit" element={<Navigate to="/superadmin/audit-logs" replace />} />
           <Route path="/superadmin/audit-logs" element={<AuditLogsPage />} />
+          <Route path="/superadmin/communication" element={<SuperAdminCommunicationPage />} />
+          <Route path="/superadmin/chatbot" element={<ChatbotFaqManagementPage />} />
+          <Route path="/superadmin/faqs" element={<Navigate to="/superadmin/chatbot" replace />} />
           <Route path="/superadmin/settings" element={<PlatformSettingsPage />} />
         </Route>
 
         {/* School Admin & Principal Workspace */}
         <Route
           element={
-            <ProtectedRoute allowedRoles={['SCHOOL_ADMIN', 'PRINCIPAL']}>
+            <ProtectedRoute allowedRoles={['SUPER_ADMIN', 'SCHOOL_ADMIN', 'PRINCIPAL']}>
               <ErpLayout />
             </ProtectedRoute>
           }
         >
           <Route path="/admin" element={<SchoolOverviewPage />} />
+          <Route path="/admin/messages" element={<ChatWorkspacePage />} />
+          <Route path="/admin/calendar" element={<CalendarWorkspacePage />} />
+          <Route path="/admin/meetings" element={<CalendarWorkspacePage />} />
           <Route path="/admin/users" element={<UserManagementPage />} />
           <Route path="/admin/accounts" element={<Navigate to="/admin/users" replace />} />
           <Route path="/admin/students" element={<StudentDirectoryPage />} />
@@ -186,6 +223,7 @@ export const App: React.FC = () => {
           <Route path="/admin/admit-cards" element={<AdmitCardManagementPage />} />
           <Route path="/admin/marksheets" element={<MarksheetManagementPage />} />
           <Route path="/admin/report-cards" element={<Navigate to="/admin/marksheets" replace />} />
+          <Route path="/admin/library" element={<LibraryManagementPage />} />
           <Route path="/admin/attendance" element={<DailyAttendancePage />} />
           <Route path="/admin/fees" element={<FeesInvoicesPage />} />
           <Route path="/admin/finance" element={<Navigate to="/admin/fees" replace />} />
@@ -193,6 +231,10 @@ export const App: React.FC = () => {
           <Route path="/admin/notices" element={<Navigate to="/admin/events-notices" replace />} />
           <Route path="/admin/website" element={<WebsiteCmsPage />} />
           <Route path="/admin/cms" element={<Navigate to="/admin/website" replace />} />
+          <Route path="/admin/chatbot" element={<ChatbotFaqManagementPage />} />
+          <Route path="/admin/faqs" element={<Navigate to="/admin/chatbot" replace />} />
+          <Route path="/admin/marketing" element={<SeoMarketingHubPage />} />
+          <Route path="/admin/seo" element={<Navigate to="/admin/marketing" replace />} />
         </Route>
 
         {/* Teacher Workspace */}
@@ -204,7 +246,13 @@ export const App: React.FC = () => {
           }
         >
           <Route path="/teacher" element={<TeacherSchedulePage />} />
+          <Route path="/teacher/messages" element={<ChatWorkspacePage />} />
+          <Route path="/teacher/calendar" element={<CalendarWorkspacePage />} />
           <Route path="/teacher/attendance" element={<TeacherAttendancePage />} />
+          <Route path="/teacher/academic-reports" element={<TeacherAcademicReportsPage />} />
+          <Route path="/teacher/reports" element={<Navigate to="/teacher/academic-reports" replace />} />
+          <Route path="/teacher/meetings" element={<TeacherMeetingsPage />} />
+          <Route path="/teacher/remarks" element={<TeacherRemarksPage />} />
           <Route path="/teacher/question-bank" element={<QuestionBankPage />} />
           <Route path="/teacher/question-papers" element={<QuestionPaperBuilderPage />} />
           <Route path="/teacher/evaluations" element={<ExamEvaluationDashboard />} />
@@ -228,11 +276,18 @@ export const App: React.FC = () => {
           }
         >
           <Route path="/student" element={<StudentOverviewPage />} />
+          <Route path="/student/messages" element={<ChatWorkspacePage />} />
+          <Route path="/student/calendar" element={<CalendarWorkspacePage />} />
           <Route path="/student/id-card" element={<StudentVirtualIdCardPage />} />
           <Route path="/student/admit-cards" element={<StudentAdmitCardsPage />} />
+          <Route path="/student/admit-card" element={<Navigate to="/student/admit-cards" replace />} />
           <Route path="/student/assessments" element={<StudentAssessmentsPage />} />
           <Route path="/student/quizzes" element={<Navigate to="/student/assessments" replace />} />
           <Route path="/student/results" element={<StudentResultsPage />} />
+          <Route path="/student/report-card" element={<Navigate to="/student/results" replace />} />
+          <Route path="/student/library" element={<StudentLibraryPage />} />
+          <Route path="/student/admission" element={<StudentAdmissionPage />} />
+          <Route path="/student/meetings" element={<StudentMeetingsPage />} />
           <Route path="/student/timetable" element={<StudentTimetablePage />} />
           <Route path="/student/homework" element={<StudentHomeworkPage />} />
           <Route path="/student/attendance" element={<StudentAttendancePage />} />
@@ -246,15 +301,24 @@ export const App: React.FC = () => {
         <Route
           element={
             <ProtectedRoute allowedRoles={['PARENT']}>
-              <ErpLayout />
+              <ParentChildProvider>
+                <ErpLayout />
+              </ParentChildProvider>
             </ProtectedRoute>
           }
         >
           <Route path="/parent" element={<ParentDashboard />} />
+          <Route path="/parent/calendar" element={<CalendarWorkspacePage />} />
           <Route path="/parent/admit-cards" element={<ParentAdmitCardsPage />} />
           <Route path="/parent/results" element={<ParentResultsPage />} />
           <Route path="/parent/attendance" element={<ParentAttendancePage />} />
           <Route path="/parent/fees" element={<ParentFeesPage />} />
+          <Route path="/parent/receipts" element={<ParentReceiptsPage />} />
+          <Route path="/parent/homework" element={<ParentHomeworkPage />} />
+          <Route path="/parent/meetings" element={<ParentMeetingsPage />} />
+          <Route path="/parent/messages" element={<ParentCommunicationPage />} />
+          <Route path="/parent/admission" element={<ParentAdmissionPage />} />
+          <Route path="/parent/library" element={<ParentLibraryPage />} />
           <Route path="/parent/notices" element={<ParentNoticesPage />} />
         </Route>
 
@@ -311,6 +375,30 @@ export const App: React.FC = () => {
           <Route path="/accounts/structures" element={<AccountsFeeStructuresPage />} />
           <Route path="/accounts/fees" element={<AccountsFeeStructuresPage />} />
           <Route path="/accounts/reconciliation" element={<AccountsReconciliationPage />} />
+        </Route>
+
+        {/* Librarian Workspace */}
+        <Route
+          element={
+            <ProtectedRoute allowedRoles={['LIBRARIAN', 'SCHOOL_ADMIN', 'PRINCIPAL']}>
+              <ErpLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="/library" element={<LibraryManagementPage />} />
+        </Route>
+
+        {/* Global Authenticated Communication & Calendar Hub */}
+        <Route
+          element={
+            <ProtectedRoute>
+              <ErpLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="/messages" element={<ChatWorkspacePage />} />
+          <Route path="/calendar" element={<CalendarWorkspacePage />} />
+          <Route path="/meetings" element={<CalendarWorkspacePage />} />
         </Route>
 
         {/* ================================================================ */}

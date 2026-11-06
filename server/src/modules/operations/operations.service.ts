@@ -21,6 +21,7 @@ import {
   BulkItemResult,
 } from '@edunexa/shared';
 import { prisma } from '../../config/db.js';
+import { notificationsService } from '../notifications/notifications.service.js';
 
 // ============================================================================
 // TENANT & RECORD RESOLVERS
@@ -705,6 +706,16 @@ export class OperationsService {
         isPublic: data.isPublic ?? false,
       },
     });
+
+    // Centralized Section 15 Notification Dispatch
+    notificationsService.dispatchNotification(school.id, 'SCHOOL_ANNOUNCEMENT', {
+      title: `Notice: ${evt.title}`,
+      priority: 'HIGH',
+      link: '/events',
+      variables: {
+        message: `${evt.title} — ${evt.description || 'Institutional announcement published.'}`,
+      },
+    }).catch(() => {});
 
     return {
       id: evt.id,
@@ -1592,6 +1603,186 @@ export class OperationsService {
       receiptNumber: payment.receiptNumber,
       status: data.action === 'RECONCILE' ? 'RECONCILED' : 'DISCREPANCY',
       auditedAt: audit.createdAt.toISOString(),
+    };
+  }
+
+  // ==========================================================================
+  // 7. STAFF PAYROLL MANAGEMENT
+  // ==========================================================================
+  async generateStaffPayroll(
+    schoolIdOrSlug: string,
+    data: {
+      staffProfileId: string;
+      month: number;
+      year: number;
+      basicSalary: number;
+      allowances?: number;
+      deductions?: number;
+      paymentMethod?: string;
+      notes?: string;
+    }
+  ) {
+    const school = await resolveSchool(schoolIdOrSlug);
+    if (!school) throw new AppError('Tenant school not found.', 404);
+
+    const staff = await prisma.staffProfile.findFirst({
+      where: {
+        id: data.staffProfileId,
+        membership: { schoolId: school.id },
+      },
+      include: {
+        membership: { include: { user: true } },
+      },
+    });
+    if (!staff) throw new AppError('Staff profile not found in this school.', 404);
+
+    const allowances = data.allowances || 0;
+    const deductions = data.deductions || 0;
+    const netSalary = Math.max(0, data.basicSalary + allowances - deductions);
+
+    return prisma.staffPayroll.upsert({
+      where: {
+        schoolId_staffProfileId_month_year: {
+          schoolId: school.id,
+          staffProfileId: data.staffProfileId,
+          month: data.month,
+          year: data.year,
+        },
+      },
+      update: {
+        basicSalary: data.basicSalary,
+        allowances,
+        deductions,
+        netSalary,
+        paymentMethod: data.paymentMethod || null,
+        notes: data.notes || undefined,
+      },
+      create: {
+        schoolId: school.id,
+        staffProfileId: data.staffProfileId,
+        month: data.month,
+        year: data.year,
+        basicSalary: data.basicSalary,
+        allowances,
+        deductions,
+        netSalary,
+        status: 'PENDING',
+        paymentMethod: data.paymentMethod || null,
+        notes: data.notes || undefined,
+      },
+      include: {
+        staffProfile: {
+          include: {
+            membership: { include: { user: true } },
+            department: true,
+          },
+        },
+      },
+    });
+  }
+
+  async listStaffPayroll(
+    schoolIdOrSlug: string,
+    filters?: {
+      month?: number;
+      year?: number;
+      status?: string;
+      staffProfileId?: string;
+      departmentId?: string;
+    }
+  ) {
+    const school = await resolveSchool(schoolIdOrSlug);
+    if (!school) throw new AppError('Tenant school not found.', 404);
+
+    const where: any = { schoolId: school.id };
+    if (filters?.month) where.month = Number(filters.month);
+    if (filters?.year) where.year = Number(filters.year);
+    if (filters?.status && filters.status !== 'ALL') where.status = filters.status;
+    if (filters?.staffProfileId) where.staffProfileId = filters.staffProfileId;
+    if (filters?.departmentId && filters.departmentId !== 'ALL') {
+      where.staffProfile = { departmentId: filters.departmentId };
+    }
+
+    return prisma.staffPayroll.findMany({
+      where,
+      include: {
+        staffProfile: {
+          include: {
+            membership: { include: { user: true } },
+            department: true,
+          },
+        },
+      },
+      orderBy: [{ year: 'desc' }, { month: 'desc' }, { createdAt: 'desc' }],
+    });
+  }
+
+  async updatePayrollStatus(
+    schoolIdOrSlug: string,
+    id: string,
+    data: {
+      status: 'PENDING' | 'PROCESSING' | 'PAID' | 'CANCELLED';
+      paymentMethod?: string;
+      paymentDate?: string;
+      referenceNumber?: string;
+      notes?: string;
+    }
+  ) {
+    const school = await resolveSchool(schoolIdOrSlug);
+    if (!school) throw new AppError('Tenant school not found.', 404);
+
+    const payroll = await prisma.staffPayroll.findFirst({
+      where: { id, schoolId: school.id },
+    });
+    if (!payroll) throw new AppError('Payroll record not found.', 404);
+
+    return prisma.staffPayroll.update({
+      where: { id },
+      data: {
+        status: data.status as any,
+        paymentMethod: data.paymentMethod !== undefined ? data.paymentMethod : undefined,
+        paymentDate: data.paymentDate ? new Date(data.paymentDate) : data.status === 'PAID' ? new Date() : undefined,
+        referenceNumber: data.referenceNumber !== undefined ? data.referenceNumber : undefined,
+        notes: data.notes !== undefined ? data.notes : undefined,
+      },
+      include: {
+        staffProfile: {
+          include: { membership: { include: { user: true } } },
+        },
+      },
+    });
+  }
+
+  async getPayrollSummary(schoolIdOrSlug: string, month: number, year: number) {
+    const school = await resolveSchool(schoolIdOrSlug);
+    if (!school) throw new AppError('Tenant school not found.', 404);
+
+    const records = await prisma.staffPayroll.findMany({
+      where: { schoolId: school.id, month: Number(month), year: Number(year) },
+    });
+
+    const totalStaff = records.length;
+    const totalBasic = records.reduce((acc, r) => acc + r.basicSalary, 0);
+    const totalAllowances = records.reduce((acc, r) => acc + r.allowances, 0);
+    const totalDeductions = records.reduce((acc, r) => acc + r.deductions, 0);
+    const totalNet = records.reduce((acc, r) => acc + r.netSalary, 0);
+    const paidCount = records.filter((r) => r.status === 'PAID').length;
+    const pendingCount = records.filter((r) => r.status === 'PENDING').length;
+    const totalPaidAmount = records
+      .filter((r) => r.status === 'PAID')
+      .reduce((acc, r) => acc + r.netSalary, 0);
+
+    return {
+      month: Number(month),
+      year: Number(year),
+      totalStaff,
+      totalBasic,
+      totalAllowances,
+      totalDeductions,
+      totalNet,
+      paidCount,
+      pendingCount,
+      totalPaidAmount,
     };
   }
 }

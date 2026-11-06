@@ -21,11 +21,16 @@ import {
   ExternalLink,
   ChevronRight,
   User,
+  Library,
+  FileText,
+  Video,
+  MessageSquare,
 } from 'lucide-react';
 import {
   coreApi,
   academicApi,
   operationsApi,
+  portalsApi,
   getStoredUser,
 } from '../../services/api.js';
 
@@ -38,6 +43,7 @@ export const StudentOverviewPage: React.FC = () => {
   const [timetable, setTimetable] = useState<any[]>([]);
   const [notices, setNotices] = useState<any[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
+  const [portalTelemetry, setPortalTelemetry] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -49,12 +55,23 @@ export const StudentOverviewPage: React.FC = () => {
       const storedUser = getStoredUser();
       const currentStudentId = storedUser?.studentProfileId || 'stu-aarav-01';
 
-      // Load student profile
-      const studentProfile = await coreApi.getStudentById(currentStudentId);
-      setStudent(studentProfile);
+      // Load portal dashboard & student profile concurrently
+      const [telemetryRes, studentProfile] = await Promise.allSettled([
+        portalsApi.getStudentDashboard(),
+        coreApi.getStudentById(currentStudentId),
+      ]);
 
-      const targetClass = studentProfile?.className || studentProfile?.enrollments?.[0]?.class?.name || 'Grade 10';
-      const targetSection = studentProfile?.sectionName || studentProfile?.enrollments?.[0]?.section?.name || 'A';
+      if (telemetryRes.status === 'fulfilled' && telemetryRes.value?.data) {
+        setPortalTelemetry(telemetryRes.value.data);
+      }
+
+      if (studentProfile.status === 'fulfilled' && studentProfile.value) {
+        setStudent(studentProfile.value);
+      }
+
+      const activeStudent = studentProfile.status === 'fulfilled' ? studentProfile.value : null;
+      const targetClass = activeStudent?.className || activeStudent?.enrollments?.[0]?.class?.name || 'Grade 10';
+      const targetSection = activeStudent?.sectionName || activeStudent?.enrollments?.[0]?.section?.name || 'A';
 
       // Concurrently fetch all academic and operational records
       const [attRes, rcRes, quizRes, assignRes, ttRes, noticeRes, invRes] = await Promise.allSettled([
@@ -186,6 +203,49 @@ export const StudentOverviewPage: React.FC = () => {
             <IdCard size={15} /> View Virtual ID
           </Link>
         </div>
+      </div>
+
+      {/* Quick Navigation Hub */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+        <Link to="/student/admit-card" className="ed-card" style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', color: 'inherit', transition: 'all 0.15s ease' }}>
+          <FileText size={18} style={{ color: 'var(--color-primary)' }} />
+          <div>
+            <div style={{ fontSize: '0.82rem', fontWeight: 700 }}>Hall Ticket</div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Section 5 Exam Pass</div>
+          </div>
+        </Link>
+
+        <Link to="/student/report-card" className="ed-card" style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', color: 'inherit', transition: 'all 0.15s ease' }}>
+          <Award size={18} style={{ color: 'var(--color-primary)' }} />
+          <div>
+            <div style={{ fontSize: '0.82rem', fontWeight: 700 }}>Official Marksheet</div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Section 7 Report Cards</div>
+          </div>
+        </Link>
+
+        <Link to="/student/library" className="ed-card" style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', color: 'inherit', transition: 'all 0.15s ease' }}>
+          <Library size={18} style={{ color: 'var(--color-primary)' }} />
+          <div>
+            <div style={{ fontSize: '0.82rem', fontWeight: 700 }}>Library Books</div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Borrow & Catalog</div>
+          </div>
+        </Link>
+
+        <Link to="/student/meetings" className="ed-card" style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', color: 'inherit', transition: 'all 0.15s ease' }}>
+          <Video size={18} style={{ color: 'var(--color-primary)' }} />
+          <div>
+            <div style={{ fontSize: '0.82rem', fontWeight: 700 }}>Teacher Meetings</div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>PTM & Google Meet</div>
+          </div>
+        </Link>
+
+        <Link to="/student/admission" className="ed-card" style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', color: 'inherit', transition: 'all 0.15s ease' }}>
+          <User size={18} style={{ color: 'var(--color-primary)' }} />
+          <div>
+            <div style={{ fontSize: '0.82rem', fontWeight: 700 }}>Admission Dossier</div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Section 3 Verified Docs</div>
+          </div>
+        </Link>
       </div>
 
       {error && (
@@ -488,6 +548,34 @@ export const StudentOverviewPage: React.FC = () => {
               </Link>
             </div>
           </div>
+
+          {/* Teacher Remarks & Observations */}
+          {portalTelemetry?.remarks && portalTelemetry.remarks.length > 0 && (
+            <div className="ed-card">
+              <div className="ed-card-header">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                  <MessageSquare size={16} style={{ color: 'var(--primary-600)' }} />
+                  <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>Teacher Feedback & Remarks</span>
+                </div>
+              </div>
+              <div className="ed-card-body" style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {portalTelemetry.remarks.map((r: any) => (
+                  <div key={r.id} style={{ padding: '10px', backgroundColor: 'var(--bg-subtle)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-default)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <span className="ed-badge ed-badge-teal" style={{ fontSize: '0.70rem' }}>{r.category}</span>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{new Date(r.createdAt).toLocaleDateString()}</span>
+                    </div>
+                    <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--text-primary)', fontStyle: 'italic' }}>
+                      "{r.remark}"
+                    </p>
+                    <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', marginTop: '4px', textAlign: 'right' }}>
+                      — {r.teacher?.firstName} {r.teacher?.lastName}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Institutional Notices Preview */}
           <div className="ed-card">

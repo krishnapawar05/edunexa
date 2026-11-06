@@ -22,7 +22,7 @@ import {
   BulkActionToolbar,
   BulkActionItem,
 } from '../../components/bulk/index.js';
-import { superadminApi } from '../../services/api.js';
+import { superadminApi, governanceApi } from '../../services/api.js';
 
 export const AuditLogsPage: React.FC = () => {
   const [logs, setLogs] = useState<any[]>([]);
@@ -30,6 +30,7 @@ export const AuditLogsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   const [actionFilter, setActionFilter] = useState('ALL');
+  const [moduleFilter, setModuleFilter] = useState('ALL');
   const [selectedLog, setSelectedLog] = useState<any | null>(null);
   const [showPayloadModal, setShowPayloadModal] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -46,11 +47,20 @@ export const AuditLogsPage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await superadminApi.getAuditLogs({
-        action: actionFilter,
+      const res = await governanceApi.listActivityLogs({
+        action: actionFilter !== 'ALL' ? actionFilter : undefined,
+        module: moduleFilter !== 'ALL' ? moduleFilter : undefined,
         limit: 100,
       });
-      setLogs(Array.isArray(data) ? data : []);
+      if (res.data?.success && res.data.data?.logs) {
+        setLogs(res.data.data.logs);
+      } else {
+        const fallbackData = await superadminApi.getAuditLogs({
+          action: actionFilter,
+          limit: 100,
+        });
+        setLogs(Array.isArray(fallbackData) ? fallbackData : []);
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to fetch administrative audit logs.');
     } finally {
@@ -60,7 +70,7 @@ export const AuditLogsPage: React.FC = () => {
 
   useEffect(() => {
     loadAuditLogs();
-  }, [actionFilter]);
+  }, [actionFilter, moduleFilter]);
 
   const handleInspectPayload = (log: any) => {
     setSelectedLog(log);
@@ -168,10 +178,25 @@ export const AuditLogsPage: React.FC = () => {
           </p>
         </div>
 
-        <button onClick={loadAuditLogs} className="ed-btn ed-btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <RefreshCw size={14} className={loading ? 'ed-spin' : ''} />
-          <span>Refresh Logs</span>
-        </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <a
+            href={governanceApi.exportActivityLogsCsvUrl({
+              action: actionFilter !== 'ALL' ? actionFilter : undefined,
+              module: moduleFilter !== 'ALL' ? moduleFilter : undefined,
+            })}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="ed-btn ed-btn-outline"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', textDecoration: 'none' }}
+          >
+            <Download size={14} />
+            <span>Platform CSV Export</span>
+          </a>
+          <button onClick={loadAuditLogs} className="ed-btn ed-btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <RefreshCw size={14} className={loading ? 'ed-spin' : ''} />
+            <span>Refresh Logs</span>
+          </button>
+        </div>
       </div>
 
       {/* Filter Bar */}
@@ -181,16 +206,35 @@ export const AuditLogsPage: React.FC = () => {
             <Filter size={15} style={{ color: 'var(--text-muted)' }} />
             <select
               className="ed-select"
+              value={moduleFilter}
+              onChange={(e) => setModuleFilter(e.target.value)}
+              style={{ width: '200px' }}
+            >
+              <option value="ALL">All Modules</option>
+              <option value="SECURITY">SECURITY / RBAC</option>
+              <option value="MARKSHEETS">MARKSHEETS</option>
+              <option value="ADMISSIONS">ADMISSIONS</option>
+              <option value="FEES">FEES</option>
+              <option value="COMMUNICATION">COMMUNICATION</option>
+              <option value="DISASTER_RECOVERY">BACKUP & RECOVERY</option>
+              <option value="SYSTEM_SETTINGS">SYSTEM SETTINGS</option>
+              <option value="GENERAL">GENERAL</option>
+            </select>
+            <select
+              className="ed-select"
               value={actionFilter}
               onChange={(e) => setActionFilter(e.target.value)}
-              style={{ width: '240px' }}
+              style={{ width: '220px' }}
             >
               <option value="ALL">All Audit Actions</option>
               <option value="TENANT_ONBOARDED">TENANT_ONBOARDED</option>
               <option value="TENANT_STATUS_UPDATED">TENANT_STATUS_UPDATED</option>
-              <option value="TENANT_METADATA_UPDATED">TENANT_METADATA_UPDATED</option>
+              <option value="USER_CREATED">USER_CREATED</option>
+              <option value="USER_UPDATED">USER_UPDATED</option>
+              <option value="PASSWORD_RESET">PASSWORD_RESET</option>
               <option value="ROLE_PERMISSION_CHANGED">ROLE_PERMISSION_CHANGED</option>
-              <option value="SUBSCRIPTION_PLAN_MODIFIED">SUBSCRIPTION_PLAN_MODIFIED</option>
+              <option value="MARKSHEET_PUBLICATION_REVIEW">MARKSHEET_PUBLICATION_REVIEW</option>
+              <option value="BACKUP_INITIATED">BACKUP_INITIATED</option>
               <option value="SYSTEM_SETTINGS_UPDATED">SYSTEM_SETTINGS_UPDATED</option>
             </select>
           </div>
@@ -199,6 +243,7 @@ export const AuditLogsPage: React.FC = () => {
             type="button"
             onClick={() => {
               setActionFilter('ALL');
+              setModuleFilter('ALL');
               loadAuditLogs();
             }}
             className="ed-btn ed-btn-secondary"

@@ -14,6 +14,7 @@ export const PlatformRole = {
   HR_STAFF: 'HR_STAFF',
   ACCOUNTS: 'ACCOUNTS',
   EXAM_COORDINATOR: 'EXAM_COORDINATOR',
+  LIBRARIAN: 'LIBRARIAN',
 } as const;
 
 export type PlatformRoleType = (typeof PlatformRole)[keyof typeof PlatformRole];
@@ -1808,6 +1809,1085 @@ export const UpdateGradingCriteriaSchema = z.object({
     .min(1, 'At least one grade boundary is required'),
 });
 export type UpdateGradingCriteriaDTO = z.infer<typeof UpdateGradingCriteriaSchema>;
+
+// ==============================================================================
+// SECTION 8: STUDENT, PARENT & TEACHER PANELS SCHEMAS
+// ==============================================================================
+
+export const ScheduleMeetingSchema = z.object({
+  title: z.string().min(1, 'Meeting title is required'),
+  description: z.string().optional(),
+  meetingType: z.enum(['PARENT_TEACHER', 'STAFF_INTERNAL', 'STUDENT_COUNSELING']).default('PARENT_TEACHER'),
+  studentProfileId: z.string().optional(),
+  guardianUserId: z.string().optional(),
+  scheduledDate: z.string().min(1, 'Meeting date is required'),
+  startTime: z.string().min(1, 'Start time is required'),
+  endTime: z.string().min(1, 'End time is required'),
+  meetingMode: z.enum(['ONLINE', 'IN_PERSON']).default('ONLINE'),
+  locationOrRoom: z.string().optional(),
+  joiningUrl: z.string().optional(),
+  notes: z.string().optional(),
+});
+export type ScheduleMeetingDTO = z.infer<typeof ScheduleMeetingSchema>;
+
+export const UpdateMeetingStatusSchema = z.object({
+  status: z.enum(['SCHEDULED', 'COMPLETED', 'CANCELLED', 'RESCHEDULED']),
+  notes: z.string().optional(),
+  joiningUrl: z.string().optional(),
+});
+export type UpdateMeetingStatusDTO = z.infer<typeof UpdateMeetingStatusSchema>;
+
+export const SendCommunicationMessageSchema = z.object({
+  recipientUserId: z.string().optional(),
+  studentProfileId: z.string().optional(),
+  channel: z.enum(['PARENT_TEACHER', 'STUDENT_TEACHER', 'ANNOUNCEMENT']).default('PARENT_TEACHER'),
+  subject: z.string().optional(),
+  messageContent: z.string().min(1, 'Message content cannot be empty'),
+  attachmentUrl: z.string().optional(),
+});
+export type SendCommunicationMessageDTO = z.infer<typeof SendCommunicationMessageSchema>;
+
+export const AddStudentRemarkSchema = z.object({
+  studentProfileId: z.string().min(1, 'Student ID is required'),
+  academicSessionId: z.string().optional(),
+  category: z.enum(['GENERAL', 'ACADEMIC', 'DISCIPLINE', 'REPORT_CARD', 'ATTENDANCE']).default('GENERAL'),
+  remark: z.string().min(1, 'Remark is required'),
+  isPrivate: z.boolean().default(false),
+});
+export type AddStudentRemarkDTO = z.infer<typeof AddStudentRemarkSchema>;
+
+// ==============================================================================
+// SECTION 11: LIBRARY MANAGEMENT SYSTEM SCHEMAS
+// ==============================================================================
+
+export const LibraryCategoryList = [
+  'Science',
+  'Mathematics',
+  'English',
+  'Hindi',
+  'Computers',
+  'History',
+  'Geography',
+  'General Knowledge',
+] as const;
+
+export const BookStatusList = ['AVAILABLE', 'OUT_OF_STOCK', 'ARCHIVED'] as const;
+export const BookConditionList = ['GOOD', 'DAMAGED', 'LOST'] as const;
+export const BookIssueStatusList = ['ISSUED', 'RETURNED', 'OVERDUE', 'LOST'] as const;
+export const FineStatusList = ['NONE', 'PENDING', 'PAID', 'WAIVED'] as const;
+
+export const CreateLibraryBookSchema = z.object({
+  title: z.string().min(1, 'Book title is required'),
+  author: z.string().min(1, 'Author is required'),
+  isbn: z.string().optional(),
+  category: z.string().optional(),
+  publisher: z.string().optional(),
+  edition: z.string().optional(),
+  publicationYear: z.number().int().optional(),
+  language: z.string().default('English'),
+  description: z.string().optional(),
+  coverUrl: z.string().optional(),
+  totalCopies: z.number().int().min(1).default(1),
+  availableCopies: z.number().int().min(0).optional(),
+  shelfLocation: z.string().optional(),
+  status: z.enum(BookStatusList).default('AVAILABLE'),
+});
+export type CreateLibraryBookDTO = z.infer<typeof CreateLibraryBookSchema>;
+
+export const UpdateLibraryBookSchema = CreateLibraryBookSchema.partial();
+export type UpdateLibraryBookDTO = z.infer<typeof UpdateLibraryBookSchema>;
+
+export const IssueBookSchema = z.object({
+  bookId: z.string().min(1, 'Book ID is required'),
+  studentProfileId: z.string().min(1, 'Student ID is required'),
+  issueDate: z.string().optional(),
+  dueDate: z.string().min(1, 'Due date is required'),
+  notes: z.string().optional(),
+});
+export type IssueBookDTO = z.infer<typeof IssueBookSchema>;
+
+export const ReturnBookSchema = z.object({
+  returnCondition: z.enum(BookConditionList).default('GOOD'),
+  returnDate: z.string().optional(),
+  notes: z.string().optional(),
+  waiveFine: z.boolean().optional(),
+});
+export type ReturnBookDTO = z.infer<typeof ReturnBookSchema>;
+
+export const UpdateFineStatusSchema = z.object({
+  fineStatus: z.enum(['NONE', 'PENDING', 'PAID', 'WAIVED']),
+  notes: z.string().optional(),
+});
+export type UpdateFineStatusDTO = z.infer<typeof UpdateFineStatusSchema>;
+
+export const UpdateLibrarySettingSchema = z.object({
+  finePerDay: z.number().min(0).optional(),
+  gracePeriodDays: z.number().int().min(0).optional(),
+  maxFineAmount: z.number().min(0).optional(),
+  maxBooksPerStudent: z.number().int().min(1).optional(),
+  loanDurationDays: z.number().int().min(1).optional(),
+});
+export type UpdateLibrarySettingDTO = z.infer<typeof UpdateLibrarySettingSchema>;
+
+// ==============================================================================
+// SECTION 9: INTERNAL CHAT, MESSAGING, MEETINGS & CALENDAR SCHEMAS
+// ==============================================================================
+
+export const CreateConversationSchema = z.object({
+  type: z.enum(['DIRECT', 'GROUP']).default('DIRECT'),
+  participantIds: z.array(z.string()).min(1, 'At least one participant required'),
+  title: z.string().optional(),
+  groupType: z
+    .enum(['CLASS_GROUP', 'SUBJECT_GROUP', 'DEPARTMENT_GROUP', 'ADMIN_GROUP', 'PTM_GROUP', 'GENERAL_GROUP'])
+    .optional(),
+  initialMessage: z.string().optional(),
+});
+export type CreateConversationDTO = z.infer<typeof CreateConversationSchema>;
+
+export const SendChatMessageSchema = z.object({
+  conversationId: z.string().min(1, 'Conversation ID is required'),
+  content: z.string().min(1, 'Message content cannot be empty'),
+  messageType: z.enum(['TEXT', 'FILE', 'SYSTEM']).default('TEXT'),
+  attachments: z
+    .array(
+      z.object({
+        fileName: z.string(),
+        fileUrl: z.string(),
+        fileType: z.string(),
+        fileSize: z.number().int().min(1),
+      })
+    )
+    .optional(),
+});
+export type SendChatMessageDTO = z.infer<typeof SendChatMessageSchema>;
+
+export const AddGroupParticipantsSchema = z.object({
+  userIds: z.array(z.string()).min(1, 'At least one user ID required'),
+});
+export type AddGroupParticipantsDTO = z.infer<typeof AddGroupParticipantsSchema>;
+
+export const ReportMessageSchema = z.object({
+  messageId: z.string().min(1, 'Message ID is required'),
+  reason: z.string().min(3, 'Detailed reporting reason required'),
+});
+export type ReportMessageDTO = z.infer<typeof ReportMessageSchema>;
+
+export const ModerateReportedMessageSchema = z.object({
+  action: z.enum(['WARNING', 'MESSAGE_REMOVED', 'DISMISSED']),
+  moderatorNotes: z.string().optional(),
+});
+export type ModerateReportedMessageDTO = z.infer<typeof ModerateReportedMessageSchema>;
+
+export const UpdateCommunicationPermissionConfigSchema = z.object({
+  allowStudentToStudent: z.boolean().optional(),
+  allowParentToParent: z.boolean().optional(),
+  allowTeacherToStudent: z.boolean().optional(),
+  allowTeacherToParent: z.boolean().optional(),
+  allowAdminToAll: z.boolean().optional(),
+  allowFileSharing: z.boolean().optional(),
+  maxAttachmentSizeBytes: z.number().int().positive().optional(),
+});
+export type UpdateCommunicationPermissionConfigDTO = z.infer<typeof UpdateCommunicationPermissionConfigSchema>;
+
+export const CreateCalendarEventSchema = z.object({
+  title: z.string().min(1, 'Event title is required'),
+  description: z.string().optional(),
+  category: z.enum(['ACADEMIC', 'EXAM', 'MEETING', 'HOLIDAY', 'SPORTS', 'PTM']).default('ACADEMIC'),
+  startDate: z.string().min(1, 'Start date is required'),
+  endDate: z.string().min(1, 'End date is required'),
+  isAllDay: z.boolean().default(false),
+  location: z.string().optional(),
+  targetAudience: z.enum(['ALL', 'TEACHERS_ONLY', 'STUDENTS_ONLY', 'PARENTS_ONLY']).default('ALL'),
+  classId: z.string().optional(),
+});
+export type CreateCalendarEventDTO = z.infer<typeof CreateCalendarEventSchema>;
+
+export const ConfigureGoogleWorkspaceSchema = z.object({
+  clientId: z.string().optional(),
+  clientSecret: z.string().optional(),
+  redirectUri: z.string().optional(),
+  connectedEmail: z.string().email().optional(),
+  calendarSyncEnabled: z.boolean().default(true),
+  meetIntegrationEnabled: z.boolean().default(true),
+  primaryCalendarId: z.string().optional(),
+  status: z.enum(['CONNECTED', 'DISCONNECTED', 'ERROR']).default('CONNECTED'),
+});
+export type ConfigureGoogleWorkspaceDTO = z.infer<typeof ConfigureGoogleWorkspaceSchema>;
+
+// ============================================================================
+// SECTION 10: ADMISSION, DOCUMENT & DOWNLOAD CENTRE SCHEMAS
+// ============================================================================
+
+export const DocumentCategoryEnum = [
+  'ADMISSION_FORM',
+  'PROSPECTUS',
+  'FEE_STRUCTURE',
+  'ACADEMIC_CALENDAR',
+  'GUIDELINES',
+  'UNIFORM_INFO',
+  'HOLIDAY_LIST',
+  'SYLLABUS',
+  'CIRCULAR',
+  'GENERAL',
+] as const;
+
+export const DocumentAudienceEnum = [
+  'PUBLIC',
+  'ALL_STUDENTS',
+  'CLASS_SPECIFIC',
+  'TEACHERS_ONLY',
+  'STAFF_ONLY',
+] as const;
+
+export const CertificateTypeEnum = [
+  'BONAFIDE',
+  'TRANSFER_CERTIFICATE',
+  'CHARACTER',
+  'MIGRATION',
+  'MERIT',
+] as const;
+
+export const CreateDownloadableDocSchema = z.object({
+  title: z.string().min(2, 'Title must be at least 2 characters'),
+  description: z.string().optional(),
+  category: z.enum(DocumentCategoryEnum).default('GENERAL'),
+  fileUrl: z.string().min(1, 'File URL or storage path is required'),
+  fileSize: z.string().optional(),
+  fileType: z.string().default('PDF'),
+  targetAudience: z.enum(DocumentAudienceEnum).default('PUBLIC'),
+  academicSessionId: z.string().optional(),
+  classId: z.string().optional(),
+  displayOrder: z.number().int().default(0),
+  isPublished: z.boolean().default(true),
+  publicationStatus: z.enum(['DRAFT', 'PUBLISHED', 'ARCHIVED']).default('PUBLISHED'),
+});
+export type CreateDownloadableDocDTO = z.infer<typeof CreateDownloadableDocSchema>;
+
+export const UpdateDownloadableDocSchema = CreateDownloadableDocSchema.partial();
+export type UpdateDownloadableDocDTO = z.infer<typeof UpdateDownloadableDocSchema>;
+
+export const IssueCertificateSchema = z.object({
+  studentProfileId: z.string().min(1, 'Student ID is required'),
+  certificateType: z.enum(CertificateTypeEnum).default('BONAFIDE'),
+  academicSessionId: z.string().optional(),
+  reason: z.string().optional(),
+  remarks: z.string().optional(),
+  metadata: z.record(z.any()).optional(),
+});
+export type IssueCertificateDTO = z.infer<typeof IssueCertificateSchema>;
+
+export const UpdateCertificateStatusSchema = z.object({
+  status: z.enum(['DRAFT', 'ISSUED', 'REVOKED']),
+  remarks: z.string().optional(),
+});
+export type UpdateCertificateStatusDTO = z.infer<typeof UpdateCertificateStatusSchema>;
+
+export const RecordDocumentAccessSchema = z.object({
+  documentType: z.string().min(1, 'Document type is required'),
+  documentId: z.string().min(1, 'Document ID is required'),
+  documentTitle: z.string().min(1, 'Document title is required'),
+  targetStudentId: z.string().optional(),
+  action: z.enum(['PREVIEW', 'DOWNLOAD', 'PRINT']).default('DOWNLOAD'),
+});
+export type RecordDocumentAccessDTO = z.infer<typeof RecordDocumentAccessSchema>;
+
+// ============================================================================
+// SECTION 12: STAFF PAYROLL SCHEMAS
+// ============================================================================
+
+export const GeneratePayrollSchema = z.object({
+  staffProfileId: z.string().uuid('Valid Staff ID is required'),
+  month: z.number().int().min(1).max(12),
+  year: z.number().int().min(2020).max(2050),
+  basicSalary: z.number().min(0, 'Basic salary cannot be negative'),
+  allowances: z.number().min(0).default(0),
+  deductions: z.number().min(0).default(0),
+  paymentMethod: z.string().optional(),
+  notes: z.string().optional(),
+});
+export type GeneratePayrollDTO = z.infer<typeof GeneratePayrollSchema>;
+
+export const UpdatePayrollStatusSchema = z.object({
+  status: z.enum(['PENDING', 'PROCESSING', 'PAID', 'CANCELLED']),
+  paymentMethod: z.string().optional(),
+  paymentDate: z.string().optional(),
+  referenceNumber: z.string().optional(),
+  notes: z.string().optional(),
+});
+export type UpdatePayrollStatusDTO = z.infer<typeof UpdatePayrollStatusSchema>;
+
+// ============================================================================
+// SECTION 12: TRANSPORT MANAGEMENT SCHEMAS
+// ============================================================================
+
+export const CreateTransportVehicleSchema = z.object({
+  registrationNumber: z.string().min(3, 'Registration number is required'),
+  vehicleModel: z.string().min(2, 'Vehicle model is required'),
+  capacity: z.number().int().min(1).default(40),
+  driverId: z.string().uuid().optional().nullable(),
+  insuranceExpiry: z.string().optional().nullable(),
+  fitnessExpiry: z.string().optional().nullable(),
+  status: z.enum(['ACTIVE', 'MAINTENANCE', 'INACTIVE']).default('ACTIVE'),
+});
+export type CreateTransportVehicleDTO = z.infer<typeof CreateTransportVehicleSchema>;
+
+export const CreateTransportDriverSchema = z.object({
+  name: z.string().min(2, 'Driver name is required'),
+  licenseNumber: z.string().min(4, 'License number is required'),
+  phone: z.string().min(7, 'Valid contact phone number is required'),
+  emergencyContact: z.string().optional(),
+  status: z.enum(['ACTIVE', 'INACTIVE']).default('ACTIVE'),
+});
+export type CreateTransportDriverDTO = z.infer<typeof CreateTransportDriverSchema>;
+
+export const CreateTransportRouteSchema = z.object({
+  routeName: z.string().min(3, 'Route name is required'),
+  routeCode: z.string().min(2, 'Route code is required'),
+  vehicleId: z.string().uuid().optional().nullable(),
+  startLocation: z.string().min(2, 'Start location is required'),
+  endLocation: z.string().min(2, 'End location is required'),
+  monthlyFare: z.number().min(0).default(1500),
+  status: z.enum(['ACTIVE', 'MAINTENANCE', 'INACTIVE']).default('ACTIVE'),
+  stops: z.array(
+    z.object({
+      stopName: z.string().min(2),
+      stopOrder: z.number().int().min(1),
+      pickupTime: z.string().min(2),
+      dropTime: z.string().min(2),
+      fare: z.number().min(0).optional(),
+    })
+  ).optional(),
+});
+export type CreateTransportRouteDTO = z.infer<typeof CreateTransportRouteSchema>;
+
+export const AllocateStudentTransportSchema = z.object({
+  studentProfileId: z.string().uuid('Valid Student ID is required'),
+  routeId: z.string().uuid('Valid Route ID is required'),
+  stopId: z.string().uuid().optional().nullable(),
+  pickupType: z.enum(['BOTH', 'PICKUP_ONLY', 'DROP_ONLY']).default('BOTH'),
+  startDate: z.string().optional(),
+  monthlyFare: z.number().min(0).default(1500),
+  notes: z.string().optional(),
+});
+export type AllocateStudentTransportDTO = z.infer<typeof AllocateStudentTransportSchema>;
+
+// ============================================================================
+// SECTION 12: INVENTORY MANAGEMENT SCHEMAS
+// ============================================================================
+
+export const CreateInventoryCategorySchema = z.object({
+  name: z.string().min(2, 'Category name is required'),
+  code: z.string().min(2, 'Category code is required'),
+  description: z.string().optional(),
+});
+export type CreateInventoryCategoryDTO = z.infer<typeof CreateInventoryCategorySchema>;
+
+export const CreateInventoryItemSchema = z.object({
+  categoryId: z.string().uuid('Category ID is required'),
+  itemName: z.string().min(2, 'Item name is required'),
+  itemCode: z.string().min(2, 'Item code is required'),
+  quantity: z.number().int().min(0).default(0),
+  unit: z.string().default('Units'),
+  minStockAlert: z.number().int().min(0).default(5),
+  unitPrice: z.number().min(0).default(0),
+  location: z.string().optional(),
+});
+export type CreateInventoryItemDTO = z.infer<typeof CreateInventoryItemSchema>;
+
+export const UpdateInventoryItemSchema = CreateInventoryItemSchema.partial();
+export type UpdateInventoryItemDTO = z.infer<typeof UpdateInventoryItemSchema>;
+
+export const RecordInventoryTransactionSchema = z.object({
+  itemId: z.string().uuid('Item ID is required'),
+  transactionType: z.enum(['PURCHASE', 'ISSUE', 'RETURN', 'DISPOSAL', 'ADJUSTMENT']),
+  quantity: z.number().int().min(1, 'Quantity must be at least 1'),
+  unitPrice: z.number().min(0).optional(),
+  issuedToName: z.string().optional(),
+  recipientRole: z.string().optional(),
+  referenceNumber: z.string().optional(),
+  notes: z.string().optional(),
+});
+export type RecordInventoryTransactionDTO = z.infer<typeof RecordInventoryTransactionSchema>;
+
+// ============================================================================
+// SECTION 12: CERTIFICATE REQUEST SCHEMAS
+// ============================================================================
+
+export const RequestCertificateSchema = z.object({
+  certificateType: z.enum(['BONAFIDE', 'TRANSFER_CERTIFICATE', 'CHARACTER', 'MIGRATION', 'MERIT']),
+  reason: z.string().min(3, 'Reason for certificate request is required'),
+  academicSessionId: z.string().uuid().optional(),
+});
+export type RequestCertificateDTO = z.infer<typeof RequestCertificateSchema>;
+
+export const ReviewCertificateRequestSchema = z.object({
+  action: z.enum(['APPROVE', 'REJECT']),
+  rejectionReason: z.string().optional(),
+  remarks: z.string().optional(),
+});
+export type ReviewCertificateRequestDTO = z.infer<typeof ReviewCertificateRequestSchema>;
+
+// ============================================================================
+// SECTION 13: AI CHATBOT, FAQ & ENQUIRY ESCALATION SCHEMAS
+// ============================================================================
+
+export const ChatbotMessageSchema = z
+  .object({
+    message: z.string().optional(),
+    question: z.string().optional(),
+    schoolIdentifier: z.string().optional(),
+    history: z
+      .array(
+        z.object({
+          sender: z.enum(['user', 'bot']),
+          text: z.string(),
+        })
+      )
+      .optional(),
+    conversationHistory: z
+      .array(
+        z.object({
+          sender: z.enum(['user', 'bot']),
+          text: z.string(),
+        })
+      )
+      .optional(),
+    visitorSessionId: z.string().optional(),
+  })
+  .refine(
+    (data) => Boolean((data.message && data.message.trim().length > 0) || (data.question && data.question.trim().length > 0)),
+    {
+      message: 'Message cannot be empty',
+      path: ['message'],
+    }
+  );
+export type ChatbotMessageDTO = z.infer<typeof ChatbotMessageSchema>;
+
+export const ChatbotEnquirySchema = z.object({
+  schoolIdentifier: z.string().min(1, 'School identifier is required'),
+  parentName: z.string().min(2, 'Parent name is required'),
+  studentName: z.string().min(2, 'Student name is required'),
+  phone: z.string().min(8, 'Valid phone number is required'),
+  email: z.string().email('Valid email address is required'),
+  applyingClass: z.string().min(1, 'Target class is required'),
+  message: z.string().optional(),
+});
+export type ChatbotEnquiryDTO = z.infer<typeof ChatbotEnquirySchema>;
+
+export const ChatbotEscalationSchema = z.object({
+  schoolIdentifier: z.string().min(1, 'School identifier is required'),
+  visitorName: z.string().optional(),
+  visitorPhone: z.string().optional(),
+  visitorEmail: z.string().optional(),
+  query: z.string().min(1, 'Inquiry text is required'),
+  reason: z.string().default('VISITOR_REQUESTED_HUMAN'),
+  conversationSnapshot: z.array(z.any()).optional(),
+});
+export type ChatbotEscalationDTO = z.infer<typeof ChatbotEscalationSchema>;
+
+export const FAQCategoryEnum = z.enum([
+  'ADMISSIONS',
+  'FEES',
+  'ACADEMICS',
+  'FACILITIES',
+  'TIMINGS',
+  'EXAMINATIONS',
+  'CONTACT',
+  'GENERAL',
+]);
+export type FAQCategory = z.infer<typeof FAQCategoryEnum>;
+
+export const CreateChatbotFAQSchema = z.object({
+  question: z.string().min(3, 'Question must be at least 3 characters long'),
+  answer: z.string().min(3, 'Answer must be at least 3 characters long'),
+  category: FAQCategoryEnum.default('GENERAL'),
+  displayOrder: z.number().int().min(0).default(0),
+  isPublished: z.boolean().default(true),
+});
+export type CreateChatbotFAQDTO = z.infer<typeof CreateChatbotFAQSchema>;
+
+export const UpdateChatbotFAQSchema = CreateChatbotFAQSchema.partial();
+export type UpdateChatbotFAQDTO = z.infer<typeof UpdateChatbotFAQSchema>;
+
+export const UpdateChatbotConfigSchema = z.object({
+  botName: z.string().optional(),
+  welcomeMessage: z.string().optional(),
+  suggestedQuestions: z.array(z.string()).optional(),
+  fallbackMessage: z.string().optional(),
+  whatsappNumber: z.string().optional().nullable(),
+  whatsappPrefillText: z.string().optional().nullable(),
+  whatsappEnabled: z.boolean().optional(),
+  escalationEnabled: z.boolean().optional(),
+  escalationContactName: z.string().optional().nullable(),
+  escalationEmail: z.string().optional().nullable(),
+  escalationPhone: z.string().optional().nullable(),
+  escalationAvailability: z.string().optional().nullable(),
+  escalationMessage: z.string().optional().nullable(),
+});
+export type UpdateChatbotConfigDTO = z.infer<typeof UpdateChatbotConfigSchema>;
+
+export const UpdateEscalationStatusSchema = z.object({
+  status: z.enum(['PENDING', 'IN_PROGRESS', 'RESOLVED', 'DISMISSED']),
+  staffNotes: z.string().optional(),
+  assignedToStaffId: z.string().optional().nullable(),
+});
+export type UpdateEscalationStatusDTO = z.infer<typeof UpdateEscalationStatusSchema>;
+
+// ============================================================================
+// SECTION 14: SEO, DIGITAL MARKETING & WEBSITE CONVERSION
+// ============================================================================
+
+export const PageSEOSchema = z.object({
+  id: z.string(),
+  schoolId: z.string(),
+  pagePath: z.string(),
+  pageTitle: z.string(),
+  metaDescription: z.string().nullable().optional(),
+  metaKeywords: z.string().nullable().optional(),
+  canonicalUrl: z.string().nullable().optional(),
+  ogTitle: z.string().nullable().optional(),
+  ogDescription: z.string().nullable().optional(),
+  ogImage: z.string().nullable().optional(),
+  twitterCard: z.string().default('summary_large_image'),
+  structuredData: z.any().nullable().optional(),
+  imageAltText: z.string().nullable().optional(),
+  isPublished: z.boolean().default(true),
+  createdAt: z.string().or(z.date()).optional(),
+  updatedAt: z.string().or(z.date()).optional(),
+});
+export type PageSEODTO = z.infer<typeof PageSEOSchema>;
+
+export const UpsertPageSEOSchema = z.object({
+  pagePath: z.string().min(1, 'Page path is required'),
+  pageTitle: z.string().min(1, 'Page title is required'),
+  metaDescription: z.string().optional().nullable(),
+  metaKeywords: z.string().optional().nullable(),
+  canonicalUrl: z.string().optional().nullable(),
+  ogTitle: z.string().optional().nullable(),
+  ogDescription: z.string().optional().nullable(),
+  ogImage: z.string().optional().nullable(),
+  twitterCard: z.string().default('summary_large_image'),
+  structuredData: z.any().optional().nullable(),
+  imageAltText: z.string().optional().nullable(),
+  isPublished: z.boolean().default(true),
+});
+export type UpsertPageSEODTO = z.infer<typeof UpsertPageSEOSchema>;
+
+export const MarketingIntegrationSchema = z.object({
+  id: z.string().optional(),
+  schoolId: z.string().optional(),
+  googleAnalyticsId: z.string().nullable().optional(),
+  ga4TrackingEnabled: z.boolean().default(false),
+  searchConsoleProperty: z.string().nullable().optional(),
+  searchConsoleVerificationCode: z.string().nullable().optional(),
+  searchConsoleConnected: z.boolean().default(false),
+  facebookUrl: z.string().nullable().optional(),
+  instagramUrl: z.string().nullable().optional(),
+  youtubeUrl: z.string().nullable().optional(),
+  linkedinUrl: z.string().nullable().optional(),
+  twitterUrl: z.string().nullable().optional(),
+  prospectusFileUrl: z.string().nullable().optional(),
+  prospectusTitle: z.string().nullable().optional(),
+  prospectusPublished: z.boolean().default(false),
+});
+export type MarketingIntegrationDTO = z.infer<typeof MarketingIntegrationSchema>;
+
+export const UpdateMarketingIntegrationSchema = MarketingIntegrationSchema.partial();
+export type UpdateMarketingIntegrationDTO = z.infer<typeof UpdateMarketingIntegrationSchema>;
+
+export const BlogArticleSchema = z.object({
+  id: z.string(),
+  schoolId: z.string(),
+  title: z.string(),
+  slug: z.string(),
+  summary: z.string().nullable().optional(),
+  content: z.string(),
+  coverImageUrl: z.string().nullable().optional(),
+  authorName: z.string().default('School Editorial Team'),
+  category: z.string().default('Academics'),
+  tags: z.array(z.string()).default([]),
+  isPublished: z.boolean().default(true),
+  publishedAt: z.string().or(z.date()).nullable().optional(),
+  seoTitle: z.string().nullable().optional(),
+  metaDescription: z.string().nullable().optional(),
+  imageAltText: z.string().nullable().optional(),
+  viewCount: z.number().default(0),
+  createdAt: z.string().or(z.date()).optional(),
+  updatedAt: z.string().or(z.date()).optional(),
+});
+export type BlogArticleDTO = z.infer<typeof BlogArticleSchema>;
+
+export const CreateBlogArticleSchema = z.object({
+  title: z.string().min(3, 'Title must be at least 3 characters'),
+  slug: z.string().optional(),
+  summary: z.string().optional().nullable(),
+  content: z.string().min(10, 'Article content must be at least 10 characters'),
+  coverImageUrl: z.string().optional().nullable(),
+  authorName: z.string().default('School Editorial Team'),
+  category: z.string().default('Academics'),
+  tags: z.array(z.string()).default([]),
+  isPublished: z.boolean().default(true),
+  seoTitle: z.string().optional().nullable(),
+  metaDescription: z.string().optional().nullable(),
+  imageAltText: z.string().optional().nullable(),
+});
+export type CreateBlogArticleDTO = z.infer<typeof CreateBlogArticleSchema>;
+
+export const UpdateBlogArticleSchema = CreateBlogArticleSchema.partial();
+export type UpdateBlogArticleDTO = z.infer<typeof UpdateBlogArticleSchema>;
+
+export const MarketingBannerSchema = z.object({
+  id: z.string(),
+  schoolId: z.string(),
+  title: z.string(),
+  description: z.string().nullable().optional(),
+  bannerType: z.enum(['ADMISSION_OPEN', 'PROMOTIONAL', 'ANNOUNCEMENT', 'ACHIEVEMENT']).default('ADMISSION_OPEN'),
+  imageUrl: z.string().nullable().optional(),
+  ctaText: z.string().nullable().optional(),
+  ctaLink: z.string().nullable().optional(),
+  startDate: z.string().or(z.date()).nullable().optional(),
+  endDate: z.string().or(z.date()).nullable().optional(),
+  displayPosition: z.enum(['TOP_BAR', 'HERO_POPUP', 'SIDE_DRAWER', 'CONTENT_FOOTER']).default('TOP_BAR'),
+  displayOrder: z.number().default(0),
+  isPublished: z.boolean().default(true),
+  createdAt: z.string().or(z.date()).optional(),
+  updatedAt: z.string().or(z.date()).optional(),
+});
+export type MarketingBannerDTO = z.infer<typeof MarketingBannerSchema>;
+
+export const CreateMarketingBannerSchema = z.object({
+  title: z.string().min(2, 'Banner title is required'),
+  description: z.string().optional().nullable(),
+  bannerType: z.enum(['ADMISSION_OPEN', 'PROMOTIONAL', 'ANNOUNCEMENT', 'ACHIEVEMENT']).default('ADMISSION_OPEN'),
+  imageUrl: z.string().optional().nullable(),
+  ctaText: z.string().optional().nullable(),
+  ctaLink: z.string().optional().nullable(),
+  startDate: z.string().optional().nullable(),
+  endDate: z.string().optional().nullable(),
+  displayPosition: z.enum(['TOP_BAR', 'HERO_POPUP', 'SIDE_DRAWER', 'CONTENT_FOOTER']).default('TOP_BAR'),
+  displayOrder: z.number().default(0),
+  isPublished: z.boolean().default(true),
+});
+export type CreateMarketingBannerDTO = z.infer<typeof CreateMarketingBannerSchema>;
+
+export const UpdateMarketingBannerSchema = CreateMarketingBannerSchema.partial();
+export type UpdateMarketingBannerDTO = z.infer<typeof UpdateMarketingBannerSchema>;
+
+export const CallbackRequestSchema = z.object({
+  id: z.string(),
+  schoolId: z.string(),
+  requestNumber: z.string(),
+  fullName: z.string(),
+  phone: z.string(),
+  email: z.string().nullable().optional(),
+  applyingClass: z.string().nullable().optional(),
+  preferredTime: z.string().nullable().optional(),
+  message: z.string().nullable().optional(),
+  status: z.enum(['PENDING', 'CONTACTED', 'FOLLOW_UP_REQUIRED', 'RESOLVED', 'CLOSED']).default('PENDING'),
+  assignedStaffId: z.string().nullable().optional(),
+  staffNotes: z.string().nullable().optional(),
+  utmSource: z.string().nullable().optional(),
+  utmMedium: z.string().nullable().optional(),
+  utmCampaign: z.string().nullable().optional(),
+  createdAt: z.string().or(z.date()).optional(),
+  updatedAt: z.string().or(z.date()).optional(),
+});
+export type CallbackRequestDTO = z.infer<typeof CallbackRequestSchema>;
+
+export const CreateCallbackRequestSchema = z.object({
+  fullName: z.string().min(2, 'Full name is required'),
+  phone: z.string().min(7, 'A valid contact phone number is required'),
+  email: z.string().email().optional().or(z.literal('')).nullable(),
+  applyingClass: z.string().optional().nullable(),
+  preferredTime: z.string().optional().nullable(),
+  message: z.string().optional().nullable(),
+  utmSource: z.string().optional().nullable(),
+  utmMedium: z.string().optional().nullable(),
+  utmCampaign: z.string().optional().nullable(),
+});
+export type CreateCallbackRequestDTO = z.infer<typeof CreateCallbackRequestSchema>;
+
+export const UpdateCallbackStatusSchema = z.object({
+  status: z.enum(['PENDING', 'CONTACTED', 'FOLLOW_UP_REQUIRED', 'RESOLVED', 'CLOSED']),
+  staffNotes: z.string().optional().nullable(),
+  assignedStaffId: z.string().optional().nullable(),
+});
+export type UpdateCallbackStatusDTO = z.infer<typeof UpdateCallbackStatusSchema>;
+
+export const NewsletterSubscribeSchema = z.object({
+  email: z.string().email('Please enter a valid email address'),
+  source: z.string().default('WEBSITE_FOOTER'),
+});
+export type NewsletterSubscribeDTO = z.infer<typeof NewsletterSubscribeSchema>;
+
+export const LeadFollowUpSchema = z.object({
+  id: z.string(),
+  schoolId: z.string(),
+  enquiryId: z.string().nullable().optional(),
+  callbackId: z.string().nullable().optional(),
+  counsellorId: z.string().nullable().optional(),
+  counsellorName: z.string().default('Admission Counsellor'),
+  followUpDate: z.string().or(z.date()),
+  followUpTime: z.string().nullable().optional(),
+  description: z.string().min(1, 'Follow-up description/objective is required'),
+  status: z.enum(['SCHEDULED', 'COMPLETED', 'MISSED', 'CANCELLED']).default('SCHEDULED'),
+  outcomeNotes: z.string().nullable().optional(),
+  createdAt: z.string().or(z.date()).optional(),
+  updatedAt: z.string().or(z.date()).optional(),
+});
+export type LeadFollowUpDTO = z.infer<typeof LeadFollowUpSchema>;
+
+export const CreateLeadFollowUpSchema = z.object({
+  enquiryId: z.string().optional().nullable(),
+  callbackId: z.string().optional().nullable(),
+  counsellorId: z.string().optional().nullable(),
+  counsellorName: z.string().default('Admission Counsellor'),
+  followUpDate: z.string().min(1, 'Follow up date is required'),
+  followUpTime: z.string().optional().nullable(),
+  description: z.string().min(1, 'Description is required'),
+  status: z.enum(['SCHEDULED', 'COMPLETED', 'MISSED', 'CANCELLED']).default('SCHEDULED'),
+  outcomeNotes: z.string().optional().nullable(),
+});
+export type CreateLeadFollowUpDTO = z.infer<typeof CreateLeadFollowUpSchema>;
+
+export const UpdateLeadFollowUpSchema = CreateLeadFollowUpSchema.partial();
+export type UpdateLeadFollowUpDTO = z.infer<typeof UpdateLeadFollowUpSchema>;
+
+export const RecordAnalyticsEventSchema = z.object({
+  eventType: z.enum(['PAGE_VIEW', 'ADMISSION_BANNER_CLICK', 'ENQUIRY_SUBMIT', 'APPLICATION_START', 'PROSPECTUS_DOWNLOAD', 'WHATSAPP_CLICK', 'CALLBACK_REQUEST', 'NEWSLETTER_SUBMIT']),
+  pagePath: z.string(),
+  source: z.string().default('WEBSITE'),
+  utmSource: z.string().optional().nullable(),
+  utmMedium: z.string().optional().nullable(),
+  utmCampaign: z.string().optional().nullable(),
+  referrer: z.string().optional().nullable(),
+});
+export type RecordAnalyticsEventDTO = z.infer<typeof RecordAnalyticsEventSchema>;
+
+// ============================================================================
+// SECTION 15: NOTIFICATION & ALERT MANAGEMENT
+// ============================================================================
+
+export const NotificationEventEnum = z.enum([
+  'ADMISSION_ENQUIRY_RECEIVED',
+  'ADMISSION_STATUS_UPDATED',
+  'FEE_PAYMENT_REMINDER',
+  'FEE_PAYMENT_SUCCESS',
+  'ATTENDANCE_ABSENT_ALERT',
+  'HOMEWORK_ASSIGNED',
+  'EXAMINATION_ANNOUNCED',
+  'ADMIT_CARD_PUBLISHED',
+  'RESULT_PUBLISHED',
+  'MEETING_SCHEDULED',
+  'CHAT_MESSAGE_RECEIVED',
+  'SCHOOL_ANNOUNCEMENT',
+]);
+export type NotificationEventType = z.infer<typeof NotificationEventEnum>;
+
+export const NotificationChannelEnum = z.enum([
+  'IN_APP',
+  'EMAIL',
+  'SMS',
+  'WHATSAPP',
+]);
+export type NotificationChannelType = z.infer<typeof NotificationChannelEnum>;
+
+export const NotificationItemSchema = z.object({
+  id: z.string(),
+  schoolId: z.string(),
+  userId: z.string(),
+  title: z.string(),
+  message: z.string(),
+  type: z.string().default('INFO'),
+  category: z.string().default('GENERAL'),
+  priority: z.string().default('MEDIUM'),
+  link: z.string().nullable().optional(),
+  metadata: z.any().nullable().optional(),
+  isRead: z.boolean().default(false),
+  createdAt: z.string().or(z.date()),
+});
+export type NotificationItemDTO = z.infer<typeof NotificationItemSchema>;
+
+export const NotificationEventConfigSchema = z.object({
+  id: z.string(),
+  schoolId: z.string(),
+  eventKey: NotificationEventEnum,
+  eventName: z.string(),
+  description: z.string().nullable().optional(),
+  isEnabled: z.boolean().default(true),
+  channels: z.array(NotificationChannelEnum).default(['IN_APP']),
+  recipientRoles: z.array(z.string()).default([]),
+  createdAt: z.string().or(z.date()).optional(),
+  updatedAt: z.string().or(z.date()).optional(),
+});
+export type NotificationEventConfigDTO = z.infer<typeof NotificationEventConfigSchema>;
+
+export const UpdateNotificationEventConfigSchema = z.object({
+  isEnabled: z.boolean().optional(),
+  channels: z.array(NotificationChannelEnum).optional(),
+  recipientRoles: z.array(z.string()).optional(),
+});
+export type UpdateNotificationEventConfigDTO = z.infer<typeof UpdateNotificationEventConfigSchema>;
+
+export const NotificationTemplateSchema = z.object({
+  id: z.string(),
+  schoolId: z.string(),
+  eventKey: NotificationEventEnum,
+  channel: NotificationChannelEnum,
+  name: z.string(),
+  subject: z.string().nullable().optional(),
+  body: z.string(),
+  isActive: z.boolean().default(true),
+  createdAt: z.string().or(z.date()).optional(),
+  updatedAt: z.string().or(z.date()).optional(),
+});
+export type NotificationTemplateDTO = z.infer<typeof NotificationTemplateSchema>;
+
+export const CreateNotificationTemplateSchema = z.object({
+  eventKey: NotificationEventEnum,
+  channel: NotificationChannelEnum,
+  name: z.string().min(2, 'Template name is required'),
+  subject: z.string().optional().nullable(),
+  body: z.string().min(5, 'Template body is required'),
+  isActive: z.boolean().default(true),
+});
+export type CreateNotificationTemplateDTO = z.infer<typeof CreateNotificationTemplateSchema>;
+
+export const UpdateNotificationTemplateSchema = CreateNotificationTemplateSchema.partial();
+export type UpdateNotificationTemplateDTO = z.infer<typeof UpdateNotificationTemplateSchema>;
+
+export const PreviewNotificationTemplateSchema = z.object({
+  subject: z.string().optional().nullable(),
+  body: z.string().min(1, 'Body is required for preview'),
+  eventKey: NotificationEventEnum,
+  sampleOverrides: z.record(z.string()).optional(),
+});
+export type PreviewNotificationTemplateDTO = z.infer<typeof PreviewNotificationTemplateSchema>;
+
+export const NotificationDeliveryLogSchema = z.object({
+  id: z.string(),
+  schoolId: z.string(),
+  notificationId: z.string().nullable().optional(),
+  eventKey: z.string(),
+  channel: NotificationChannelEnum,
+  recipientId: z.string().nullable().optional(),
+  recipientContact: z.string(),
+  recipientName: z.string().nullable().optional(),
+  subject: z.string().nullable().optional(),
+  content: z.string(),
+  status: z.enum(['PENDING', 'SENT', 'DELIVERED', 'FAILED']),
+  errorDetails: z.string().nullable().optional(),
+  providerMessageId: z.string().nullable().optional(),
+  retryCount: z.number().default(0),
+  createdAt: z.string().or(z.date()),
+  updatedAt: z.string().or(z.date()).optional(),
+});
+export type NotificationDeliveryLogDTO = z.infer<typeof NotificationDeliveryLogSchema>;
+
+export const NotificationProviderConfigSchema = z.object({
+  id: z.string().optional(),
+  schoolId: z.string().optional(),
+  emailProvider: z.enum(['SYSTEM_DEFAULT', 'SMTP', 'RESEND', 'SENDGRID']).default('SYSTEM_DEFAULT'),
+  emailSenderName: z.string().default('Apex Academy Notifications'),
+  emailSenderAddress: z.string().default('notifications@apexacademy.edu.in'),
+  emailApiKey: z.string().nullable().optional(),
+  smsProvider: z.enum(['SIMULATED', 'TWILIO', 'MSG91', 'FAST2SMS']).default('SIMULATED'),
+  smsSenderId: z.string().nullable().optional(),
+  smsApiKey: z.string().nullable().optional(),
+  whatsAppProvider: z.enum(['SIMULATED', 'META_CLOUD', 'TWILIO_WHATSAPP']).default('SIMULATED'),
+  whatsAppPhoneNumberId: z.string().nullable().optional(),
+  whatsAppApiKey: z.string().nullable().optional(),
+});
+export type NotificationProviderConfigDTO = z.infer<typeof NotificationProviderConfigSchema>;
+
+export const UpdateNotificationProviderConfigSchema = NotificationProviderConfigSchema.partial();
+export type UpdateNotificationProviderConfigDTO = z.infer<typeof UpdateNotificationProviderConfigSchema>;
+
+// ============================================================================
+// SECTION 16: SUPER ADMIN PLATFORM GOVERNANCE, RBAC, AUDIT & SYSTEM CONTROLS
+// ============================================================================
+
+export const PlatformModuleEnum = z.enum([
+  'DASHBOARD',
+  'USERS',
+  'SCHOOLS',
+  'STUDENTS',
+  'STAFF',
+  'ACADEMIC',
+  'ADMISSIONS',
+  'ATTENDANCE',
+  'FEES',
+  'EXAMINATIONS',
+  'MARKSHEETS',
+  'ID_CARDS',
+  'CERTIFICATES',
+  'LIBRARY',
+  'TRANSPORT',
+  'INVENTORY',
+  'COMMUNICATION',
+  'NOTIFICATIONS',
+  'WEBSITE',
+  'ANALYTICS',
+  'BACKUP',
+  'SETTINGS',
+]);
+export type PlatformModule = z.infer<typeof PlatformModuleEnum>;
+
+export const ModulePermissionSchema = z.object({
+  id: z.string().optional(),
+  schoolId: z.string().nullable().optional(),
+  role: z.nativeEnum(PlatformRole),
+  moduleKey: z.string(),
+  canView: z.boolean().default(true),
+  canCreate: z.boolean().default(false),
+  canEdit: z.boolean().default(false),
+  canDelete: z.boolean().default(false),
+  canApprove: z.boolean().default(false),
+  canPublish: z.boolean().default(false),
+  canExport: z.boolean().default(false),
+  canManage: z.boolean().default(false),
+});
+export type ModulePermissionDTO = z.infer<typeof ModulePermissionSchema>;
+
+export const UpdateModulePermissionSchema = z.object({
+  schoolId: z.string().nullable().optional(),
+  role: z.nativeEnum(PlatformRole),
+  moduleKey: z.string(),
+  canView: z.boolean().optional(),
+  canCreate: z.boolean().optional(),
+  canEdit: z.boolean().optional(),
+  canDelete: z.boolean().optional(),
+  canApprove: z.boolean().optional(),
+  canPublish: z.boolean().optional(),
+  canExport: z.boolean().optional(),
+  canManage: z.boolean().optional(),
+});
+export type UpdateModulePermissionDTO = z.infer<typeof UpdateModulePermissionSchema>;
+
+export const SuperAdminCreateUserSchema = z.object({
+  email: z.string().email('Valid email address is required'),
+  username: z.string().min(3).optional(),
+  firstName: z.string().min(1, 'First name is required'),
+  lastName: z.string().min(1, 'Last name is required'),
+  phone: z.string().optional(),
+  role: z.nativeEnum(PlatformRole),
+  schoolId: z.string().optional(),
+  temporaryPassword: z.string().min(6).optional(),
+  mustChangePassword: z.boolean().default(true),
+});
+export type SuperAdminCreateUserDTO = z.infer<typeof SuperAdminCreateUserSchema>;
+
+export const SuperAdminUpdateUserSchema = z.object({
+  firstName: z.string().min(1).optional(),
+  lastName: z.string().min(1).optional(),
+  phone: z.string().optional(),
+  isActive: z.boolean().optional(),
+  accountLocked: z.boolean().optional(),
+  mustChangePassword: z.boolean().optional(),
+});
+export type SuperAdminUpdateUserDTO = z.infer<typeof SuperAdminUpdateUserSchema>;
+
+export const MarksheetPublicationReviewSchema = z.object({
+  action: z.enum(['APPROVE', 'REJECT', 'PUBLISH']),
+  reviewNotes: z.string().optional(),
+});
+export type MarksheetPublicationReviewDTO = z.infer<typeof MarksheetPublicationReviewSchema>;
+
+export const CreateBackupRequestSchema = z.object({
+  backupType: z.enum(['FULL', 'TENANT_DATA', 'DATABASE_SQL', 'MEDIA_METADATA']).default('FULL'),
+  schoolId: z.string().optional(),
+  notes: z.string().optional(),
+});
+export type CreateBackupRequestDTO = z.infer<typeof CreateBackupRequestSchema>;
+
+export const UpdatePlatformSystemConfigSchema = z.object({
+  platformName: z.string().optional(),
+  supportEmail: z.string().email().optional(),
+  maintenanceMode: z.boolean().optional(),
+  maintenanceMessage: z.string().nullable().optional(),
+  sessionTimeoutMinutes: z.number().min(5).max(1440).optional(),
+  maxLoginAttempts: z.number().min(1).max(20).optional(),
+  lockoutDurationMinutes: z.number().min(5).max(1440).optional(),
+  enforcePasswordChangeDays: z.number().min(0).max(365).optional(),
+  allowSelfRegistration: z.boolean().optional(),
+  globalAnnouncements: z.any().optional(),
+  featureFlags: z.any().optional(),
+  backupSettings: z.any().optional(),
+});
+export type UpdatePlatformSystemConfigDTO = z.infer<typeof UpdatePlatformSystemConfigSchema>;
+
+export const ActivityLogQuerySchema = z.object({
+  search: z.string().optional(),
+  schoolId: z.string().optional(),
+  userId: z.string().optional(),
+  role: z.string().optional(),
+  module: z.string().optional(),
+  action: z.string().optional(),
+  status: z.string().optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  page: z.number().min(1).default(1),
+  limit: z.number().min(1).max(100).default(50),
+});
+export type ActivityLogQueryDTO = z.infer<typeof ActivityLogQuerySchema>;
+
+// ============================================================================
+// SECTION 17: UI/UX, SECURITY & TECHNICAL STANDARDS SCHEMAS
+// ============================================================================
+
+export const VerifyMfaOtpSchema = z.object({
+  mfaToken: z.string().min(1, 'MFA Token is required'),
+  otpCode: z.string().regex(/^\d{6}$/, 'OTP must be a 6-digit numeric code'),
+});
+export type VerifyMfaOtpDTO = z.infer<typeof VerifyMfaOtpSchema>;
+
+export const ResendMfaOtpSchema = z.object({
+  mfaToken: z.string().min(1, 'MFA Token is required'),
+});
+export type ResendMfaOtpDTO = z.infer<typeof ResendMfaOtpSchema>;
+
+export const ToggleMfaSchema = z.object({
+  enable: z.boolean(),
+  method: z.enum(['EMAIL_OTP', 'TOTP']).default('EMAIL_OTP'),
+});
+export type ToggleMfaDTO = z.infer<typeof ToggleMfaSchema>;
+
+export const SecureFileUploadSchema = z.object({
+  originalName: z.string().min(1, 'Original file name is required'),
+  mimeType: z.string().min(1, 'MIME type is required'),
+  category: z.enum([
+    'STUDENT_PHOTO',
+    'STAFF_PHOTO',
+    'ADMISSION_DOC',
+    'ASSIGNMENT',
+    'EXAM_PAPER',
+    'MARKSHEET_ATTACHMENT',
+    'FEE_RECEIPT',
+    'DOCUMENT',
+  ]).default('DOCUMENT'),
+  isPublic: z.boolean().default(false),
+  base64Data: z.string().min(1, 'File payload in base64 is required'),
+  metadata: z.record(z.any()).optional(),
+});
+export type SecureFileUploadDTO = z.infer<typeof SecureFileUploadSchema>;
+
+export const SecureFileQuerySchema = z.object({
+  category: z.string().optional(),
+  isPublic: z.boolean().optional(),
+  search: z.string().optional(),
+  page: z.number().min(1).default(1),
+  limit: z.number().min(1).max(100).default(50),
+});
+export type SecureFileQueryDTO = z.infer<typeof SecureFileQuerySchema>;
+
+
+
+
+
+
+
+
+
 
 
 

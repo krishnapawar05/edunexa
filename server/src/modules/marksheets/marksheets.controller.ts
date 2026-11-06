@@ -68,7 +68,7 @@ export class MarksheetsController {
       if (!schoolId) throw new AppError('Tenant school context required.', 400);
 
       const result = await marksheetsService.deleteTemplate(schoolId, req.params.templateId);
-      res.status(200).json({ success: true, ...result });
+      res.status(200).json(result);
     } catch (err) {
       next(err);
     }
@@ -322,3 +322,4 @@ export class MarksheetsController {
 }
 
 export const marksheetsController = new MarksheetsController();
+

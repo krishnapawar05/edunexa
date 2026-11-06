@@ -86,15 +86,43 @@ describe('EDUNEXA PHASE 4: End-to-End School ERP Workflows Test Suite', () => {
     await prisma.feePayment.deleteMany({
       where: { feeInvoiceId: 'inv-ananya-02' },
     });
-    await prisma.feeInvoice.updateMany({
-      where: { id: 'inv-ananya-02' },
-      data: {
-        amountPaid: 20000,
-        discountApplied: 0,
-        status: 'PARTIALLY_PAID',
-        auditTrail: [],
-      },
-    });
+
+    const apexSchool = await prisma.school.findFirst({ where: { slug: 'apex-academy' } });
+    const feeStruct = apexSchool ? await prisma.feeStructure.findFirst({ where: { schoolId: apexSchool.id } }) : null;
+    const apexStudent = apexSchool ? await prisma.studentProfile.findFirst({ where: { membership: { schoolId: apexSchool.id } } }) : null;
+
+    if (apexSchool && feeStruct && apexStudent) {
+      await prisma.feeInvoice.upsert({
+        where: { id: 'inv-ananya-02' },
+        create: {
+          id: 'inv-ananya-02',
+          invoiceNumber: 'INV-2026-ANA-02',
+          studentProfileId: apexStudent.id,
+          feeStructureId: feeStruct.id,
+          amountDue: 35000,
+          amountPaid: 20000,
+          discountApplied: 0,
+          dueDate: new Date('2026-11-30'),
+          status: 'PARTIALLY_PAID',
+        },
+        update: {
+          amountPaid: 20000,
+          discountApplied: 0,
+          status: 'PARTIALLY_PAID',
+          auditTrail: [],
+        },
+      });
+    } else {
+      await prisma.feeInvoice.updateMany({
+        where: { id: 'inv-ananya-02' },
+        data: {
+          amountPaid: 20000,
+          discountApplied: 0,
+          status: 'PARTIALLY_PAID',
+          auditTrail: [],
+        },
+      });
+    }
 
     // Clean up test timetable slots
     await prisma.timetableSlot.deleteMany({
