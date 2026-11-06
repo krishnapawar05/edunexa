@@ -33,3 +33,9 @@ logs/
 
 # Uploads
 uploads/
+
+# Documentation & Reports
+*.pdf
+Advanced School Management Website & AI-Powered ERP System.pdf
+Final Project Enhancement Report.pdf
+
