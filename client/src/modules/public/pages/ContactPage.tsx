@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { MapPin, Phone, Mail, Clock, Send, CheckCircle2 } from 'lucide-react';
+import { MapPin, Phone, PhoneCall, Mail, Clock, Send, CheckCircle2 } from 'lucide-react';
 import { useSchoolBranding } from '../../../context/SchoolBrandingContext.js';
 
 export const ContactPage: React.FC = () => {
@@ -75,6 +75,36 @@ export const ContactPage: React.FC = () => {
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* Quick Callback Trigger Box */}
+          <div
+            style={{
+              padding: '16px',
+              borderRadius: 'var(--radius-sm)',
+              background: 'linear-gradient(135deg, rgba(22, 62, 50, 0.08) 0%, rgba(196, 164, 107, 0.12) 100%)',
+              border: '1px solid rgba(196, 164, 107, 0.4)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <PhoneCall size={18} style={{ color: 'var(--academic-gold-600, #997b3d)' }} />
+              <h4 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 700 }}>Prefer a Direct Phone Call?</h4>
+            </div>
+            <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+              Request an instant admissions callback and our specialist will reach out during your preferred hours.
+            </p>
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent('edunexa:open-callback-modal'))}
+              className="ed-btn-academic-callback"
+              style={{ marginTop: '4px', width: 'fit-content', padding: '8px 16px', fontSize: '0.84rem' }}
+            >
+              <PhoneCall size={14} />
+              <span>Request an Admissions Callback</span>
+            </button>
           </div>
         </div>
 

@@ -72,6 +72,13 @@ export const PublicLayout: React.FC = () => {
     captureAndStoreUtmParams();
   }, [location.pathname, location.search]);
 
+  // Listen for global callback request triggers from landing page sections
+  useEffect(() => {
+    const handleOpenCallback = () => setShowCallbackModal(true);
+    window.addEventListener('edunexa:open-callback-modal', handleOpenCallback);
+    return () => window.removeEventListener('edunexa:open-callback-modal', handleOpenCallback);
+  }, []);
+
   // 2. Fetch SEO Metadata & Schema.org JSON-LD dynamically per route
   useEffect(() => {
     marketingApi
@@ -358,23 +365,13 @@ export const PublicLayout: React.FC = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
           {/* Quick Callback Trigger */}
           <button
+            type="button"
             onClick={() => setShowCallbackModal(true)}
-            style={{
-              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-              border: 'none',
-              color: '#ffffff',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '4px',
-              fontWeight: 700,
-              padding: '3px 10px',
-              borderRadius: 'var(--radius-xs)',
-              fontSize: '0.74rem',
-              cursor: 'pointer',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
-            }}
+            className="ed-btn-academic-callback-gold"
+            title="Request an instant callback from admissions counsellors"
           >
-            <PhoneCall size={11} /> Request Callback
+            <PhoneCall size={12} />
+            <span>Request Callback</span>
           </button>
 
           <Link
@@ -680,7 +677,7 @@ export const PublicLayout: React.FC = () => {
 
       {/* Main Outlet for Current Public Subpage */}
       <main style={{ flex: 1 }}>
-        <Outlet />
+        <Outlet context={{ setShowCallbackModal, openCallbackModal: () => setShowCallbackModal(true) }} />
       </main>
 
       {/* Online Admission Application Modal (Responsive) */}
@@ -1015,22 +1012,41 @@ export const PublicLayout: React.FC = () => {
                   Phone: {branding.contactPhone}
                 </span>
                 <button
+                  type="button"
                   onClick={() => setShowCallbackModal(true)}
                   style={{
-                    background: 'none',
-                    border: 'none',
-                    color: 'var(--academic-gold-500)',
+                    background: 'rgba(196, 164, 107, 0.14)',
+                    border: '1px solid rgba(196, 164, 107, 0.45)',
+                    color: 'var(--academic-gold-100, #fef9c3)',
                     fontWeight: 600,
-                    fontSize: '0.84rem',
+                    fontSize: '0.82rem',
                     textAlign: 'left',
                     cursor: 'pointer',
-                    padding: 0,
-                    display: 'flex',
+                    padding: '8px 14px',
+                    borderRadius: 'var(--radius-sm, 6px)',
+                    display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '4px',
+                    gap: '8px',
+                    width: 'fit-content',
+                    transition: 'all 0.2s ease',
+                    marginTop: '4px',
+                    marginBottom: '4px',
+                    boxShadow: '0 2px 5px rgba(0,0,0,0.2)',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgba(196, 164, 107, 0.24)';
+                    e.currentTarget.style.borderColor = 'var(--academic-gold-500, #c4a46b)';
+                    e.currentTarget.style.color = '#ffffff';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgba(196, 164, 107, 0.14)';
+                    e.currentTarget.style.borderColor = 'rgba(196, 164, 107, 0.45)';
+                    e.currentTarget.style.color = 'var(--academic-gold-100, #fef9c3)';
                   }}
                 >
-                  <PhoneCall size={12} /> Request an Admissions Callback →
+                  <PhoneCall size={13} style={{ color: 'var(--academic-gold-400, #dfc08a)' }} />
+                  <span>Request an Admissions Callback</span>
+                  <ArrowRight size={13} style={{ opacity: 0.8 }} />
                 </button>
                 <Link to="/login" style={{ color: 'var(--academic-gold-500)', fontWeight: 600, fontSize: '0.84rem', textDecoration: 'none', marginTop: '4px' }}>
                   Staff & Student ERP Portal →

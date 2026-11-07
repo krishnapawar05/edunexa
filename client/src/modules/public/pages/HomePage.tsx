@@ -24,6 +24,7 @@ import {
   Check,
   Clock,
   Phone,
+  PhoneCall,
   Bell,
   Calendar,
   Download,
@@ -123,6 +124,22 @@ export const HomePage: React.FC = () => {
                 <span>{content.heroCtaText || 'Admissions Open 2026–2027'}</span>
                 <ArrowRight size={17} />
               </Link>
+
+              <button
+                type="button"
+                onClick={() => window.dispatchEvent(new CustomEvent('edunexa:open-callback-modal'))}
+                className="ed-btn-academic-forest"
+                style={{
+                  cursor: 'pointer',
+                  border: '1px solid rgba(196, 164, 107, 0.65)',
+                  backgroundColor: 'rgba(14, 42, 34, 0.85)',
+                  backdropFilter: 'blur(4px)',
+                }}
+                title="Schedule an admissions callback"
+              >
+                <PhoneCall size={16} style={{ color: 'var(--academic-gold-400, #dfc08a)' }} />
+                <span>Request Callback</span>
+              </button>
 
               <Link to="/about" className="ed-btn-academic-forest">
                 <span>{content.heroSecondaryCtaText || 'Explore Our School'}</span>
@@ -757,11 +774,21 @@ export const HomePage: React.FC = () => {
               </p>
             </div>
 
-            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: '0.85rem', flexWrap: 'wrap', alignItems: 'center' }}>
               <Link to="/admissions" className="ed-btn-academic-gold">
                 <span>Start Online Application</span>
                 <ArrowRight size={16} />
               </Link>
+              <button
+                type="button"
+                onClick={() => window.dispatchEvent(new CustomEvent('edunexa:open-callback-modal'))}
+                className="ed-btn-academic-callback"
+                style={{ cursor: 'pointer' }}
+                title="Schedule an admissions callback"
+              >
+                <PhoneCall size={16} style={{ color: 'var(--academic-gold-400, #dfc08a)' }} />
+                <span>Request Admissions Callback</span>
+              </button>
               <Link to="/contact" style={{ backgroundColor: 'rgba(255,255,255,0.1)', color: '#ffffff', border: '1px solid rgba(255,255,255,0.3)', padding: '12px 22px', borderRadius: 'var(--radius-sm)', textDecoration: 'none', fontWeight: 600, fontSize: '0.94rem' }}>
                 Campus Inquiries
               </Link>

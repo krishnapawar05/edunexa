@@ -1542,6 +1542,54 @@ html.dark .ed-drawer-header {
   transform: translateY(-1px);
 }
 
+.ed-btn-academic-callback {
+  background: linear-gradient(135deg, #163e32 0%, #0e2a22 100%);
+  color: #ffffff !important;
+  font-weight: 700;
+  padding: 12px 24px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(196, 164, 107, 0.5);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 0.94rem;
+  transition: all 0.2s ease;
+  text-decoration: none;
+}
+
+.ed-btn-academic-callback:hover {
+  background: linear-gradient(135deg, #1e4f40 0%, #13392e 100%);
+  border-color: var(--color-accent, #c4a46b);
+  color: #ffffff !important;
+  box-shadow: 0 4px 14px rgba(196, 164, 107, 0.35);
+  transform: translateY(-1px);
+}
+
+.ed-btn-academic-callback-gold {
+  background: linear-gradient(180deg, var(--color-accent, #c4a46b) 0%, #ab894c 100%);
+  color: #1c1917 !important;
+  font-weight: 700;
+  padding: 5px 12px;
+  border-radius: var(--radius-xs, 4px);
+  border: 1px solid #8c6e37;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  font-size: 0.76rem;
+  transition: all 0.15s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+  text-decoration: none;
+}
+
+.ed-btn-academic-callback-gold:hover {
+  background: linear-gradient(180deg, #ab894c 0%, #8c6e37 100%);
+  color: #ffffff !important;
+  transform: translateY(-1px);
+}
+
 /* Institutional Footer (Forest Green Theme) */
 .ed-academic-footer {
   background-color: #173327;
