@@ -238,18 +238,37 @@ export const TeacherVirtualIdCardPage: React.FC = () => {
                         height: '92px',
                         borderRadius: '6px',
                         backgroundColor: '#f1f5f9',
-                        border: '2px solid #1e3a8a',
+                        border: `2px solid ${cardData?.idCard?.template?.primaryColor || '#1e3a8a'}`,
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
                         justifyContent: 'center',
                         flexShrink: 0,
+                        overflow: 'hidden',
+                        position: 'relative',
                       }}
                     >
-                      <span style={{ fontSize: '1.4rem', fontWeight: 800, color: '#1e3a8a' }}>
-                        {cardData?.fullName?.charAt(0) || 'F'}
-                      </span>
-                      <span style={{ fontSize: '0.52rem', color: '#64748b', marginTop: '4px' }}>FACULTY</span>
+                      {cardData?.avatarUrl || cardData?.photoUrl ? (
+                        <img
+                          src={cardData.avatarUrl || cardData.photoUrl}
+                          alt={cardData.fullName}
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                          }}
+                          onError={(e) => {
+                            (e.target as HTMLElement).style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <>
+                          <span style={{ fontSize: '1.4rem', fontWeight: 800, color: cardData?.idCard?.template?.primaryColor || '#1e3a8a' }}>
+                            {cardData?.fullName?.charAt(0) || 'F'}
+                          </span>
+                          <span style={{ fontSize: '0.50rem', color: '#64748b', marginTop: '2px', fontWeight: 600 }}>FACULTY</span>
+                        </>
+                      )}
                     </div>
 
                     {/* Holder Info */}

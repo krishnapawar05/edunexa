@@ -34,6 +34,12 @@ router.post('/admin/generate', idCardsController.generateIndividualIdCard);
 router.post('/admin/bulk-generate', idCardsController.bulkGenerateIdCards);
 router.patch('/admin/cards/:id/status', idCardsController.updateCardStatus);
 
+// Photo Management (Student & Employee)
+router.post('/admin/students/:id/photo', idCardsController.uploadStudentPhoto);
+router.delete('/admin/students/:id/photo', idCardsController.removeStudentPhoto);
+router.post('/admin/employees/:id/photo', idCardsController.uploadEmployeePhoto);
+router.delete('/admin/employees/:id/photo', idCardsController.removeEmployeePhoto);
+
 // Templates
 router.get('/admin/templates', idCardsController.listTemplates);
 router.post('/admin/templates', idCardsController.createTemplate);

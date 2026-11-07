@@ -1747,6 +1747,33 @@ export const idCardsApi = {
       method: 'DELETE',
     });
   },
+
+  // Photo Management (Student & Employee)
+  async uploadStudentPhoto(studentId: string, payload: { photoData: string; fileName?: string; mimeType?: string }): Promise<any> {
+    return apiRequest<any>(`/api/v1/id-cards/admin/students/${studentId}/photo`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async removeStudentPhoto(studentId: string): Promise<any> {
+    return apiRequest<any>(`/api/v1/id-cards/admin/students/${studentId}/photo`, {
+      method: 'DELETE',
+    });
+  },
+
+  async uploadEmployeePhoto(employeeId: string, payload: { photoData: string; fileName?: string; mimeType?: string }): Promise<any> {
+    return apiRequest<any>(`/api/v1/id-cards/admin/employees/${employeeId}/photo`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async removeEmployeePhoto(employeeId: string): Promise<any> {
+    return apiRequest<any>(`/api/v1/id-cards/admin/employees/${employeeId}/photo`, {
+      method: 'DELETE',
+    });
+  },
 };
 
 // ============================================================================

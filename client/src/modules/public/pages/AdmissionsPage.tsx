@@ -17,6 +17,8 @@ import {
   Copy,
   Check,
   Sparkles,
+  Camera,
+  Trash2,
 } from 'lucide-react';
 import { useSchoolBranding } from '../../../context/SchoolBrandingContext.js';
 import { admissionsApi } from '../../../services/api.js';
@@ -64,7 +66,10 @@ export const AdmissionsPage: React.FC = () => {
     marksPercentage: '',
 
     // Step 4: Documents Uploaded
-    uploadedDocs: {} as Record<string, { fileName: string; fileSize?: string; uploadedAt: string }>,
+    uploadedDocs: {} as Record<
+      string,
+      { fileName: string; fileSize?: string; uploadedAt: string; fileUrl?: string; previewUrl?: string }
+    >,
 
     // Step 5: Declaration
     declarationAgreed: false,
@@ -123,10 +128,69 @@ export const AdmissionsPage: React.FC = () => {
     setTimeout(() => setCopiedAppNo(false), 2000);
   };
 
-  // Mock / Interactive file upload simulator
+  // Centralized File & Passport Photograph Upload Handler
   const handleFileUpload = (docType: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
+    if (!file) return;
+
+    // Reset error
+    setSubmissionError(null);
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setSubmissionError('File size exceeds the 5MB limit. Please upload a smaller file.');
+      return;
+    }
+
+    const isPhoto = docType === 'STUDENT_PHOTO' || docType === 'PASSPORT_PHOTO';
+    const isImage = file.type.startsWith('image/');
+
+    if (isPhoto) {
+      const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+      if (!allowed.includes(file.type.toLowerCase())) {
+        setSubmissionError('Student photograph must be a JPG, PNG, or WebP image file.');
+        return;
+      }
+    }
+
+    if (isImage) {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const previewUrl = ev.target?.result as string;
+        setFormData((prev) => ({
+          ...prev,
+          uploadedDocs: {
+            ...prev.uploadedDocs,
+            [docType]: {
+              fileName: file.name,
+              fileSize: `${(file.size / 1024).toFixed(1)} KB`,
+              uploadedAt: new Date().toISOString(),
+              fileUrl: previewUrl,
+              previewUrl,
+            },
+            ...(isPhoto
+              ? {
+                  STUDENT_PHOTO: {
+                    fileName: file.name,
+                    fileSize: `${(file.size / 1024).toFixed(1)} KB`,
+                    uploadedAt: new Date().toISOString(),
+                    fileUrl: previewUrl,
+                    previewUrl,
+                  },
+                  PASSPORT_PHOTO: {
+                    fileName: file.name,
+                    fileSize: `${(file.size / 1024).toFixed(1)} KB`,
+                    uploadedAt: new Date().toISOString(),
+                    fileUrl: previewUrl,
+                    previewUrl,
+                  },
+                }
+              : {}),
+          },
+        }));
+      };
+      reader.readAsDataURL(file);
+    } else {
       setFormData((prev) => ({
         ...prev,
         uploadedDocs: {
@@ -135,10 +199,23 @@ export const AdmissionsPage: React.FC = () => {
             fileName: file.name,
             fileSize: `${(file.size / 1024).toFixed(1)} KB`,
             uploadedAt: new Date().toISOString(),
+            fileUrl: `/uploads/admissions/${file.name}`,
           },
         },
       }));
     }
+  };
+
+  const handleRemoveDoc = (docType: string) => {
+    setFormData((prev) => {
+      const copy = { ...prev.uploadedDocs };
+      delete copy[docType];
+      if (docType === 'STUDENT_PHOTO' || docType === 'PASSPORT_PHOTO') {
+        delete copy['STUDENT_PHOTO'];
+        delete copy['PASSPORT_PHOTO'];
+      }
+      return { ...prev, uploadedDocs: copy };
+    });
   };
 
   // Step Validation
@@ -214,7 +291,7 @@ export const AdmissionsPage: React.FC = () => {
       const docsPayload = Object.entries(formData.uploadedDocs).map(([type, val]) => ({
         type,
         fileName: val.fileName,
-        fileUrl: `/uploads/admissions/${val.fileName}`,
+        fileUrl: (val as any).fileUrl || `/uploads/admissions/${val.fileName}`,
         uploadedAt: val.uploadedAt,
       }));
 
@@ -653,6 +730,137 @@ export const AdmissionsPage: React.FC = () => {
                     Enter official identity information as stated on the birth certificate.
                   </p>
 
+                  {/* Passport-Size Photograph Upload */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '20px',
+                      padding: '16px 20px',
+                      backgroundColor: 'var(--bg-subtle)',
+                      border: '1px solid var(--border-default)',
+                      borderRadius: '10px',
+                      marginBottom: '20px',
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: '84px',
+                        height: '104px',
+                        borderRadius: '6px',
+                        border: '2px dashed var(--border-default)',
+                        backgroundColor: '#ffffff',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        overflow: 'hidden',
+                        position: 'relative',
+                        flexShrink: 0,
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+                      }}
+                    >
+                      {formData.uploadedDocs['STUDENT_PHOTO']?.previewUrl ||
+                      formData.uploadedDocs['PASSPORT_PHOTO']?.previewUrl ? (
+                        <img
+                          src={
+                            formData.uploadedDocs['STUDENT_PHOTO']?.previewUrl ||
+                            formData.uploadedDocs['PASSPORT_PHOTO']?.previewUrl
+                          }
+                          alt="Student Passport"
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                      ) : (
+                        <div style={{ textAlign: 'center', padding: '6px' }}>
+                          <Camera size={26} color="#94a3b8" style={{ margin: '0 auto 4px' }} />
+                          <span style={{ fontSize: '0.62rem', color: '#94a3b8', lineHeight: 1.1, display: 'block' }}>
+                            Passport Photo
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                        <span style={{ fontWeight: 600, fontSize: '0.92rem', color: 'var(--text-primary)' }}>
+                          Student Passport Photograph
+                        </span>
+                        <span
+                          style={{
+                            fontSize: '0.72rem',
+                            padding: '2px 8px',
+                            borderRadius: '12px',
+                            backgroundColor:
+                              formData.uploadedDocs['STUDENT_PHOTO'] || formData.uploadedDocs['PASSPORT_PHOTO']
+                                ? '#dcfce7'
+                                : '#fef3c7',
+                            color:
+                              formData.uploadedDocs['STUDENT_PHOTO'] || formData.uploadedDocs['PASSPORT_PHOTO']
+                                ? '#166534'
+                                : '#92400e',
+                            fontWeight: 600,
+                          }}
+                        >
+                          {formData.uploadedDocs['STUDENT_PHOTO'] || formData.uploadedDocs['PASSPORT_PHOTO']
+                            ? 'Uploaded'
+                            : 'Recommended / Required'}
+                        </span>
+                      </div>
+                      <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '0 0 10px 0', lineHeight: 1.4 }}>
+                        Official passport-size portrait with clear background. This photograph will be printed on your
+                        official ISO CR80 Student Virtual ID Card and examination admit cards.
+                      </p>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <label
+                          className="ed-btn ed-btn-secondary"
+                          style={{
+                            fontSize: '0.78rem',
+                            padding: '6px 14px',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                          }}
+                        >
+                          <UploadCloud size={14} />
+                          {formData.uploadedDocs['STUDENT_PHOTO'] || formData.uploadedDocs['PASSPORT_PHOTO']
+                            ? 'Replace Photograph'
+                            : 'Upload Photograph'}
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp,image/jpg"
+                            style={{ display: 'none' }}
+                            onChange={(e) => handleFileUpload('STUDENT_PHOTO', e)}
+                          />
+                        </label>
+
+                        {(formData.uploadedDocs['STUDENT_PHOTO'] || formData.uploadedDocs['PASSPORT_PHOTO']) && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveDoc('STUDENT_PHOTO')}
+                            className="ed-btn"
+                            style={{
+                              fontSize: '0.78rem',
+                              padding: '6px 12px',
+                              color: '#dc2626',
+                              backgroundColor: '#fee2e2',
+                              border: '1px solid #fecaca',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                            }}
+                          >
+                            <Trash2 size={13} />
+                            Remove
+                          </button>
+                        )}
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                          Accepted: JPG, PNG, WebP (Max 5MB)
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '14px' }}>
                     <div className="ed-input-group">
                       <label className="ed-label">First Name *</label>
@@ -946,27 +1154,43 @@ export const AdmissionsPage: React.FC = () => {
                             gap: '12px',
                           }}
                         >
-                          <div>
-                            <div style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <span>{docItem.label}</span>
-                              {docItem.isRequired ? (
-                                <span style={{ color: '#dc2626', fontWeight: 700 }}>*</span>
-                              ) : (
-                                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 'normal' }}>(Optional)</span>
-                              )}
-                            </div>
-                            <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                              {uploaded ? (
-                                <span style={{ color: '#16a34a', fontWeight: 600 }}>
-                                  ✓ Uploaded: {uploaded.fileName} ({uploaded.fileSize})
-                                </span>
-                              ) : (
-                                <span>Accepted: PDF, JPG, PNG (Max 5MB)</span>
-                              )}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            {uploaded?.previewUrl && (
+                              <img
+                                src={uploaded.previewUrl}
+                                alt={docItem.label}
+                                style={{
+                                  width: '42px',
+                                  height: '52px',
+                                  objectFit: 'cover',
+                                  borderRadius: '4px',
+                                  border: '1px solid #86efac',
+                                  flexShrink: 0,
+                                }}
+                              />
+                            )}
+                            <div>
+                              <div style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span>{docItem.label}</span>
+                                {docItem.isRequired ? (
+                                  <span style={{ color: '#dc2626', fontWeight: 700 }}>*</span>
+                                ) : (
+                                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 'normal' }}>(Optional)</span>
+                                )}
+                              </div>
+                              <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                {uploaded ? (
+                                  <span style={{ color: '#16a34a', fontWeight: 600 }}>
+                                    ✓ Uploaded: {uploaded.fileName} ({uploaded.fileSize})
+                                  </span>
+                                ) : (
+                                  <span>Accepted: PDF, JPG, PNG, WebP (Max 5MB)</span>
+                                )}
+                              </div>
                             </div>
                           </div>
 
-                          <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <label
                               className="ed-btn ed-btn-secondary"
                               style={{
@@ -982,11 +1206,27 @@ export const AdmissionsPage: React.FC = () => {
                               {uploaded ? 'Replace' : 'Upload File'}
                               <input
                                 type="file"
-                                accept=".pdf,.png,.jpg,.jpeg"
+                                accept=".pdf,.png,.jpg,.jpeg,.webp"
                                 style={{ display: 'none' }}
                                 onChange={(e) => handleFileUpload(docItem.type, e)}
                               />
                             </label>
+                            {uploaded && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveDoc(docItem.type)}
+                                className="ed-btn"
+                                title="Remove file"
+                                style={{
+                                  padding: '6px 8px',
+                                  color: '#dc2626',
+                                  backgroundColor: '#fee2e2',
+                                  border: '1px solid #fecaca',
+                                }}
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            )}
                           </div>
                         </div>
                       );

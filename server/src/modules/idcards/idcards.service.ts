@@ -8,6 +8,7 @@ import {
   IdCardTemplateDTO,
   UpdateIdCardStatusDTO,
 } from '@edunexa/shared';
+import { storageService } from '../storage/storage.service.js';
 
 export class IdCardsService {
   /**
@@ -1020,6 +1021,284 @@ export class IdCardsService {
     return prisma.idCardTemplate.delete({
       where: { id },
     });
+  }
+
+  // ==========================================================================
+  // 6. CENTRALIZED PHOTO MANAGEMENT (STUDENTS & EMPLOYEES)
+  // ==========================================================================
+
+  /**
+   * Upload or replace student photograph with tenant isolation and audit logging.
+   */
+  async updateStudentPhoto(
+    schoolId: string,
+    studentId: string,
+    photoData: string,
+    originalName?: string,
+    mimeType?: string,
+    actingUserId?: string
+  ) {
+    const student = await prisma.studentProfile.findFirst({
+      where: {
+        id: studentId,
+        membership: { schoolId },
+      },
+      include: {
+        membership: { include: { user: true } },
+        virtualIdCard: true,
+      },
+    });
+
+    if (!student) {
+      throw new AppError('Student record not found in this school tenant.', 404, 'NOT_FOUND');
+    }
+
+    let finalPhotoUrl = photoData;
+
+    // If photoData is a base64 string, securely persist to disk via StorageService
+    if (photoData.startsWith('data:') || photoData.length > 500) {
+      const detectedMime = mimeType || (photoData.startsWith('data:') ? photoData.split(';')[0].split(':')[1] : 'image/jpeg');
+      const ext = detectedMime.includes('png') ? 'png' : detectedMime.includes('webp') ? 'webp' : 'jpg';
+      const fileName = originalName || `student_${student.admissionNumber.replace(/[^a-zA-Z0-9]/g, '_')}_photo.${ext}`;
+
+      const uploadResult = await storageService.uploadFile(schoolId, actingUserId || null, {
+        originalName: fileName,
+        mimeType: detectedMime,
+        category: 'STUDENT_PHOTO',
+        isPublic: true,
+        base64Data: photoData,
+      });
+
+      finalPhotoUrl = uploadResult.downloadUrl;
+    }
+
+    // Persist photo reference in PostgreSQL on both StudentProfile and User models
+    await prisma.$transaction([
+      prisma.studentProfile.update({
+        where: { id: student.id },
+        data: { photoUrl: finalPhotoUrl },
+      }),
+      prisma.user.update({
+        where: { id: student.membership.userId },
+        data: { avatarUrl: finalPhotoUrl },
+      }),
+    ]);
+
+    // Recompute Virtual ID Card dataHash if a card already exists
+    if (student.virtualIdCard) {
+      const enrollment = await prisma.studentEnrollment.findFirst({
+        where: { studentProfileId: student.id },
+        include: { class: true, section: true },
+      });
+      const currentData = {
+        name: `${student.membership.user.firstName} ${student.membership.user.lastName}`.trim(),
+        admissionNumber: student.admissionNumber,
+        rollNumber: enrollment?.rollNumber ? String(enrollment.rollNumber) : '',
+        className: enrollment?.class?.name || '',
+        sectionName: enrollment?.section?.name || '',
+        emergencyPhone: student.emergencyPhone || '',
+        bloodGroup: student.bloodGroup || '',
+        avatarUrl: finalPhotoUrl,
+      };
+      await prisma.virtualIdCard.update({
+        where: { id: student.virtualIdCard.id },
+        data: { dataHash: this.computeProfileHash(currentData) },
+      });
+    }
+
+    if (actingUserId) {
+      await prisma.auditLog.create({
+        data: {
+          schoolId,
+          userId: actingUserId,
+          action: 'STUDENT_PHOTO_UPDATED',
+          entityType: 'STUDENT_PROFILE',
+          entityId: studentId,
+          details: { studentId, admissionNumber: student.admissionNumber, photoUrl: finalPhotoUrl },
+        },
+      }).catch(() => {});
+    }
+
+    return {
+      success: true,
+      message: 'Student photograph updated successfully.',
+      photoUrl: finalPhotoUrl,
+      studentId: student.id,
+      admissionNumber: student.admissionNumber,
+    };
+  }
+
+  /**
+   * Remove student photograph
+   */
+  async removeStudentPhoto(schoolId: string, studentId: string, actingUserId?: string) {
+    const student = await prisma.studentProfile.findFirst({
+      where: { id: studentId, membership: { schoolId } },
+      include: { membership: true, virtualIdCard: true },
+    });
+
+    if (!student) {
+      throw new AppError('Student record not found in this school tenant.', 404, 'NOT_FOUND');
+    }
+
+    await prisma.$transaction([
+      prisma.studentProfile.update({
+        where: { id: student.id },
+        data: { photoUrl: null },
+      }),
+      prisma.user.update({
+        where: { id: student.membership.userId },
+        data: { avatarUrl: null },
+      }),
+    ]);
+
+    if (actingUserId) {
+      await prisma.auditLog.create({
+        data: {
+          schoolId,
+          userId: actingUserId,
+          action: 'STUDENT_PHOTO_REMOVED',
+          entityType: 'STUDENT_PROFILE',
+          entityId: studentId,
+          details: { studentId, admissionNumber: student.admissionNumber },
+        },
+      }).catch(() => {});
+    }
+
+    return { success: true, message: 'Student photograph removed successfully.' };
+  }
+
+  /**
+   * Upload or replace employee/faculty photograph with tenant isolation and audit logging.
+   */
+  async updateEmployeePhoto(
+    schoolId: string,
+    staffId: string,
+    photoData: string,
+    originalName?: string,
+    mimeType?: string,
+    actingUserId?: string
+  ) {
+    const staff = await prisma.staffProfile.findFirst({
+      where: {
+        id: staffId,
+        membership: { schoolId },
+      },
+      include: {
+        membership: { include: { user: true } },
+        virtualIdCard: true,
+        department: true,
+      },
+    });
+
+    if (!staff) {
+      throw new AppError('Employee record not found in this school tenant.', 404, 'NOT_FOUND');
+    }
+
+    let finalPhotoUrl = photoData;
+
+    if (photoData.startsWith('data:') || photoData.length > 500) {
+      const detectedMime = mimeType || (photoData.startsWith('data:') ? photoData.split(';')[0].split(':')[1] : 'image/jpeg');
+      const ext = detectedMime.includes('png') ? 'png' : detectedMime.includes('webp') ? 'webp' : 'jpg';
+      const fileName = originalName || `staff_${staff.employeeId.replace(/[^a-zA-Z0-9]/g, '_')}_photo.${ext}`;
+
+      const uploadResult = await storageService.uploadFile(schoolId, actingUserId || null, {
+        originalName: fileName,
+        mimeType: detectedMime,
+        category: 'STAFF_PHOTO',
+        isPublic: true,
+        base64Data: photoData,
+      });
+
+      finalPhotoUrl = uploadResult.downloadUrl;
+    }
+
+    await prisma.$transaction([
+      prisma.staffProfile.update({
+        where: { id: staff.id },
+        data: { photoUrl: finalPhotoUrl },
+      }),
+      prisma.user.update({
+        where: { id: staff.membership.userId },
+        data: { avatarUrl: finalPhotoUrl },
+      }),
+    ]);
+
+    if (staff.virtualIdCard) {
+      const currentData = {
+        name: `${staff.membership.user.firstName} ${staff.membership.user.lastName}`.trim(),
+        employeeId: staff.employeeId,
+        designation: staff.designation,
+        department: staff.department?.name || '',
+        emergencyPhone: staff.membership.user.phone || '',
+        avatarUrl: finalPhotoUrl,
+      };
+      await prisma.virtualIdCard.update({
+        where: { id: staff.virtualIdCard.id },
+        data: { dataHash: this.computeProfileHash(currentData) },
+      });
+    }
+
+    if (actingUserId) {
+      await prisma.auditLog.create({
+        data: {
+          schoolId,
+          userId: actingUserId,
+          action: 'STAFF_PHOTO_UPDATED',
+          entityType: 'STAFF_PROFILE',
+          entityId: staffId,
+          details: { staffId, employeeId: staff.employeeId, photoUrl: finalPhotoUrl },
+        },
+      }).catch(() => {});
+    }
+
+    return {
+      success: true,
+      message: 'Employee photograph updated successfully.',
+      photoUrl: finalPhotoUrl,
+      staffId: staff.id,
+      employeeId: staff.employeeId,
+    };
+  }
+
+  /**
+   * Remove employee photograph
+   */
+  async removeEmployeePhoto(schoolId: string, staffId: string, actingUserId?: string) {
+    const staff = await prisma.staffProfile.findFirst({
+      where: { id: staffId, membership: { schoolId } },
+      include: { membership: true },
+    });
+
+    if (!staff) {
+      throw new AppError('Employee record not found in this school tenant.', 404, 'NOT_FOUND');
+    }
+
+    await prisma.$transaction([
+      prisma.staffProfile.update({
+        where: { id: staff.id },
+        data: { photoUrl: null },
+      }),
+      prisma.user.update({
+        where: { id: staff.membership.userId },
+        data: { avatarUrl: null },
+      }),
+    ]);
+
+    if (actingUserId) {
+      await prisma.auditLog.create({
+        data: {
+          schoolId,
+          userId: actingUserId,
+          action: 'STAFF_PHOTO_REMOVED',
+          entityType: 'STAFF_PROFILE',
+          entityId: staffId,
+          details: { staffId, employeeId: staff.employeeId },
+        },
+      }).catch(() => {});
+    }
+
+    return { success: true, message: 'Employee photograph removed successfully.' };
   }
 }
 

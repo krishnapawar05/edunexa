@@ -481,6 +481,7 @@ export class CoreSchoolService {
       });
 
       if (!studentProfile) {
+        const studentPhoto = (data as any).photoUrl || (data as any).avatarUrl || null;
         studentProfile = await tx.studentProfile.create({
           data: {
             membershipId: membership.id,
@@ -491,8 +492,16 @@ export class CoreSchoolService {
             address,
             emergencyPhone,
             status: StudentStatus.ACTIVE,
+            photoUrl: studentPhoto,
           },
         });
+
+        if (studentPhoto) {
+          await tx.user.update({
+            where: { id: user.id },
+            data: { avatarUrl: studentPhoto },
+          });
+        }
       }
 
       // Resolve or create Class & Section
@@ -1648,6 +1657,18 @@ export class CoreSchoolService {
     if (review.decision === 'APPROVED') {
       const admissionNum = `ADM-2026-${Math.floor(1000 + Math.random() * 9000)}`;
       const rand = Math.floor(1000 + Math.random() * 9000);
+
+      // Extract passport photo if attached during admission
+      let passportPhotoUrl: string | undefined = undefined;
+      if (Array.isArray(app.documents)) {
+        const photoDoc = (app.documents as any[]).find(
+          (d) => d.type === 'PASSPORT_PHOTO' || d.type === 'PHOTO' || d.type === 'STUDENT_PHOTO'
+        );
+        if (photoDoc && (photoDoc.fileUrl || photoDoc.url)) {
+          passportPhotoUrl = photoDoc.fileUrl || photoDoc.url;
+        }
+      }
+
       enrolledStudent = await this.createStudent(targetSchoolId, {
         firstName: app.studentFirstName,
         lastName: app.studentLastName,
@@ -1665,7 +1686,8 @@ export class CoreSchoolService {
         guardianPhone: app.guardianPhone,
         sendInvitation: true,
         isAssistedActivation: false,
-      });
+        ...(passportPhotoUrl ? { photoUrl: passportPhotoUrl } : {}),
+      } as any);
     }
 
     return {
@@ -1821,13 +1843,15 @@ export class CoreSchoolService {
     }
 
     return prisma.$transaction(async (tx) => {
-      if (data.firstName || data.lastName || data.email) {
+      const studentPhoto = data.photoUrl !== undefined ? data.photoUrl : (data.avatarUrl !== undefined ? data.avatarUrl : undefined);
+      if (data.firstName || data.lastName || data.email || studentPhoto !== undefined) {
         await tx.user.update({
           where: { id: student.membership.userId },
           data: {
             ...(data.firstName && { firstName: data.firstName }),
             ...(data.lastName && { lastName: data.lastName }),
             ...(data.email && { email: data.email }),
+            ...(studentPhoto !== undefined && { avatarUrl: studentPhoto }),
           },
         });
       }
@@ -1840,6 +1864,7 @@ export class CoreSchoolService {
           ...(data.address && { address: data.address }),
           ...(data.emergencyPhone && { emergencyPhone: data.emergencyPhone }),
           ...(data.status && { status: data.status as StudentStatus }),
+          ...(studentPhoto !== undefined && { photoUrl: studentPhoto }),
         },
       });
 

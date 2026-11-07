@@ -214,6 +214,94 @@ export class IdCardsController {
       next(err);
     }
   }
+
+  // ==========================================================================
+  // PHOTO MANAGEMENT (STUDENT & EMPLOYEE)
+  // ==========================================================================
+
+  async uploadStudentPhoto(req: Request, res: Response, next: NextFunction) {
+    try {
+      const schoolId = req.schoolId || (req.user as any)?.schoolId;
+      if (!schoolId) throw new AppError('Tenant school context required.', 400);
+
+      const { id } = req.params;
+      const { photoData, fileName, mimeType } = req.body;
+      if (!photoData) {
+        throw new AppError('Photograph data payload (photoData) is required.', 422);
+      }
+
+      const actingUserId = (req.user as any)?.userId || (req.user as any)?.id;
+      const result = await idCardsService.updateStudentPhoto(
+        schoolId,
+        id,
+        photoData,
+        fileName,
+        mimeType,
+        actingUserId
+      );
+
+      res.status(200).json(result);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async removeStudentPhoto(req: Request, res: Response, next: NextFunction) {
+    try {
+      const schoolId = req.schoolId || (req.user as any)?.schoolId;
+      if (!schoolId) throw new AppError('Tenant school context required.', 400);
+
+      const { id } = req.params;
+      const actingUserId = (req.user as any)?.userId || (req.user as any)?.id;
+      const result = await idCardsService.removeStudentPhoto(schoolId, id, actingUserId);
+
+      res.status(200).json(result);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async uploadEmployeePhoto(req: Request, res: Response, next: NextFunction) {
+    try {
+      const schoolId = req.schoolId || (req.user as any)?.schoolId;
+      if (!schoolId) throw new AppError('Tenant school context required.', 400);
+
+      const { id } = req.params;
+      const { photoData, fileName, mimeType } = req.body;
+      if (!photoData) {
+        throw new AppError('Photograph data payload (photoData) is required.', 422);
+      }
+
+      const actingUserId = (req.user as any)?.userId || (req.user as any)?.id;
+      const result = await idCardsService.updateEmployeePhoto(
+        schoolId,
+        id,
+        photoData,
+        fileName,
+        mimeType,
+        actingUserId
+      );
+
+      res.status(200).json(result);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async removeEmployeePhoto(req: Request, res: Response, next: NextFunction) {
+    try {
+      const schoolId = req.schoolId || (req.user as any)?.schoolId;
+      if (!schoolId) throw new AppError('Tenant school context required.', 400);
+
+      const { id } = req.params;
+      const actingUserId = (req.user as any)?.userId || (req.user as any)?.id;
+      const result = await idCardsService.removeEmployeePhoto(schoolId, id, actingUserId);
+
+      res.status(200).json(result);
+    } catch (err) {
+      next(err);
+    }
+  }
 }
 
 export const idCardsController = new IdCardsController();

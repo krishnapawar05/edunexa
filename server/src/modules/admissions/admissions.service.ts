@@ -617,11 +617,18 @@ export class AdmissionsService {
         app.studentEmail ||
         `${app.studentFirstName.toLowerCase()}.${app.studentLastName.toLowerCase()}.${rand}@student.apex.edu`;
 
+      // Find passport photo if attached in application documents
+      const passportDoc = (app.documents as any[])?.find(
+        (d: any) => d.type === 'STUDENT_PHOTO' || d.type === 'PASSPORT_PHOTO' || d.type === 'PHOTO'
+      );
+      const photoUrl = passportDoc?.fileUrl || undefined;
+
       enrolledStudentResult = await coreSchoolService.createStudent(schoolId, {
         firstName: app.studentFirstName,
         lastName: app.studentLastName,
         email: studentEmail,
         admissionNumber: admissionNum,
+        photoUrl,
         dateOfBirth: app.dateOfBirth.toISOString().split('T')[0],
         gender: app.gender as any,
         bloodGroup: app.bloodGroup || undefined,

@@ -179,6 +179,7 @@ export const CreateStudentSchema = z.object({
   guardianPhone: z.string().optional().or(z.literal('')),
   sendInvitation: z.boolean().optional().default(true),
   isAssistedActivation: z.boolean().optional().default(false),
+  photoUrl: z.string().optional().or(z.literal('')),
 });
 
 export type CreateStudentDTO = z.infer<typeof CreateStudentSchema>;
@@ -195,6 +196,7 @@ export const CreateStaffSchema = z.object({
   employmentStatus: z.enum(['ACTIVE', 'ON_LEAVE', 'PROBATION', 'RESIGNED', 'TERMINATED']).default('ACTIVE'),
   phone: z.string().min(7, 'Contact phone is required'),
   sendInvitation: z.boolean().default(true),
+  photoUrl: z.string().optional().or(z.literal('')),
 });
 
 export type CreateStaffDTO = z.infer<typeof CreateStaffSchema>;

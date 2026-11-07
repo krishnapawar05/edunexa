@@ -90,21 +90,33 @@ export function drawCardFront(
   doc.setLineWidth(0.4);
   doc.roundedRect(photoX, photoY, photoW, photoH, 1, 1, 'FD');
 
-  // Silhouette / Initials
-  doc.setTextColor(primaryColor);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(14);
-  const initials = data.fullName
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((p) => p.charAt(0))
-    .join('');
-  doc.text(initials || 'ID', photoX + photoW / 2, photoY + 15, { align: 'center' });
+  let imageDrawn = false;
+  if (data.avatarUrl) {
+    try {
+      doc.addImage(data.avatarUrl, 'JPEG', photoX + 0.3, photoY + 0.3, photoW - 0.6, photoH - 0.6);
+      imageDrawn = true;
+    } catch {
+      imageDrawn = false;
+    }
+  }
 
-  doc.setFontSize(4);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(100, 116, 139);
-  doc.text('OFFICIAL PHOTO', photoX + photoW / 2, photoY + 23, { align: 'center' });
+  if (!imageDrawn) {
+    // Silhouette / Initials
+    doc.setTextColor(primaryColor);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    const initials = data.fullName
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((p) => p.charAt(0))
+      .join('');
+    doc.text(initials || 'ID', photoX + photoW / 2, photoY + 14, { align: 'center' });
+
+    doc.setFontSize(3.8);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100, 116, 139);
+    doc.text('PHOTO PENDING', photoX + photoW / 2, photoY + 22, { align: 'center' });
+  }
 
   // Right Side Data
   const textX = x + 28;
@@ -315,15 +327,42 @@ export function generateIndividualIdCardPdf(
 }
 
 /**
- * Download Individual ID Card PDF.
+ * Helper to convert an image URL (relative or absolute) to base64 Data URL
+ * to ensure jsPDF can embed it seamlessly without canvas tainting.
  */
-export function downloadIndividualIdCardPdf(
+export async function resolveImageBase64(url: string): Promise<string | null> {
+  if (!url) return null;
+  if (url.startsWith('data:image')) return url;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Download Individual ID Card PDF with embedded photograph.
+ */
+export async function downloadIndividualIdCardPdf(
   data: IdCardRenderData,
   template: IdCardTemplateSettings = {},
   fileName?: string
-): void {
-  const doc = generateIndividualIdCardPdf(data, template);
-  const cleanId = (data.identifier || 'id-card').toLowerCase().replace(/[^a-z0-9_-]/g, '');
+): Promise<void> {
+  const cloned = { ...data };
+  if (cloned.avatarUrl && !cloned.avatarUrl.startsWith('data:image')) {
+    const b64 = await resolveImageBase64(cloned.avatarUrl);
+    if (b64) cloned.avatarUrl = b64;
+  }
+  const doc = generateIndividualIdCardPdf(cloned, template);
+  const cleanId = (cloned.identifier || 'id-card').toLowerCase().replace(/[^a-z0-9_-]/g, '');
   doc.save(fileName || `id-card-${cleanId}.pdf`);
 }
 
@@ -412,13 +451,23 @@ export function generateBulkIdCardsPdf(
 }
 
 /**
- * Download Bulk ID Cards PDF.
+ * Download Bulk ID Cards PDF with resolved photos.
  */
-export function downloadBulkIdCardsPdf(
+export async function downloadBulkIdCardsPdf(
   cards: IdCardRenderData[],
   template: IdCardTemplateSettings = {},
   fileName = 'edunexa-id-cards-batch.pdf'
-): void {
-  const doc = generateBulkIdCardsPdf(cards, template);
+): Promise<void> {
+  const resolvedCards = await Promise.all(
+    cards.map(async (c) => {
+      const cloned = { ...c };
+      if (cloned.avatarUrl && !cloned.avatarUrl.startsWith('data:image')) {
+        const b64 = await resolveImageBase64(cloned.avatarUrl);
+        if (b64) cloned.avatarUrl = b64;
+      }
+      return cloned;
+    })
+  );
+  const doc = generateBulkIdCardsPdf(resolvedCards, template);
   doc.save(fileName);
 }

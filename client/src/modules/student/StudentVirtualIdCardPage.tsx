@@ -187,171 +187,240 @@ export const StudentVirtualIdCardPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="ed-card-body" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-4)' }}>
-            {/* The ISO CR80 Virtual ID Card Container */}
+          <div className="ed-card-body" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-4)', backgroundColor: 'var(--bg-subtle)', padding: 'var(--space-6)' }}>
+            {/* The ISO CR80 Virtual ID Card Container (Standardized White Theme with Blue Header & Orange Accent) */}
             <div
               style={{
-                width: '100%',
-                maxWidth: '420px',
-                aspectRatio: '1.586 / 1', // ISO/IEC 7810 ID-1 standard ratio
-                borderRadius: '16px',
-                background: 'linear-gradient(145deg, #173327, #1d3d2f)',
-                color: '#ffffff',
-                padding: '20px 24px',
-                boxShadow: '0 12px 30px rgba(10, 38, 24, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-                border: '1px solid var(--academic-gold-500)',
-                position: 'relative',
+                width: '360px',
+                height: '228px',
+                borderRadius: '12px',
+                backgroundColor: '#ffffff',
+                border: '1px solid #cbd5e1',
+                boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.06)',
                 display: 'flex',
                 flexDirection: 'column',
-                justifyContent: 'space-between',
                 overflow: 'hidden',
+                position: 'relative',
               }}
             >
-              {/* Background watermark hologram simulation */}
-              <div
-                style={{
-                  position: 'absolute',
-                  right: '-20px',
-                  bottom: '-20px',
-                  opacity: 0.05,
-                  pointerEvents: 'none',
-                }}
-              >
-                <Award size={240} />
-              </div>
-
               {cardSide === 'FRONT' ? (
                 <>
-                  {/* Card Header */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid rgba(255, 255, 255, 0.12)', paddingBottom: '10px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <div
-                        style={{
-                          width: '34px',
-                          height: '34px',
-                          borderRadius: '6px',
-                          backgroundColor: 'var(--brand-forest-700)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontWeight: 900,
-                          fontSize: '1rem',
-                          color: '#ffffff',
-                          border: '1px solid var(--academic-gold-500)',
-                        }}
-                      >
-                        {schoolName ? schoolName.charAt(0) : 'E'}
+                  {/* Front: Navy / Royal Blue Header Banner */}
+                  <div
+                    style={{
+                      backgroundColor: template?.primaryColor || '#1e3a8a',
+                      color: '#ffffff',
+                      padding: '10px 14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      borderBottom: `3px solid ${template?.secondaryColor || '#d97706'}`,
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontSize: '0.82rem', fontWeight: 800, letterSpacing: '0.04em' }}>
+                        {schoolName ? schoolName.toUpperCase() : 'APEX ACADEMY OF SCIENCES & ARTS'}
                       </div>
-                      <div>
-                        <div style={{ fontSize: '0.9rem', fontWeight: 800, letterSpacing: '-0.01em', color: '#f8fafc' }}>
-                          {schoolName}
-                        </div>
-                        <div style={{ fontSize: '0.66rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                          {schoolCode} • OFFICIAL STUDENT CREDENTIAL
-                        </div>
+                      <div style={{ fontSize: '0.62rem', opacity: 0.9, letterSpacing: '0.05em' }}>
+                        STUDENT IDENTITY CREDENTIAL
                       </div>
                     </div>
-                    <span
-                      className="ed-badge ed-badge-success"
-                      style={{ fontSize: '0.64rem', fontWeight: 700, padding: '3px 8px' }}
-                    >
-                      STUDENT
-                    </span>
-                  </div>
-
-                  {/* Card Middle: Photo + Student Info + QR */}
-                  <div style={{ display: 'flex', gap: '16px', alignItems: 'center', margin: '12px 0' }}>
-                    {/* Photo Placeholder */}
                     <div
                       style={{
-                        width: '82px',
-                        height: '98px',
-                        backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                        width: '28px',
+                        height: '28px',
+                        borderRadius: '50%',
+                        backgroundColor: '#ffffff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: template?.primaryColor || '#1e3a8a',
+                        fontWeight: 900,
+                        fontSize: '0.78rem',
+                      }}
+                    >
+                      {schoolCode ? schoolCode.slice(0, 3).toUpperCase() : 'APX'}
+                    </div>
+                  </div>
+
+                  {/* Front Body: Photo Container + Student Info + QR */}
+                  <div style={{ display: 'flex', padding: '12px 14px', gap: '14px', flex: 1, alignItems: 'center' }}>
+                    {/* Standardized Passport Photo Box */}
+                    <div
+                      style={{
+                        width: '74px',
+                        height: '92px',
                         borderRadius: '6px',
+                        backgroundColor: '#f1f5f9',
+                        border: `2px solid ${template?.primaryColor || '#1e3a8a'}`,
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        color: 'var(--text-inverse-muted)',
                         flexShrink: 0,
+                        overflow: 'hidden',
+                        position: 'relative',
                       }}
                     >
-                      <Award size={32} style={{ color: 'var(--academic-gold-500)', marginBottom: '4px' }} />
-                      <span style={{ fontSize: '0.64rem', fontWeight: 700 }}>STUDENT</span>
+                      {profile?.avatarUrl || profile?.photoUrl ? (
+                        <img
+                          src={profile.avatarUrl || profile.photoUrl}
+                          alt={studentFullName}
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                          }}
+                          onError={(e) => {
+                            (e.target as HTMLElement).style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <>
+                          <span style={{ fontSize: '1.4rem', fontWeight: 800, color: template?.primaryColor || '#1e3a8a' }}>
+                            {studentFullName.charAt(0) || 'S'}
+                          </span>
+                          <span style={{ fontSize: '0.50rem', color: '#64748b', marginTop: '2px', fontWeight: 600 }}>
+                            STUDENT PHOTO
+                          </span>
+                        </>
+                      )}
                     </div>
 
-                    {/* Metadata */}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.02em', lineHeight: 1.2 }}>
+                    {/* Student Metadata */}
+                    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <div
+                        style={{
+                          fontSize: '0.94rem',
+                          fontWeight: 800,
+                          color: '#0f172a',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
                         {studentFullName}
                       </div>
-                      <div style={{ color: 'var(--academic-gold-500)', fontFamily: 'var(--font-mono)', fontSize: '0.78rem', marginTop: '2px', fontWeight: 600 }}>
-                        {admissionNumber}
+                      <div style={{ fontSize: '0.74rem', fontWeight: 600, color: template?.primaryColor || '#1e3a8a' }}>
+                        {className} - {sectionName}
                       </div>
-                      <div style={{ marginTop: '8px', color: '#cbd5e1', fontSize: '0.78rem', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                        <div>Class: <strong style={{ color: '#ffffff' }}>{className} - {sectionName}</strong></div>
-                        <div>Roll Number: <strong style={{ color: '#ffffff' }}>{rollNumber}</strong></div>
-                        <div>Blood Group: <strong style={{ color: '#ffffff' }}>{bloodGroup}</strong></div>
+                      <div style={{ fontSize: '0.68rem', color: '#475569' }}>
+                        Adm No: <strong>{admissionNumber}</strong>
+                      </div>
+                      <div style={{ fontSize: '0.68rem', color: '#475569' }}>
+                        Roll No: <strong>{rollNumber}</strong>
+                      </div>
+                      <div style={{ fontSize: '0.68rem', color: '#475569' }}>
+                        Blood Group: <strong>{bloodGroup}</strong>
+                      </div>
+                      <div style={{ fontSize: '0.68rem', color: '#475569' }}>
+                        Status: <span style={{ color: '#16a34a', fontWeight: 700 }}>● Active Enrolled</span>
                       </div>
                     </div>
 
-                    {/* QR Code */}
+                    {/* QR Code Verification Box */}
                     <div
                       onClick={() => setShowQrModal(true)}
                       title="Click to view public verification preview"
                       style={{
-                        width: '68px',
-                        height: '68px',
+                        width: '56px',
+                        height: '56px',
                         backgroundColor: '#ffffff',
-                        padding: '4px',
+                        padding: '3px',
                         borderRadius: '6px',
+                        border: '1px solid #e2e8f0',
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
                         justifyContent: 'center',
                         cursor: 'pointer',
                         flexShrink: 0,
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.08)',
                       }}
                     >
-                      <QrCode size={52} style={{ color: '#0f172a' }} />
-                      <span style={{ fontSize: '0.52rem', color: '#334155', fontWeight: 800 }}>VERIFY</span>
+                      <QrCode size={40} style={{ color: '#0f172a' }} />
+                      <span style={{ fontSize: '0.46rem', color: '#1e3a8a', fontWeight: 800 }}>VERIFY</span>
                     </div>
                   </div>
 
-                  {/* Card Footer */}
-                  <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)', paddingTop: '8px', display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', color: '#94a3b8' }}>
-                    <span>Card ID: <strong>{cardNumber}</strong></span>
-                    <span>Status: <strong style={{ color: '#34d399' }}>{cardStatus}</strong></span>
+                  {/* Front Footer */}
+                  <div
+                    style={{
+                      padding: '6px 14px',
+                      backgroundColor: '#f8fafc',
+                      borderTop: '1px solid #e2e8f0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      fontSize: '0.62rem',
+                      color: '#64748b',
+                    }}
+                  >
+                    <span>Card No: {cardNumber}</span>
+                    <span style={{ color: template?.primaryColor || '#1e3a8a', fontWeight: 600 }}>ISO CR80 TAMPER-PROOF</span>
                   </div>
                 </>
               ) : (
                 <>
-                  {/* Card Back */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    {/* Magnetic Stripe representation */}
+                  {/* Back: Details & Seal (Matching Teacher Back Side) */}
+                  <div
+                    style={{
+                      height: '6px',
+                      backgroundColor: template?.primaryColor || '#1e3a8a',
+                    }}
+                  />
+                  <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '6px', flex: 1 }}>
+                    <div style={{ fontSize: '0.70rem', fontWeight: 700, color: template?.primaryColor || '#1e3a8a', textAlign: 'center' }}>
+                      STUDENT VERIFICATION & GUARDIAN CONTACT
+                    </div>
+                    <div style={{ fontSize: '0.64rem', color: '#334155', lineHeight: 1.4 }}>
+                      <strong>Campus:</strong> {school?.address || 'Plot 42, Knowledge Park III, Institutional Area'}
+                      <br />
+                      <strong>School Phone:</strong> {school?.phone || '+91 11 2840-9100'} | <strong>Email:</strong> {school?.email || 'admissions@apexacademy.edu'}
+                      <br />
+                      <strong>Guardian Contact:</strong> {profile?.emergencyPhone || profile?.parentPhone || '+91 98450 12345'}
+                    </div>
+
                     <div
                       style={{
-                        height: '32px',
-                        backgroundColor: '#121714',
-                        margin: '-4px -24px 8px -24px',
-                        borderTop: '1px solid rgba(255, 255, 255, 0.1)',
-                        borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+                        fontSize: '0.56rem',
+                        color: '#64748b',
+                        lineHeight: 1.3,
+                        backgroundColor: '#f8fafc',
+                        padding: '6px',
+                        borderRadius: '4px',
+                        border: '1px solid #e2e8f0',
+                        marginTop: '2px',
                       }}
-                    />
-                    <div style={{ fontSize: '0.74rem', color: '#cbd5e1', lineHeight: 1.4 }}>
-                      <strong style={{ color: '#ffffff' }}>Terms of Use:</strong> This card is the property of {schoolName} and must be returned upon transfer or withdrawal. Found cards must be deposited at the campus administration office.
+                    >
+                      {template?.customTermsText ||
+                        'This smart credential remains institutional property. Valid for academic year. Transfer or unauthorized duplication is strictly prohibited. If found, please return to the school administration office.'}
                     </div>
-                    <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '6px' }}>
-                      <div>Campus Contact: {school?.phone || 'Administration Office'}</div>
-                      <div>Address: {school?.address || 'School Campus'}</div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 'auto' }}>
+                      <div
+                        style={{
+                          width: '56px',
+                          height: '24px',
+                          border: '1px dashed #94a3b8',
+                          borderRadius: '4px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '0.48rem',
+                          color: '#94a3b8',
+                        }}
+                      >
+                        OFFICIAL SEAL
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ width: '80px', borderBottom: '1px solid #334155', marginBottom: '2px' }} />
+                        <div style={{ fontSize: '0.52rem', fontWeight: 700, color: '#0f172a' }}>Principal / Registrar</div>
+                      </div>
                     </div>
                   </div>
-
-                  <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)', paddingTop: '8px', display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', color: '#94a3b8' }}>
-                    <span>Authorized Principal Signature</span>
-                    <span style={{ fontFamily: 'var(--font-mono)' }}>ENC-SHA256</span>
+                  <div style={{ fontSize: '0.54rem', color: '#94a3b8', textAlign: 'center', paddingBottom: '4px' }}>
+                    Token: {verificationToken || 'v-tok-demo'}
                   </div>
                 </>
               )}

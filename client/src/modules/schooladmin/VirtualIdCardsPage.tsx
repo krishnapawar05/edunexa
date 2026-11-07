@@ -30,6 +30,9 @@ import {
   Plus,
   Trash2,
   Edit,
+  Camera,
+  UploadCloud,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { Badge } from '../../components/ui/Badge.js';
 import { Button } from '../../components/ui/Button.js';
@@ -113,6 +116,124 @@ export const VirtualIdCardsPage: React.FC = () => {
     selectedTemplateId: '',
     isProcessing: false,
   });
+
+  // Photo Upload Modal state
+  const [photoModalTarget, setPhotoModalTarget] = useState<any | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+
+  const openPhotoModal = (target: any, holderType: 'STUDENT' | 'TEACHER' | 'STAFF') => {
+    setPhotoModalTarget({
+      id: target.id,
+      holderType,
+      name: target.fullName || `${target.firstName} ${target.lastName}`,
+      identifier: target.admissionNumber || target.employeeId,
+      currentPhotoUrl: target.avatarUrl || target.photoUrl,
+    });
+    setPhotoPreview(target.avatarUrl || target.photoUrl || null);
+    setPhotoError(null);
+  };
+
+  const handlePhotoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      setPhotoError('Only JPG, PNG, and WebP image formats are accepted.');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setPhotoError('Image size exceeds 5MB limit.');
+      return;
+    }
+
+    setPhotoError(null);
+    const reader = new FileReader();
+    reader.onload = () => {
+      setPhotoPreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSavePhoto = async () => {
+    if (!photoModalTarget || !photoPreview) return;
+    try {
+      setUploadingPhoto(true);
+      setPhotoError(null);
+
+      if (photoModalTarget.holderType === 'STUDENT') {
+        const res = await idCardsApi.uploadStudentPhoto(photoModalTarget.id, {
+          photoData: photoPreview,
+          fileName: `student_${photoModalTarget.identifier}_photo.jpg`,
+        });
+        showToast('Student photograph updated successfully.');
+        if (res.photoUrl) {
+          setStudents((prev) =>
+            prev.map((s) => (s.id === photoModalTarget.id ? { ...s, avatarUrl: res.photoUrl, photoUrl: res.photoUrl } : s))
+          );
+          if (previewCard && previewCard.id === photoModalTarget.id) {
+            setPreviewCard((prev: any) => ({ ...prev, avatarUrl: res.photoUrl, photoUrl: res.photoUrl }));
+          }
+        }
+      } else {
+        const res = await idCardsApi.uploadEmployeePhoto(photoModalTarget.id, {
+          photoData: photoPreview,
+          fileName: `employee_${photoModalTarget.identifier}_photo.jpg`,
+        });
+        showToast('Employee photograph updated successfully.');
+        if (res.photoUrl) {
+          setTeachers((prev) =>
+            prev.map((t) => (t.id === photoModalTarget.id ? { ...t, avatarUrl: res.photoUrl, photoUrl: res.photoUrl } : t))
+          );
+          if (previewCard && previewCard.id === photoModalTarget.id) {
+            setPreviewCard((prev: any) => ({ ...prev, avatarUrl: res.photoUrl, photoUrl: res.photoUrl }));
+          }
+        }
+      }
+
+      setPhotoModalTarget(null);
+    } catch (err: any) {
+      setPhotoError(err.message || 'Failed to upload photograph.');
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  const handleRemovePhoto = async () => {
+    if (!photoModalTarget) return;
+    try {
+      setUploadingPhoto(true);
+      setPhotoError(null);
+
+      if (photoModalTarget.holderType === 'STUDENT') {
+        await idCardsApi.removeStudentPhoto(photoModalTarget.id);
+        showToast('Student photograph removed.');
+        setStudents((prev) =>
+          prev.map((s) => (s.id === photoModalTarget.id ? { ...s, avatarUrl: null, photoUrl: null } : s))
+        );
+        if (previewCard && previewCard.id === photoModalTarget.id) {
+          setPreviewCard((prev: any) => ({ ...prev, avatarUrl: null, photoUrl: null }));
+        }
+      } else {
+        await idCardsApi.removeEmployeePhoto(photoModalTarget.id);
+        showToast('Employee photograph removed.');
+        setTeachers((prev) =>
+          prev.map((t) => (t.id === photoModalTarget.id ? { ...t, avatarUrl: null, photoUrl: null } : t))
+        );
+        if (previewCard && previewCard.id === photoModalTarget.id) {
+          setPreviewCard((prev: any) => ({ ...prev, avatarUrl: null, photoUrl: null }));
+        }
+      }
+
+      setPhotoModalTarget(null);
+    } catch (err: any) {
+      setPhotoError(err.message || 'Failed to remove photograph.');
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
 
   // Verification Testing
   const [verifyTokenInput, setVerifyTokenInput] = useState('');
@@ -939,11 +1060,41 @@ export const VirtualIdCardsPage: React.FC = () => {
                             />
                           </td>
                           <td style={{ padding: '12px 16px' }}>
-                            <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-                              {st.firstName} {st.lastName}
-                            </div>
-                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                              Roll: {st.currentEnrollment?.rollNumber || '—'}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <div
+                                style={{
+                                  width: '34px',
+                                  height: '42px',
+                                  borderRadius: '4px',
+                                  border: '1px solid #cbd5e1',
+                                  overflow: 'hidden',
+                                  backgroundColor: '#f1f5f9',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  flexShrink: 0,
+                                }}
+                              >
+                                {st.avatarUrl || st.photoUrl ? (
+                                  <img
+                                    src={st.avatarUrl || st.photoUrl}
+                                    alt={st.firstName}
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                  />
+                                ) : (
+                                  <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1e3a8a' }}>
+                                    {st.firstName?.charAt(0)}
+                                  </span>
+                                )}
+                              </div>
+                              <div>
+                                <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                                  {st.firstName} {st.lastName}
+                                </div>
+                                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                                  Roll: {st.currentEnrollment?.rollNumber || '—'}
+                                </div>
+                              </div>
                             </div>
                           </td>
                           <td style={{ padding: '12px 16px', fontWeight: 600 }}>{st.admissionNumber}</td>
@@ -977,11 +1128,28 @@ export const VirtualIdCardsPage: React.FC = () => {
                           </td>
                           <td style={{ padding: '12px 16px', textAlign: 'right' }}>
                             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                              <button
+                                onClick={() => openPhotoModal(st, 'STUDENT')}
+                                className="ed-btn ed-btn-sm ed-btn-secondary"
+                                title="Upload or Change Photograph"
+                              >
+                                <Camera size={13} />
+                                <span>Photo</span>
+                              </button>
                               {st.card ? (
                                 <>
                                   <button
                                     onClick={() => {
-                                      setPreviewCard({ ...st, holderType: 'STUDENT', name: `${st.firstName} ${st.lastName}`, identifier: st.admissionNumber, subDetail: `${st.currentEnrollment?.class?.name || 'Class'} - ${st.currentEnrollment?.section?.name || 'Sec'}` });
+                                      setPreviewCard({
+                                        ...st,
+                                        holderType: 'STUDENT',
+                                        name: `${st.firstName} ${st.lastName}`,
+                                        identifier: st.admissionNumber,
+                                        subDetail: `${st.currentEnrollment?.class?.name || 'Class'} - ${st.currentEnrollment?.section?.name || 'Sec'}`,
+                                        avatarUrl: st.avatarUrl || st.photoUrl,
+                                        rollNumber: st.currentEnrollment?.rollNumber,
+                                        bloodGroup: st.bloodGroup,
+                                      });
                                       setCardSide('FRONT');
                                     }}
                                     className="ed-btn ed-btn-sm ed-btn-secondary"
@@ -1244,9 +1412,39 @@ export const VirtualIdCardsPage: React.FC = () => {
                             />
                           </td>
                           <td style={{ padding: '12px 16px' }}>
-                            <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{teacherName}</div>
-                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                              {tc.designation || 'Faculty Member'}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <div
+                                style={{
+                                  width: '34px',
+                                  height: '42px',
+                                  borderRadius: '4px',
+                                  border: '1px solid #cbd5e1',
+                                  overflow: 'hidden',
+                                  backgroundColor: '#f1f5f9',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  flexShrink: 0,
+                                }}
+                              >
+                                {tc.avatarUrl || tc.photoUrl || tc.membership?.user?.avatarUrl ? (
+                                  <img
+                                    src={tc.avatarUrl || tc.photoUrl || tc.membership?.user?.avatarUrl}
+                                    alt={teacherName}
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                  />
+                                ) : (
+                                  <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1e3a8a' }}>
+                                    {teacherName?.charAt(0) || 'F'}
+                                  </span>
+                                )}
+                              </div>
+                              <div>
+                                <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{teacherName}</div>
+                                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                                  {tc.designation || 'Faculty Member'}
+                                </div>
+                              </div>
                             </div>
                           </td>
                           <td style={{ padding: '12px 16px', fontWeight: 600 }}>{tc.employeeId}</td>
@@ -1278,6 +1476,14 @@ export const VirtualIdCardsPage: React.FC = () => {
                           </td>
                           <td style={{ padding: '12px 16px', textAlign: 'right' }}>
                             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                              <button
+                                onClick={() => openPhotoModal(tc, 'TEACHER')}
+                                className="ed-btn ed-btn-sm ed-btn-secondary"
+                                title="Upload or Change Photograph"
+                              >
+                                <Camera size={13} />
+                                <span>Photo</span>
+                              </button>
                               {tc.card ? (
                                 <>
                                   <button
@@ -1288,6 +1494,8 @@ export const VirtualIdCardsPage: React.FC = () => {
                                         name: teacherName,
                                         identifier: tc.employeeId,
                                         subDetail: `${tc.department?.name || 'Department'} • ${tc.designation || 'Teacher'}`,
+                                        avatarUrl: tc.avatarUrl || tc.photoUrl || tc.membership?.user?.avatarUrl,
+                                        emergencyPhone: tc.membership?.user?.phone,
                                       });
                                       setCardSide('FRONT');
                                     }}
@@ -2035,168 +2243,388 @@ export const VirtualIdCardsPage: React.FC = () => {
               </button>
             </div>
 
-            {/* CR80 Card Body */}
+            {/* CR80 Standardized Card Body (White Theme, Blue Header, Orange Accent, Actual Photo) */}
             <div
               style={{
-                width: '380px',
-                height: '240px',
-                borderRadius: '16px',
-                backgroundColor: 'var(--bg-dark-sidebar, #111e17)',
-                color: '#ffffff',
-                padding: '20px',
+                width: '360px',
+                height: '228px',
+                borderRadius: '12px',
+                backgroundColor: '#ffffff',
+                border: '1px solid #cbd5e1',
+                boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.06)',
                 display: 'flex',
                 flexDirection: 'column',
-                justifyContent: 'space-between',
-                position: 'relative',
                 overflow: 'hidden',
-                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.4)',
-                border: '1px solid var(--academic-gold-500, #d4af37)',
+                position: 'relative',
               }}
             >
-              {/* Top Accent bar */}
-              <div
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  height: '6px',
-                  backgroundColor: 'var(--academic-gold-500, #d4af37)',
-                }}
-              />
-
               {cardSide === 'FRONT' ? (
                 <>
-                  {/* Card Header */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <div
-                        style={{
-                          width: '32px',
-                          height: '32px',
-                          borderRadius: '6px',
-                          backgroundColor: 'var(--brand-forest-700, #173327)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontWeight: 800,
-                          fontSize: '1rem',
-                          color: '#ffffff',
-                          border: '1px solid var(--academic-gold-500)',
-                        }}
-                      >
-                        {branding.schoolName ? branding.schoolName.charAt(0) : 'E'}
-                      </div>
-                      <div>
-                        <div style={{ fontSize: '0.88rem', fontWeight: 800, lineHeight: 1.1 }}>
-                          {branding.schoolName || 'EduNexa Central School'}
-                        </div>
-                        <div style={{ fontSize: '0.62rem', color: '#94a3b8', letterSpacing: '0.04em' }}>
-                          OFFICIAL INSTITUTIONAL CREDENTIAL
-                        </div>
-                      </div>
-                    </div>
-
-                    <Badge variant={previewCard.card.status === 'ACTIVE' ? 'success' : 'danger'}>
-                      {previewCard.card.status}
-                    </Badge>
-                  </div>
-
-                  {/* Card Body */}
-                  <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-                    <div
-                      style={{
-                        width: '68px',
-                        height: '80px',
-                        borderRadius: '8px',
-                        backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '1.4rem',
-                        fontWeight: 800,
-                        color: '#93c5fd',
-                        border: '1px solid rgba(255, 255, 255, 0.15)',
-                      }}
-                    >
-                      {previewCard.name.slice(0, 2).toUpperCase()}
-                    </div>
-
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '1.05rem', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {previewCard.name}
-                      </div>
-                      <div style={{ fontSize: '0.74rem', color: 'var(--academic-gold-500)', fontWeight: 600, marginTop: '2px' }}>
-                        {previewCard.holderType} • {previewCard.subDetail}
-                      </div>
-                      <div style={{ fontSize: '0.74rem', color: '#94a3b8', marginTop: '6px' }}>
-                        ID: <strong style={{ color: '#ffffff' }}>{previewCard.identifier}</strong>
-                      </div>
-                      <div style={{ fontSize: '0.68rem', fontFamily: 'monospace', color: '#cbd5e1', marginTop: '2px' }}>
-                        Card: {previewCard.card.cardNumber}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Card Footer with QR */}
+                  {/* Front: Blue Header Banner */}
                   <div
                     style={{
+                      backgroundColor: '#1e3a8a',
+                      color: '#ffffff',
+                      padding: '10px 14px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
-                      borderTop: '1px solid rgba(255, 255, 255, 0.1)',
-                      paddingTop: '8px',
+                      borderBottom: '3px solid #d97706',
                     }}
                   >
-                    <div style={{ fontSize: '0.66rem', color: '#94a3b8' }}>
-                      Issued: {new Date(previewCard.card.issuedAt).toLocaleDateString()} • Session: 2026–2027
+                    <div>
+                      <div style={{ fontSize: '0.82rem', fontWeight: 800, letterSpacing: '0.04em' }}>
+                        {(branding.schoolName || 'APEX ACADEMY OF SCIENCES & ARTS').toUpperCase()}
+                      </div>
+                      <div style={{ fontSize: '0.62rem', opacity: 0.9, letterSpacing: '0.05em' }}>
+                        {previewCard.holderType === 'STUDENT' ? 'STUDENT IDENTITY CREDENTIAL' : 'FACULTY IDENTITY CREDENTIAL'}
+                      </div>
+                    </div>
+                    <div
+                      style={{
+                        width: '28px',
+                        height: '28px',
+                        borderRadius: '50%',
+                        backgroundColor: '#ffffff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#1e3a8a',
+                        fontWeight: 900,
+                        fontSize: '0.78rem',
+                      }}
+                    >
+                      {branding.monogram || 'APX'}
+                    </div>
+                  </div>
+
+                  {/* Front Body */}
+                  <div style={{ display: 'flex', padding: '12px 14px', gap: '14px', flex: 1, alignItems: 'center' }}>
+                    {/* Photo Container */}
+                    <div
+                      style={{
+                        width: '74px',
+                        height: '92px',
+                        borderRadius: '6px',
+                        backgroundColor: '#f1f5f9',
+                        border: '2px solid #1e3a8a',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                        overflow: 'hidden',
+                        position: 'relative',
+                      }}
+                    >
+                      {previewCard.avatarUrl || previewCard.photoUrl ? (
+                        <img
+                          src={previewCard.avatarUrl || previewCard.photoUrl}
+                          alt={previewCard.name}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          onError={(e) => {
+                            (e.target as HTMLElement).style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <>
+                          <span style={{ fontSize: '1.4rem', fontWeight: 800, color: '#1e3a8a' }}>
+                            {previewCard.name?.slice(0, 1).toUpperCase() || 'P'}
+                          </span>
+                          <span style={{ fontSize: '0.48rem', color: '#64748b', marginTop: '2px', fontWeight: 600 }}>
+                            PHOTO PENDING
+                          </span>
+                        </>
+                      )}
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <QrCode size={22} style={{ color: 'var(--academic-gold-500)' }} />
-                      <span style={{ fontSize: '0.62rem', color: '#94a3b8' }}>Cryptographic QR</span>
+                    {/* Metadata */}
+                    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <div style={{ fontSize: '0.94rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {previewCard.name}
+                      </div>
+                      <div style={{ fontSize: '0.74rem', fontWeight: 600, color: '#1e3a8a' }}>
+                        {previewCard.subDetail}
+                      </div>
+                      <div style={{ fontSize: '0.68rem', color: '#475569' }}>
+                        {previewCard.holderType === 'STUDENT' ? 'Adm No' : 'Emp ID'}: <strong>{previewCard.identifier}</strong>
+                      </div>
+                      {previewCard.rollNumber && (
+                        <div style={{ fontSize: '0.68rem', color: '#475569' }}>
+                          Roll No: <strong>{previewCard.rollNumber}</strong>
+                        </div>
+                      )}
+                      {previewCard.bloodGroup && (
+                        <div style={{ fontSize: '0.68rem', color: '#475569' }}>
+                          Blood Group: <strong>{previewCard.bloodGroup}</strong>
+                        </div>
+                      )}
+                      <div style={{ fontSize: '0.68rem', color: '#475569' }}>
+                        Status: <span style={{ color: '#16a34a', fontWeight: 700 }}>● {previewCard.card?.status || 'ACTIVE'}</span>
+                      </div>
                     </div>
+
+                    {/* QR Preview */}
+                    <div
+                      style={{
+                        width: '56px',
+                        height: '56px',
+                        backgroundColor: '#ffffff',
+                        padding: '3px',
+                        borderRadius: '6px',
+                        border: '1px solid #e2e8f0',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.08)',
+                      }}
+                    >
+                      <QrCode size={40} style={{ color: '#0f172a' }} />
+                      <span style={{ fontSize: '0.46rem', color: '#1e3a8a', fontWeight: 800 }}>VERIFY</span>
+                    </div>
+                  </div>
+
+                  {/* Front Footer */}
+                  <div
+                    style={{
+                      padding: '6px 14px',
+                      backgroundColor: '#f8fafc',
+                      borderTop: '1px solid #e2e8f0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      fontSize: '0.62rem',
+                      color: '#64748b',
+                    }}
+                  >
+                    <span>Card No: {previewCard.card?.cardNumber || 'CR80-PENDING'}</span>
+                    <span style={{ color: '#1e3a8a', fontWeight: 600 }}>ISO CR80 TAMPER-PROOF</span>
                   </div>
                 </>
               ) : (
                 <>
-                  {/* Card Back */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {/* Back Side */}
+                  <div style={{ height: '6px', backgroundColor: '#1e3a8a' }} />
+                  <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '6px', flex: 1 }}>
+                    <div style={{ fontSize: '0.70rem', fontWeight: 700, color: '#1e3a8a', textAlign: 'center' }}>
+                      {previewCard.holderType} VERIFICATION & EMERGENCY CONTACT
+                    </div>
+                    <div style={{ fontSize: '0.64rem', color: '#334155', lineHeight: 1.4 }}>
+                      <strong>Campus:</strong> {(branding as any).schoolAddress || branding.address || 'Plot 42, Institutional Area'}
+                      <br />
+                      <strong>Emergency Phone:</strong> {previewCard.emergencyPhone || '+91 98450 12345'}
+                    </div>
                     <div
                       style={{
-                        height: '28px',
-                        backgroundColor: '#0a0d0b',
-                        margin: '-4px -20px 6px -20px',
-                        borderTop: '1px solid rgba(255, 255, 255, 0.1)',
-                        borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+                        fontSize: '0.56rem',
+                        color: '#64748b',
+                        lineHeight: 1.3,
+                        backgroundColor: '#f8fafc',
+                        padding: '6px',
+                        borderRadius: '4px',
+                        border: '1px solid #e2e8f0',
+                        marginTop: '2px',
                       }}
-                    />
-                    <div style={{ fontSize: '0.70rem', color: '#cbd5e1', lineHeight: 1.35 }}>
-                      <strong style={{ color: '#ffffff' }}>Terms:</strong> This credential is the official property of {branding.schoolName || 'the institution'} and must be surrendered upon graduation or transfer.
+                    >
+                      This smart credential remains institutional property. Transfer or unauthorized duplication is strictly prohibited. If found, please return to the school administration office.
                     </div>
-                    <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '4px' }}>
-                      Campus Administration: +91 98765 43210
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 'auto' }}>
+                      <div
+                        style={{
+                          width: '56px',
+                          height: '24px',
+                          border: '1px dashed #94a3b8',
+                          borderRadius: '4px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '0.48rem',
+                          color: '#94a3b8',
+                        }}
+                      >
+                        OFFICIAL SEAL
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ width: '80px', borderBottom: '1px solid #334155', marginBottom: '2px' }} />
+                        <div style={{ fontSize: '0.52rem', fontWeight: 700, color: '#0f172a' }}>Principal / Registrar</div>
+                      </div>
                     </div>
                   </div>
-
-                  <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)', paddingTop: '6px', display: 'flex', justifyContent: 'space-between', fontSize: '0.66rem', color: '#94a3b8' }}>
-                    <span>Principal Signature [Verified]</span>
-                    <span style={{ fontFamily: 'monospace' }}>ENC-SHA256</span>
+                  <div style={{ fontSize: '0.54rem', color: '#94a3b8', textAlign: 'center', paddingBottom: '4px' }}>
+                    Token: {previewCard.card?.verificationToken || 'v-tok-verified'}
                   </div>
                 </>
               )}
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', width: '100%' }}>
-              <Button variant="secondary" onClick={() => setPreviewCard(null)}>
-                Close Preview
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', gap: '8px' }}>
+              <Button
+                variant="outline"
+                icon={<Camera size={14} />}
+                onClick={() => openPhotoModal(previewCard, previewCard.holderType)}
+              >
+                Change Photograph
+              </Button>
+
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <Button variant="secondary" onClick={() => setPreviewCard(null)}>
+                  Close Preview
+                </Button>
+                <Button
+                  variant="primary"
+                  icon={<Download size={14} />}
+                  onClick={() => handleDownloadSinglePdf(previewCard, previewCard.holderType)}
+                >
+                  Download PDF (CR80)
+                </Button>
+              </div>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: CENTRALIZED PHOTOGRAPH MANAGEMENT (STUDENT & TEACHER)               */}
+      {/* ========================================================================= */}
+      {photoModalTarget && (
+        <Modal
+          isOpen={Boolean(photoModalTarget)}
+          onClose={() => setPhotoModalTarget(null)}
+          title={`Manage Photograph — ${photoModalTarget.name}`}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+              Upload or update the official passport-size photograph for <strong>{photoModalTarget.name}</strong> ({photoModalTarget.identifier}). The photograph will automatically reflect on their virtual ID card, profile, and printable PDF.
+            </div>
+
+            {photoError && (
+              <div
+                style={{
+                  padding: '10px 14px',
+                  backgroundColor: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  borderRadius: '6px',
+                  color: '#dc2626',
+                  fontSize: '0.82rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+              >
+                <AlertTriangle size={15} />
+                <span>{photoError}</span>
+              </div>
+            )}
+
+            {/* Photo Preview & Upload Box */}
+            <div style={{ display: 'flex', gap: '20px', alignItems: 'center', padding: '16px', backgroundColor: 'var(--bg-subtle)', borderRadius: '8px', border: '1px solid var(--border-default)' }}>
+              {/* Photo Box */}
+              <div
+                style={{
+                  width: '90px',
+                  height: '112px',
+                  borderRadius: '8px',
+                  border: '2px solid #1e3a8a',
+                  backgroundColor: '#f1f5f9',
+                  overflow: 'hidden',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  position: 'relative',
+                  boxShadow: '0 4px 10px rgba(0,0,0,0.1)',
+                }}
+              >
+                {photoPreview ? (
+                  <img
+                    src={photoPreview}
+                    alt="Preview"
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                ) : (
+                  <>
+                    <Camera size={28} style={{ color: '#94a3b8' }} />
+                    <span style={{ fontSize: '0.62rem', color: '#64748b', marginTop: '4px', textAlign: 'center', padding: '0 4px' }}>
+                      No Photo
+                    </span>
+                  </>
+                )}
+              </div>
+
+              {/* Upload Input & Controls */}
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '8px 16px',
+                    backgroundColor: '#1e3a8a',
+                    color: '#ffffff',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '0.84rem',
+                    fontWeight: 600,
+                    width: 'fit-content',
+                  }}
+                >
+                  <UploadCloud size={16} />
+                  <span>Choose Photo File</span>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={handlePhotoFileChange}
+                    style={{ display: 'none' }}
+                  />
+                </label>
+                <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                  Accepts JPG, JPEG, PNG, or WebP. Max file size: 5MB. Standard 35×45mm passport aspect ratio recommended.
+                </div>
+
+                {photoModalTarget.currentPhotoUrl && (
+                  <button
+                    type="button"
+                    onClick={handleRemovePhoto}
+                    disabled={uploadingPhoto}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#dc2626',
+                      fontSize: '0.78rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      padding: 0,
+                      marginTop: '4px',
+                      width: 'fit-content',
+                    }}
+                  >
+                    <Trash2 size={13} /> Remove Existing Photograph
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '8px' }}>
+              <Button
+                variant="secondary"
+                onClick={() => setPhotoModalTarget(null)}
+                disabled={uploadingPhoto}
+              >
+                Cancel
               </Button>
               <Button
                 variant="primary"
-                icon={<Download size={14} />}
-                onClick={() => handleDownloadSinglePdf(previewCard, previewCard.holderType)}
+                onClick={handleSavePhoto}
+                disabled={uploadingPhoto || !photoPreview || photoPreview === photoModalTarget.currentPhotoUrl}
+                icon={uploadingPhoto ? <RefreshCw size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
               >
-                Download PDF (CR80)
+                {uploadingPhoto ? 'Saving Photograph...' : 'Save Photograph'}
               </Button>
             </div>
           </div>
