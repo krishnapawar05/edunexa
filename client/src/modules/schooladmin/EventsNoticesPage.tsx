@@ -13,6 +13,8 @@ import {
   Clock,
   Send,
   Sparkles,
+  Trash2,
+  XCircle,
 } from 'lucide-react';
 import { Badge } from '../../components/ui/Badge.js';
 import { Button } from '../../components/ui/Button.js';
@@ -40,6 +42,11 @@ interface SchoolEventItem {
   isPublic: boolean;
 }
 
+interface ToastState {
+  type: 'success' | 'error';
+  message: string;
+}
+
 export const EventsNoticesPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'notices' | 'events'>('notices');
   const [notices, setNotices] = useState<NoticeItem[]>([]);
@@ -51,14 +58,20 @@ export const EventsNoticesPage: React.FC = () => {
   const [showNoticeModal, setShowNoticeModal] = useState(false);
   const [showEventModal, setShowEventModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [toast, setToast] = useState<ToastState | null>(null);
+  const [modalError, setModalError] = useState<string | null>(null);
+  const [eventModalError, setEventModalError] = useState<string | null>(null);
+
+  // Search filter
+  const [searchQuery, setSearchQuery] = useState('');
 
   // New Notice Form State
   const [newNotice, setNewNotice] = useState({
     title: '',
     content: '',
     audience: 'ALL',
-    targetClass: '',
+    targetClass: 'Grade 10',
     isUrgent: false,
   });
 
@@ -73,9 +86,9 @@ export const EventsNoticesPage: React.FC = () => {
     isPublic: true,
   });
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
+  const showToast = (type: 'success' | 'error', message: string) => {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 4000);
   };
 
   const loadData = async () => {
@@ -103,37 +116,93 @@ export const EventsNoticesPage: React.FC = () => {
   // Broadcast Notice
   const handleBroadcastNotice = async (e: React.FormEvent) => {
     e.preventDefault();
+    setModalError(null);
+
+    const titleTrimmed = newNotice.title.trim();
+    const contentTrimmed = newNotice.content.trim();
+
+    if (!titleTrimmed) {
+      setModalError('Notice title is required.');
+      return;
+    }
+    if (!contentTrimmed) {
+      setModalError('Notice content is required.');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      await operationsApi.broadcastNotice(newNotice);
-      showToast(`Notice "${newNotice.title}" successfully published to audience [${newNotice.audience}]!`);
+      await operationsApi.broadcastNotice({
+        title: titleTrimmed,
+        content: contentTrimmed,
+        audience: newNotice.audience,
+        targetClass: newNotice.audience === 'SPECIFIC_CLASS' ? newNotice.targetClass : undefined,
+        isUrgent: newNotice.isUrgent,
+      });
+
+      showToast('success', `Notice "${titleTrimmed}" successfully broadcasted to audience [${newNotice.audience}]!`);
       setShowNoticeModal(false);
       setNewNotice({
         title: '',
         content: '',
         audience: 'ALL',
-        targetClass: '',
+        targetClass: 'Grade 10',
         isUrgent: false,
       });
-      loadData();
+      await loadData();
     } catch (err: any) {
-      showToast(err.message || 'Failed to publish notice.');
+      const errMsg = err.message || 'Failed to publish notice.';
+      setModalError(errMsg);
+      showToast('error', errMsg);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // Delete Notice
+  const handleDeleteNotice = async (id: string, title: string) => {
+    if (!window.confirm(`Are you sure you want to delete notice "${title}"? This cannot be undone.`)) {
+      return;
+    }
+    setDeletingId(id);
+    try {
+      await operationsApi.deleteNotice(id);
+      showToast('success', `Notice "${title}" deleted successfully.`);
+      await loadData();
+    } catch (err: any) {
+      showToast('error', err.message || 'Failed to delete notice.');
+    } finally {
+      setDeletingId(null);
     }
   };
 
   // Create Event
   const handleCreateEvent = async (e: React.FormEvent) => {
     e.preventDefault();
+    setEventModalError(null);
+
+    const titleTrimmed = newEvent.title.trim();
+    const descTrimmed = newEvent.description.trim();
+
+    if (!titleTrimmed) {
+      setEventModalError('Event title is required.');
+      return;
+    }
+    if (!descTrimmed) {
+      setEventModalError('Event description is required.');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       await operationsApi.createSchoolEvent({
         ...newEvent,
+        title: titleTrimmed,
+        description: descTrimmed,
         startDate: new Date(newEvent.startDate).toISOString(),
         endDate: new Date(newEvent.endDate).toISOString(),
       });
-      showToast(`Event "${newEvent.title}" successfully scheduled!`);
+      showToast('success', `Event "${titleTrimmed}" successfully scheduled!`);
       setShowEventModal(false);
       setNewEvent({
         title: '',
@@ -144,37 +213,55 @@ export const EventsNoticesPage: React.FC = () => {
         audience: 'ALL',
         isPublic: true,
       });
-      loadData();
+      await loadData();
     } catch (err: any) {
-      showToast(err.message || 'Failed to schedule event.');
+      const errMsg = err.message || 'Failed to schedule event.';
+      setEventModalError(errMsg);
+      showToast('error', errMsg);
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const filteredNotices = notices.filter((n) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      n.title?.toLowerCase().includes(q) ||
+      n.content?.toLowerCase().includes(q) ||
+      n.audience?.toLowerCase().includes(q)
+    );
+  });
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
       {/* Toast Notification */}
-      {toastMessage && (
+      {toast && (
         <div
           style={{
             position: 'fixed',
             top: '20px',
             right: '20px',
-            backgroundColor: 'var(--ink-900)',
+            backgroundColor: toast.type === 'success' ? '#064e3b' : '#7f1d1d',
             color: '#ffffff',
+            border: `1px solid ${toast.type === 'success' ? '#059669' : '#dc2626'}`,
             padding: '12px 20px',
             borderRadius: 'var(--radius-md)',
             boxShadow: 'var(--shadow-lg)',
-            zIndex: 1000,
+            zIndex: 1100,
             fontSize: '0.88rem',
             display: 'flex',
             alignItems: 'center',
-            gap: '8px',
+            gap: '10px',
+            maxWidth: '480px',
           }}
         >
-          <CheckCircle2 size={16} style={{ color: '#10b981' }} />
-          <span>{toastMessage}</span>
+          {toast.type === 'success' ? (
+            <CheckCircle2 size={18} style={{ color: '#34d399', flexShrink: 0 }} />
+          ) : (
+            <XCircle size={18} style={{ color: '#f87171', flexShrink: 0 }} />
+          )}
+          <span style={{ lineHeight: 1.4 }}>{toast.message}</span>
         </div>
       )}
 
@@ -217,7 +304,10 @@ export const EventsNoticesPage: React.FC = () => {
           </button>
           {activeTab === 'notices' ? (
             <button
-              onClick={() => setShowNoticeModal(true)}
+              onClick={() => {
+                setModalError(null);
+                setShowNoticeModal(true);
+              }}
               className="ed-btn ed-btn-primary"
               style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}
             >
@@ -226,7 +316,10 @@ export const EventsNoticesPage: React.FC = () => {
             </button>
           ) : (
             <button
-              onClick={() => setShowEventModal(true)}
+              onClick={() => {
+                setEventModalError(null);
+                setShowEventModal(true);
+              }}
               className="ed-btn ed-btn-primary"
               style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}
             >
@@ -237,24 +330,40 @@ export const EventsNoticesPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Tab Switcher */}
-      <div style={{ display: 'flex', gap: 'var(--space-2)', borderBottom: '1px solid var(--border-default)', paddingBottom: 'var(--space-2)' }}>
-        <button
-          onClick={() => setActiveTab('notices')}
-          className={`ed-btn ed-btn-sm ${activeTab === 'notices' ? 'ed-btn-primary' : 'ed-btn-secondary'}`}
-          style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}
-        >
-          <Bell size={15} />
-          <span>Institutional Notices ({notices.length})</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('events')}
-          className={`ed-btn ed-btn-sm ${activeTab === 'events' ? 'ed-btn-primary' : 'ed-btn-secondary'}`}
-          style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}
-        >
-          <Calendar size={15} />
-          <span>School Events Calendar ({events.length})</span>
-        </button>
+      {/* Tab Switcher & Search */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--space-3)', borderBottom: '1px solid var(--border-default)', paddingBottom: 'var(--space-2)' }}>
+        <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+          <button
+            onClick={() => setActiveTab('notices')}
+            className={`ed-btn ed-btn-sm ${activeTab === 'notices' ? 'ed-btn-primary' : 'ed-btn-secondary'}`}
+            style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}
+          >
+            <Bell size={15} />
+            <span>Institutional Notices ({notices.length})</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('events')}
+            className={`ed-btn ed-btn-sm ${activeTab === 'events' ? 'ed-btn-primary' : 'ed-btn-secondary'}`}
+            style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}
+          >
+            <Calendar size={15} />
+            <span>School Events Calendar ({events.length})</span>
+          </button>
+        </div>
+
+        {activeTab === 'notices' && (
+          <div style={{ position: 'relative', minWidth: '240px' }}>
+            <Search size={15} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+            <input
+              type="text"
+              placeholder="Filter notices by keyword..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="ed-input"
+              style={{ paddingLeft: '32px', fontSize: '0.84rem' }}
+            />
+          </div>
+        )}
       </div>
 
       {/* Error Message */}
@@ -283,18 +392,19 @@ export const EventsNoticesPage: React.FC = () => {
             <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
               Loading notices from PostgreSQL...
             </div>
-          ) : notices.length === 0 ? (
+          ) : filteredNotices.length === 0 ? (
             <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', backgroundColor: 'var(--bg-surface)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-default)' }}>
-              No institutional notices published yet. Use "Broadcast Notice" to publish an announcement.
+              {searchQuery ? 'No notices matching your search criteria.' : 'No institutional notices published yet. Use "Broadcast Notice" to publish an announcement.'}
             </div>
           ) : (
-            notices.map((n) => (
+            filteredNotices.map((n) => (
               <div
                 key={n.id}
                 style={{
                   backgroundColor: 'var(--bg-surface)',
                   borderRadius: 'var(--radius-lg)',
-                  border: '1px solid var(--border-default)',
+                  border: n.isUrgent ? '1px solid #fca5a5' : '1px solid var(--border-default)',
+                  borderLeft: n.isUrgent ? '4px solid #ef4444' : undefined,
                   padding: 'var(--space-5)',
                   boxShadow: 'var(--shadow-sm)',
                   display: 'flex',
@@ -309,15 +419,38 @@ export const EventsNoticesPage: React.FC = () => {
                     </h3>
                     {n.isUrgent && <Badge variant="danger">Urgent</Badge>}
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Badge variant="neutral">Audience: {n.audience}</Badge>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <Badge variant="neutral">
+                      Audience: {n.audience}{n.targetClass ? ` (${n.targetClass})` : ''}
+                    </Badge>
                     <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
                       {new Date(n.publishedAt).toLocaleDateString()}
                     </span>
+                    <button
+                      onClick={() => handleDeleteNotice(n.id, n.title)}
+                      disabled={deletingId === n.id}
+                      title="Delete notice"
+                      style={{
+                        padding: '4px 8px',
+                        border: '1px solid var(--danger-200)',
+                        backgroundColor: 'var(--danger-50)',
+                        color: 'var(--danger-700)',
+                        borderRadius: 'var(--radius-sm)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        fontSize: '0.74rem',
+                        fontWeight: 600,
+                      }}
+                    >
+                      <Trash2 size={13} />
+                      <span>{deletingId === n.id ? 'Deleting...' : 'Delete'}</span>
+                    </button>
                   </div>
                 </div>
 
-                <p style={{ margin: 0, fontSize: '0.86rem', color: 'var(--text-primary)', lineHeight: 1.5 }}>
+                <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-primary)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
                   {n.content}
                 </p>
               </div>
@@ -341,7 +474,7 @@ export const EventsNoticesPage: React.FC = () => {
             </div>
           ) : events.length === 0 ? (
             <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', backgroundColor: 'var(--bg-surface)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-default)', gridColumn: '1 / -1' }}>
-              No institutional events scheduled. Use "Create Event" to schedule an event.
+              No institutional events scheduled yet.
             </div>
           ) : (
             events.map((e) => (
@@ -358,36 +491,36 @@ export const EventsNoticesPage: React.FC = () => {
                   gap: 'var(--space-3)',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Badge variant="info">
-                    {new Date(e.startDate).toLocaleDateString()}
-                  </Badge>
-                  <Badge variant="neutral">
-                    {e.audience}
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
+                  <h3 style={{ margin: 0, fontSize: '1.02rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                    {e.title}
+                  </h3>
+                  <Badge variant={e.isPublic ? 'success' : 'neutral'}>
+                    {e.isPublic ? 'Public' : 'Campus'}
                   </Badge>
                 </div>
 
-                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                  {e.title}
-                </h3>
-
-                <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: 1.4, flex: 1 }}>
+                <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
                   {e.description}
                 </p>
 
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    fontSize: '0.74rem',
-                    color: 'var(--text-muted)',
-                    borderTop: '1px solid var(--border-default)',
-                    paddingTop: '8px',
-                  }}
-                >
-                  <MapPin size={13} style={{ color: 'var(--primary-600)' }} />
-                  <span>{e.venue || 'Main Institutional Campus'}</span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 'auto', paddingTop: 'var(--space-2)', borderTop: '1px solid var(--border-default)' }}>
+                  {e.venue && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <MapPin size={13} />
+                      <span>{e.venue}</span>
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Calendar size={13} />
+                    <span>
+                      {new Date(e.startDate).toLocaleDateString()} – {new Date(e.endDate).toLocaleDateString()}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Users size={13} />
+                    <span>Audience: {e.audience}</span>
+                  </div>
                 </div>
               </div>
             ))
@@ -403,10 +536,34 @@ export const EventsNoticesPage: React.FC = () => {
           title="Broadcast Institutional Notice"
         >
           <form onSubmit={handleBroadcastNotice} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+            {modalError && (
+              <div
+                style={{
+                  padding: '10px 14px',
+                  backgroundColor: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  borderRadius: 'var(--radius-sm)',
+                  color: '#991b1b',
+                  fontSize: '0.84rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+              >
+                <AlertTriangle size={16} style={{ flexShrink: 0 }} />
+                <span>{modalError}</span>
+              </div>
+            )}
+
             <div>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '4px' }}>
-                Notice Title *
-              </label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                <label style={{ fontSize: '0.82rem', fontWeight: 600 }}>
+                  Notice Title *
+                </label>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                  {newNotice.title.length} characters
+                </span>
+              </div>
               <input
                 type="text"
                 required
@@ -418,9 +575,14 @@ export const EventsNoticesPage: React.FC = () => {
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '4px' }}>
-                Notice Content *
-              </label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                <label style={{ fontSize: '0.82rem', fontWeight: 600 }}>
+                  Notice Content *
+                </label>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                  {newNotice.content.length} characters
+                </span>
+              </div>
               <textarea
                 required
                 rows={4}
@@ -431,7 +593,7 @@ export const EventsNoticesPage: React.FC = () => {
               />
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: newNotice.audience === 'SPECIFIC_CLASS' ? '1fr 1fr' : '1fr 1fr', gap: 'var(--space-3)' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '4px' }}>
                   Target Audience *
@@ -445,10 +607,47 @@ export const EventsNoticesPage: React.FC = () => {
                   <option value="STUDENTS_ONLY">Students Only</option>
                   <option value="PARENTS_ONLY">Parents Only</option>
                   <option value="STAFF_ONLY">Faculty & Staff Only</option>
+                  <option value="SPECIFIC_CLASS">Specific Class</option>
                 </select>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', paddingTop: '20px' }}>
+              {newNotice.audience === 'SPECIFIC_CLASS' ? (
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '4px' }}>
+                    Select Class *
+                  </label>
+                  <select
+                    value={newNotice.targetClass}
+                    onChange={(e) => setNewNotice({ ...newNotice, targetClass: e.target.value })}
+                    className="ed-input"
+                  >
+                    <option value="Grade 10">Grade 10</option>
+                    <option value="Grade 9">Grade 9</option>
+                    <option value="Grade 11">Grade 11</option>
+                    <option value="Grade 12">Grade 12</option>
+                    <option value="Grade 8">Grade 8</option>
+                    <option value="Grade 7">Grade 7</option>
+                    <option value="Grade 6">Grade 6</option>
+                  </select>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', paddingTop: '20px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={newNotice.isUrgent}
+                      onChange={(e) => setNewNotice({ ...newNotice, isUrgent: e.target.checked })}
+                    />
+                    <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--danger-700)' }}>
+                      Mark as Urgent / Priority Alert
+                    </span>
+                  </label>
+                </div>
+              )}
+            </div>
+
+            {newNotice.audience === 'SPECIFIC_CLASS' && (
+              <div>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
                   <input
                     type="checkbox"
@@ -460,7 +659,7 @@ export const EventsNoticesPage: React.FC = () => {
                   </span>
                 </label>
               </div>
-            </div>
+            )}
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
               <Button type="button" variant="secondary" onClick={() => setShowNoticeModal(false)}>
@@ -482,6 +681,25 @@ export const EventsNoticesPage: React.FC = () => {
           title="Schedule Institutional Event"
         >
           <form onSubmit={handleCreateEvent} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+            {eventModalError && (
+              <div
+                style={{
+                  padding: '10px 14px',
+                  backgroundColor: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  borderRadius: 'var(--radius-sm)',
+                  color: '#991b1b',
+                  fontSize: '0.84rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+              >
+                <AlertTriangle size={16} style={{ flexShrink: 0 }} />
+                <span>{eventModalError}</span>
+              </div>
+            )}
+
             <div>
               <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '4px' }}>
                 Event Title *

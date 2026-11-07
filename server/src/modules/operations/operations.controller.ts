@@ -191,6 +191,21 @@ export class OperationsController {
     }
   }
 
+  async deleteNotice(req: Request, res: Response, next: NextFunction) {
+    try {
+      const schoolId = req.user!.schoolId!;
+      const { id } = req.params;
+      const result = await operationsService.deleteNotice(schoolId, id);
+      const response: ApiSuccessResponse<typeof result> = {
+        success: true,
+        data: result,
+      };
+      res.status(200).json(response);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async listNotices(req: Request, res: Response, next: NextFunction) {
     try {
       const schoolId = req.user!.schoolId!;

@@ -840,6 +840,11 @@ export const operationsApi = {
       body: JSON.stringify(data),
     }),
 
+  deleteNotice: (id: string) =>
+    apiRequest<any>('/api/v1/operations/notices/' + encodeURIComponent(id), {
+      method: 'DELETE',
+    }),
+
   listEvents: () => apiRequest<any[]>('/api/v1/operations/events'),
 
   createSchoolEvent: (data: any) =>

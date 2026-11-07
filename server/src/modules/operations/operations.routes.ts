@@ -59,11 +59,17 @@ router.get('/resources', operationsController.listLearningResources);
 // ============================================================================
 router.post(
   '/notices',
-  requireRole(PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.TEACHER),
+  requireRole(PlatformRole.SUPER_ADMIN, PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.TEACHER),
   operationsController.createNotice
 );
 
 router.get('/notices', operationsController.listNotices);
+
+router.delete(
+  '/notices/:id',
+  requireRole(PlatformRole.SUPER_ADMIN, PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.TEACHER),
+  operationsController.deleteNotice
+);
 
 router.post(
   '/notices/bulk-actions',

@@ -45,6 +45,13 @@ describe('STAGE 6: School Operations and Reporting Test Suite', () => {
     role: PlatformRole.SCHOOL_ADMIN,
   });
 
+  const principalToken = generateAccessToken({
+    userId: 'usr-principal-01',
+    email: 'principal@apexacademy.edu',
+    schoolId: 'sch-apex-01',
+    role: PlatformRole.PRINCIPAL,
+  });
+
   const accountsToken = generateAccessToken({
     userId: 'usr-accounts-01',
     email: 'accounts@apexacademy.edu',
@@ -317,6 +324,36 @@ describe('STAGE 6: School Operations and Reporting Test Suite', () => {
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
     expect(res.body.data.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('4e. Principal and School Admin can broadcast short-content notices (e.g. title: "New", content: "Notice")', async () => {
+    const res = await request(app)
+      .post('/api/v1/operations/notices')
+      .set('Authorization', `Bearer ${principalToken}`)
+      .send({
+        title: 'New',
+        content: 'Notice',
+        audience: 'ALL',
+        isUrgent: false,
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.title).toBe('New');
+    expect(res.body.data.content).toBe('Notice');
+  });
+
+  it('4f. School Admin and Principal can delete a notice with tenant isolation', async () => {
+    const foreignRes = await request(app)
+      .delete(`/api/v1/operations/notices/${createdNoticeId}`)
+      .set('Authorization', `Bearer ${otherSchoolAdminToken}`);
+    expect(foreignRes.status).toBe(404);
+
+    const delRes = await request(app)
+      .delete(`/api/v1/operations/notices/${createdNoticeId}`)
+      .set('Authorization', `Bearer ${schoolAdminToken}`);
+    expect(delRes.status).toBe(200);
+    expect(delRes.body.success).toBe(true);
   });
 
   // ==========================================================================

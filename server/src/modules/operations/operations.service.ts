@@ -584,6 +584,22 @@ export class OperationsService {
     };
   }
 
+  async deleteNotice(schoolIdOrIdentifier: string, noticeId: string) {
+    const school = await resolveSchool(schoolIdOrIdentifier);
+    if (!school) throw new AppError('Tenant school not found.', 404, 'SCHOOL_NOT_FOUND');
+
+    const notice = await prisma.notice.findFirst({
+      where: { id: noticeId, schoolId: school.id },
+    });
+    if (!notice) throw new AppError('Notice not found or does not belong to this school.', 404, 'NOT_FOUND');
+
+    await prisma.notice.delete({
+      where: { id: noticeId },
+    });
+
+    return { id: noticeId, deleted: true };
+  }
+
   async listNotices(schoolIdOrIdentifier: string, userRole: string, userClass?: string) {
     const school = await resolveSchool(schoolIdOrIdentifier);
     if (!school) return [];

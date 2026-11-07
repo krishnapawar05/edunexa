@@ -720,10 +720,23 @@ export const CreateLearningResourceSchema = z.object({
 export type CreateLearningResourceDTO = z.infer<typeof CreateLearningResourceSchema>;
 
 // Notices & School Events
+const normalizeNoticeAudience = (val: unknown): string => {
+  if (typeof val !== 'string') return 'ALL';
+  const upper = val.toUpperCase().trim();
+  if (upper === 'CLASS' || upper === 'SPECIFIC_CLASS') return 'SPECIFIC_CLASS';
+  if (upper === 'ALL_STUDENTS' || upper === 'STUDENTS' || upper === 'STUDENTS_ONLY') return 'STUDENTS_ONLY';
+  if (upper === 'TEACHERS' || upper === 'STAFF' || upper === 'STAFF_ONLY' || upper === 'FACULTY') return 'STAFF_ONLY';
+  if (upper === 'PARENTS' || upper === 'PARENTS_ONLY') return 'PARENTS_ONLY';
+  return 'ALL';
+};
+
 export const CreateNoticeSchema = z.object({
-  title: z.string().min(3),
-  content: z.string().min(10),
-  audience: z.enum(['ALL', 'STUDENTS_ONLY', 'PARENTS_ONLY', 'STAFF_ONLY', 'SPECIFIC_CLASS']),
+  title: z.string().min(1, 'Notice title is required').max(255),
+  content: z.string().min(1, 'Notice content is required'),
+  audience: z.preprocess(
+    normalizeNoticeAudience,
+    z.enum(['ALL', 'STUDENTS_ONLY', 'PARENTS_ONLY', 'STAFF_ONLY', 'SPECIFIC_CLASS'])
+  ).default('ALL'),
   targetClass: z.string().optional(),
   isUrgent: z.boolean().default(false),
   expiresAt: z.string().optional(),
@@ -732,12 +745,15 @@ export const CreateNoticeSchema = z.object({
 export type CreateNoticeDTO = z.infer<typeof CreateNoticeSchema>;
 
 export const CreateSchoolEventSchema = z.object({
-  title: z.string().min(3),
-  description: z.string().min(5),
-  venue: z.string().min(2),
-  startDate: z.string().min(10),
-  endDate: z.string().min(10),
-  audience: z.enum(['ALL', 'STUDENTS_ONLY', 'PARENTS_ONLY', 'STAFF_ONLY', 'SPECIFIC_CLASS']),
+  title: z.string().min(1, 'Event title is required').max(255),
+  description: z.string().min(1, 'Event description is required'),
+  venue: z.string().min(1, 'Venue is required').optional().default('Main Institutional Campus'),
+  startDate: z.string().min(1, 'Start date is required'),
+  endDate: z.string().min(1, 'End date is required'),
+  audience: z.preprocess(
+    normalizeNoticeAudience,
+    z.enum(['ALL', 'STUDENTS_ONLY', 'PARENTS_ONLY', 'STAFF_ONLY', 'SPECIFIC_CLASS'])
+  ).default('ALL'),
   isPublic: z.boolean().default(false),
 });
 
