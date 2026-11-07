@@ -557,12 +557,38 @@ export class PortalsService {
 
   async getParentChildMeetings(schoolId: string, parentUserId: string, studentProfileId: string) {
     await this.verifyParentChildAccess(schoolId, parentUserId, studentProfileId);
-    return prisma.meeting.findMany({
+    const meetings = await prisma.meeting.findMany({
       where: {
         schoolId,
         studentProfileId,
       },
       orderBy: { scheduledDate: 'desc' },
+    });
+
+    const hostUserIds = Array.from(new Set(meetings.map((m) => m.hostUserId).filter(Boolean)));
+    const hosts = await prisma.user.findMany({
+      where: { id: { in: hostUserIds } },
+      select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
+    });
+    const hostMap = new Map(hosts.map((h) => [h.id, h]));
+
+    return meetings.map((m) => {
+      const host = hostMap.get(m.hostUserId);
+      return {
+        ...m,
+        hostName: host ? `${host.firstName} ${host.lastName}`.trim() : 'Faculty Host',
+        hostEmail: host?.email,
+        hostAvatar: host?.avatarUrl,
+        hostUser: host
+          ? {
+              id: host.id,
+              firstName: host.firstName,
+              lastName: host.lastName,
+              email: host.email,
+              avatarUrl: host.avatarUrl,
+            }
+          : null,
+      };
     });
   }
 
@@ -822,7 +848,199 @@ export class PortalsService {
     });
   }
 
-  async scheduleMeeting(schoolId: string, hostUserId: string, data: any) {
+  async getTeacherMeetings(schoolId: string, userId: string, userRole: string, statusFilter?: string) {
+    let whereCondition: any = { schoolId };
+
+    if (statusFilter && statusFilter !== 'ALL') {
+      whereCondition.status = statusFilter;
+    }
+
+    if (userRole === PlatformRole.TEACHER) {
+      // Find teacher profile and assigned sections
+      const teacherProfile = await prisma.staffProfile.findFirst({
+        where: {
+          membership: { schoolId, userId },
+        },
+        include: {
+          teacherAssignments: {
+            include: {
+              subject: {
+                include: {
+                  class: {
+                    include: { sections: true },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+
+      const assignments = teacherProfile?.teacherAssignments || [];
+      const sectionIds = assignments.flatMap((a) => a.subject.class?.sections.map((s) => s.id) || []);
+
+      let assignedStudentProfileIds: string[] = [];
+      if (sectionIds.length > 0) {
+        const enrollments = await prisma.studentEnrollment.findMany({
+          where: { sectionId: { in: sectionIds } },
+          select: { studentProfileId: true },
+        });
+        assignedStudentProfileIds = enrollments.map((e) => e.studentProfileId);
+      }
+
+      // Teacher can see:
+      // 1. Meetings hosted by the teacher
+      // 2. Meetings for students in the teacher's assigned classes/sections
+      // 3. Staff internal meetings for the school
+      const orClauses: any[] = [
+        { hostUserId: userId },
+        { meetingType: 'STAFF_INTERNAL' },
+      ];
+      if (assignedStudentProfileIds.length > 0) {
+        orClauses.push({ studentProfileId: { in: assignedStudentProfileIds } });
+      }
+
+      whereCondition.AND = [{ OR: orClauses }];
+    } else if (
+      userRole === PlatformRole.SCHOOL_ADMIN ||
+      userRole === PlatformRole.PRINCIPAL ||
+      userRole === PlatformRole.SUPER_ADMIN
+    ) {
+      // Institutional Admins and Principals see all consultations in the school tenant
+    } else {
+      throw new AppError(`Access denied. Role '${userRole}' cannot view teacher consultations.`, 403);
+    }
+
+    const meetings = await prisma.meeting.findMany({
+      where: whereCondition,
+      include: {
+        student: {
+          include: {
+            membership: { include: { user: true } },
+            enrollments: {
+              include: { class: true, section: true },
+              orderBy: { enrolledAt: 'desc' },
+              take: 1,
+            },
+          },
+        },
+      },
+      orderBy: { scheduledDate: 'desc' },
+    });
+
+    // Collect hostUserIds and guardianUserIds to load user profiles
+    const userIdsToFetch = new Set<string>();
+    meetings.forEach((m) => {
+      if (m.hostUserId) userIdsToFetch.add(m.hostUserId);
+      if (m.guardianUserId) userIdsToFetch.add(m.guardianUserId);
+    });
+
+    const users = await prisma.user.findMany({
+      where: { id: { in: Array.from(userIdsToFetch) } },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        phone: true,
+        avatarUrl: true,
+      },
+    });
+    const userMap = new Map(users.map((u) => [u.id, u]));
+
+    return meetings.map((m) => {
+      const studentUser = m.student?.membership?.user;
+      const enrollment = m.student?.enrollments?.[0];
+      const host = userMap.get(m.hostUserId);
+      const guardian = m.guardianUserId ? userMap.get(m.guardianUserId) : null;
+
+      return {
+        id: m.id,
+        schoolId: m.schoolId,
+        title: m.title,
+        description: m.description,
+        meetingType: m.meetingType,
+        meetingMode: m.meetingMode,
+        scheduledDate: m.scheduledDate,
+        startTime: m.startTime,
+        endTime: m.endTime,
+        locationOrRoom: m.locationOrRoom,
+        joiningUrl: m.joiningUrl,
+        status: m.status,
+        notes: m.notes,
+        createdAt: m.createdAt,
+        updatedAt: m.updatedAt,
+        hostUserId: m.hostUserId,
+        guardianUserId: m.guardianUserId,
+        studentProfileId: m.studentProfileId,
+        hostName: host ? `${host.firstName} ${host.lastName}`.trim() : 'Faculty Host',
+        hostEmail: host?.email,
+        hostAvatar: host?.avatarUrl,
+        hostUser: host
+          ? {
+              id: host.id,
+              firstName: host.firstName,
+              lastName: host.lastName,
+              email: host.email,
+              avatarUrl: host.avatarUrl,
+            }
+          : null,
+        guardianName: guardian ? `${guardian.firstName} ${guardian.lastName}`.trim() : undefined,
+        guardianEmail: guardian?.email,
+        guardianPhone: guardian?.phone,
+        studentName: studentUser ? `${studentUser.firstName} ${studentUser.lastName}`.trim() : undefined,
+        studentAdmissionNumber: m.student?.admissionNumber,
+        studentClassName: enrollment?.class?.name,
+        studentSectionName: enrollment?.section?.name,
+        studentRollNumber: enrollment?.rollNumber,
+        studentPhotoUrl: m.student?.photoUrl || studentUser?.avatarUrl,
+        studentProfile: m.student
+          ? {
+              id: m.student.id,
+              admissionNumber: m.student.admissionNumber,
+              user: studentUser,
+              enrollments: m.student.enrollments,
+            }
+          : null,
+      };
+    });
+  }
+
+  async scheduleMeeting(schoolId: string, hostUserId: string, userRoleOrData: any, dataParam?: any) {
+    const userRole = dataParam !== undefined ? userRoleOrData : PlatformRole.SCHOOL_ADMIN;
+    const data = dataParam !== undefined ? dataParam : userRoleOrData;
+
+    let guardianUserId = data.guardianUserId || null;
+
+    if (data.studentProfileId) {
+      const student = await prisma.studentProfile.findFirst({
+        where: { id: data.studentProfileId, membership: { schoolId } },
+        include: {
+          enrollments: {
+            include: { section: true },
+            orderBy: { enrolledAt: 'desc' },
+            take: 1,
+          },
+          parentLinks: {
+            include: {
+              parentMembership: { include: { user: true } },
+            },
+          },
+        },
+      });
+
+      if (!student) {
+        throw new AppError('Student profile not found within this institutional school tenant.', 404);
+      }
+
+      // Enforce tenant boundary: student must belong to the caller's school
+      // Auto-link guardian if not explicitly passed
+      if (!guardianUserId && student.parentLinks.length > 0) {
+        const primaryLink = student.parentLinks.find((l) => l.isPrimaryContact) || student.parentLinks[0];
+        guardianUserId = primaryLink.parentMembership.userId;
+      }
+    }
+
     let scheduledDate = new Date();
     if (data.scheduledDate) {
       const d = new Date(data.scheduledDate);
@@ -832,33 +1050,47 @@ export class PortalsService {
       if (!isNaN(d.getTime())) scheduledDate = d;
     }
 
-    let startTime = data.startTime || '10:00';
-    let endTime = data.endTime || '10:30';
+    const startTime = data.startTime || '10:00';
+    const endTime = data.endTime || '10:30';
 
-    const cleanAlpha = () => crypto.randomBytes(4).toString('hex').replace(/[^a-z]/g, 'a').slice(0, 3);
-    const meetUrl =
-      data.joiningUrl ||
-      (data.meetingMode === 'ONLINE' || !data.meetingMode
-        ? `https://meet.google.com/${cleanAlpha()}-${(cleanAlpha() + 'm').slice(0, 4)}-${cleanAlpha()}`
-        : null);
+    let meetUrl = data.joiningUrl || null;
+    const meetingMode = data.meetingMode || 'ONLINE';
+    if (meetingMode === 'ONLINE' && !meetUrl) {
+      const cleanAlpha = () => crypto.randomBytes(4).toString('hex').replace(/[^a-z]/g, 'a').slice(0, 3);
+      const part1 = cleanAlpha() || 'edu';
+      const part2 = (cleanAlpha() + 'm').slice(0, 4);
+      const part3 = cleanAlpha() || 'xyz';
+      meetUrl = `https://meet.google.com/${part1}-${part2}-${part3}`;
+    }
+
+    let meetingType = data.meetingType || 'PARENT_TEACHER';
+    if (meetingType === 'PTM') meetingType = 'PARENT_TEACHER';
 
     const meeting = await prisma.meeting.create({
       data: {
         schoolId,
         title: data.title,
         description: data.description || null,
-        meetingType: data.meetingType || 'PARENT_TEACHER',
+        meetingType,
         hostUserId,
         studentProfileId: data.studentProfileId || null,
-        guardianUserId: data.guardianUserId || null,
+        guardianUserId,
         scheduledDate,
         startTime,
         endTime,
-        meetingMode: data.meetingMode || 'ONLINE',
-        locationOrRoom: data.locationOrRoom || null,
-        joiningUrl: meetUrl,
+        meetingMode,
+        locationOrRoom: meetingMode === 'IN_PERSON' ? (data.locationOrRoom || 'Main Campus Conference Room') : null,
+        joiningUrl: meetingMode === 'ONLINE' ? meetUrl : null,
         notes: data.notes || null,
         status: 'SCHEDULED',
+      },
+      include: {
+        student: {
+          include: {
+            membership: { include: { user: true } },
+            enrollments: { include: { class: true, section: true }, take: 1, orderBy: { enrolledAt: 'desc' } },
+          },
+        },
       },
     });
 
@@ -891,6 +1123,80 @@ export class PortalsService {
     return meeting;
   }
 
+  async updateMeeting(schoolId: string, userId: string, userRole: string, meetingId: string, data: any) {
+    const meeting = await prisma.meeting.findFirst({
+      where: { id: meetingId, schoolId },
+      include: {
+        student: {
+          include: {
+            enrollments: { include: { section: true }, take: 1, orderBy: { enrolledAt: 'desc' } },
+          },
+        },
+      },
+    });
+
+    if (!meeting) {
+      throw new AppError('Consultation meeting not found in this school tenant', 404);
+    }
+
+    // Authorization check for TEACHER role
+    if (userRole === PlatformRole.TEACHER) {
+      const isHost = meeting.hostUserId === userId;
+
+      let isAssignedTeacher = false;
+      if (!isHost && meeting.student?.enrollments?.[0]?.sectionId) {
+        const staff = await prisma.staffProfile.findFirst({
+          where: { membership: { schoolId, userId } },
+          include: {
+            teacherAssignments: {
+              include: { subject: { include: { class: { include: { sections: true } } } } },
+            },
+          },
+        });
+        const assignedSectionIds = staff?.teacherAssignments?.flatMap(
+          (a) => a.subject.class?.sections.map((s) => s.id) || []
+        ) || [];
+        isAssignedTeacher = assignedSectionIds.includes(meeting.student.enrollments[0].sectionId);
+      }
+
+      if (!isHost && !isAssignedTeacher) {
+        throw new AppError(
+          'Access denied. Teachers can only manage or reschedule their own consultations or meetings for their assigned students.',
+          403
+        );
+      }
+    } else if (
+      userRole !== PlatformRole.SCHOOL_ADMIN &&
+      userRole !== PlatformRole.PRINCIPAL &&
+      userRole !== PlatformRole.SUPER_ADMIN
+    ) {
+      throw new AppError(`Access denied. Role '${userRole}' is not authorized to manage consultations.`, 403);
+    }
+
+    const updateData: any = {};
+    if (data.status) updateData.status = data.status;
+    if (data.notes !== undefined) updateData.notes = data.notes;
+    if (data.joiningUrl !== undefined) updateData.joiningUrl = data.joiningUrl;
+    if (data.locationOrRoom !== undefined) updateData.locationOrRoom = data.locationOrRoom;
+    if (data.meetingMode) updateData.meetingMode = data.meetingMode;
+    if (data.title) updateData.title = data.title;
+    if (data.description !== undefined) updateData.description = data.description;
+
+    if (data.scheduledDate) {
+      const d = new Date(data.scheduledDate);
+      if (!isNaN(d.getTime())) updateData.scheduledDate = d;
+    }
+    if (data.startTime) updateData.startTime = data.startTime;
+    if (data.endTime) updateData.endTime = data.endTime;
+
+    const updated = await prisma.meeting.update({
+      where: { id: meetingId },
+      data: updateData,
+    });
+
+    return updated;
+  }
+
   async updateMeetingStatus(schoolId: string, meetingId: string, data: any) {
     return prisma.meeting.update({
       where: { id: meetingId, schoolId },
@@ -899,6 +1205,31 @@ export class PortalsService {
         notes: data.notes !== undefined ? data.notes : undefined,
         joiningUrl: data.joiningUrl !== undefined ? data.joiningUrl : undefined,
       },
+    });
+  }
+
+  async deleteMeeting(schoolId: string, userId: string, userRole: string, meetingId: string) {
+    const meeting = await prisma.meeting.findFirst({
+      where: { id: meetingId, schoolId },
+    });
+    if (!meeting) throw new AppError('Consultation meeting not found in this school tenant', 404);
+
+    if (
+      userRole === PlatformRole.TEACHER &&
+      meeting.hostUserId !== userId
+    ) {
+      throw new AppError('Access denied. Teachers can only cancel their own scheduled meetings.', 403);
+    } else if (
+      userRole !== PlatformRole.TEACHER &&
+      userRole !== PlatformRole.SCHOOL_ADMIN &&
+      userRole !== PlatformRole.PRINCIPAL &&
+      userRole !== PlatformRole.SUPER_ADMIN
+    ) {
+      throw new AppError(`Access denied. Role '${userRole}' cannot cancel meetings.`, 403);
+    }
+
+    return prisma.meeting.delete({
+      where: { id: meetingId },
     });
   }
 

@@ -23,6 +23,9 @@ describe('SECTION 8: STUDENT, PARENT & TEACHER ROLE-BASED PANELS TEST SUITE', ()
   let teacherToken: string;
   let teacherUserId: string;
 
+  let schoolAdminToken: string;
+  let foreignTeacherToken: string;
+
   let createdBookId: string;
   let createdIssueId: string;
   let createdMeetingId: string;
@@ -142,6 +145,21 @@ describe('SECTION 8: STUDENT, PARENT & TEACHER ROLE-BASED PANELS TEST SUITE', ()
         role: PlatformRole.TEACHER,
       });
     }
+
+    // 5. School Admin & Foreign Teacher Tokens
+    schoolAdminToken = generateAccessToken({
+      userId: 'usr-school-admin-01',
+      email: 'admin.test@apexacademy.edu',
+      schoolId,
+      role: PlatformRole.SCHOOL_ADMIN,
+    });
+
+    foreignTeacherToken = generateAccessToken({
+      userId: 'usr-foreign-teacher-01',
+      email: 'foreign.teacher@other.edu',
+      schoolId: foreignSchoolId,
+      role: PlatformRole.TEACHER,
+    });
   });
 
   // ============================================================================
@@ -385,6 +403,94 @@ describe('SECTION 8: STUDENT, PARENT & TEACHER ROLE-BASED PANELS TEST SUITE', ()
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
       expect(res.body.data.status).toBe('COMPLETED');
+    });
+
+    it('3.7 Teacher retrieves list of scheduled consultations with full details', async () => {
+      const res = await request(app)
+        .get('/api/v1/portals/teacher/meetings')
+        .set('Authorization', `Bearer ${teacherToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(Array.isArray(res.body.data)).toBe(true);
+      expect(res.body.data.length).toBeGreaterThanOrEqual(1);
+
+      const found = res.body.data.find((m: any) => m.id === createdMeetingId);
+      expect(found).toBeDefined();
+      expect(found.title).toBe('Term 1 Academic Progress Review');
+      expect(found.hostName).toBeDefined();
+      expect(found.studentName).toBeDefined();
+    });
+
+    it('3.8 Teacher reschedules consultation with updated timings and reason', async () => {
+      const res = await request(app)
+        .patch(`/api/v1/portals/teacher/meetings/${createdMeetingId}`)
+        .set('Authorization', `Bearer ${teacherToken}`)
+        .send({
+          status: 'RESCHEDULED',
+          scheduledDate: '2026-11-20',
+          startTime: '03:00 PM',
+          endTime: '03:30 PM',
+          notes: 'Rescheduled per parent request for afternoon slot.',
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.status).toBe('RESCHEDULED');
+      expect(res.body.data.startTime).toBe('03:00 PM');
+    });
+
+    it('3.9 School Admin can view all consultations in the institutional tenant', async () => {
+      const res = await request(app)
+        .get('/api/v1/portals/teacher/meetings')
+        .set('Authorization', `Bearer ${schoolAdminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(Array.isArray(res.body.data)).toBe(true);
+      expect(res.body.data.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('3.10 Parent retrieves scheduled consultation for linked child with host info', async () => {
+      const res = await request(app)
+        .get(`/api/v1/portals/parent/child/${linkedChildAId}/meetings`)
+        .set('Authorization', `Bearer ${parentToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(Array.isArray(res.body.data)).toBe(true);
+      expect(res.body.data.length).toBeGreaterThanOrEqual(1);
+      expect(res.body.data[0].hostName).toBeDefined();
+    });
+
+    it('3.11 Security: Student role is rejected from accessing teacher meetings endpoint (403)', async () => {
+      const res = await request(app)
+        .get('/api/v1/portals/teacher/meetings')
+        .set('Authorization', `Bearer ${studentToken}`);
+
+      expect(res.status).toBe(403);
+      expect(res.body.success).toBe(false);
+    });
+
+    it('3.12 Security & Tenant Isolation: Foreign teacher cannot access or update consultation', async () => {
+      const res = await request(app)
+        .patch(`/api/v1/portals/teacher/meetings/${createdMeetingId}`)
+        .set('Authorization', `Bearer ${foreignTeacherToken}`)
+        .send({
+          status: 'CANCELLED',
+        });
+
+      expect(res.status).toBe(404);
+      expect(res.body.success).toBe(false);
+    });
+
+    it('3.13 Teacher cancels scheduled consultation', async () => {
+      const res = await request(app)
+        .delete(`/api/v1/portals/teacher/meetings/${createdMeetingId}`)
+        .set('Authorization', `Bearer ${teacherToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
     });
   });
 

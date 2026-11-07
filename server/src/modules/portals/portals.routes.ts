@@ -122,18 +122,32 @@ router.post(
   (req, res, next) => portalsController.addStudentRemark(req, res, next)
 );
 
+router.get(
+  '/teacher/meetings',
+  authenticateUser,
+  requireRole(PlatformRole.TEACHER, PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.SUPER_ADMIN),
+  (req, res, next) => portalsController.getTeacherMeetings(req, res, next)
+);
+
 router.post(
   '/teacher/meetings',
   authenticateUser,
-  requireRole(PlatformRole.TEACHER, PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL),
+  requireRole(PlatformRole.TEACHER, PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.SUPER_ADMIN),
   (req, res, next) => portalsController.scheduleMeeting(req, res, next)
 );
 
 router.patch(
   '/teacher/meetings/:id',
   authenticateUser,
-  requireRole(PlatformRole.TEACHER, PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL),
+  requireRole(PlatformRole.TEACHER, PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.SUPER_ADMIN),
   (req, res, next) => portalsController.updateMeeting(req, res, next)
+);
+
+router.delete(
+  '/teacher/meetings/:id',
+  authenticateUser,
+  requireRole(PlatformRole.TEACHER, PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.SUPER_ADMIN),
+  (req, res, next) => portalsController.deleteMeeting(req, res, next)
 );
 
 // ==============================================================================

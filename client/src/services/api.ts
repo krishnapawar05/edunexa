@@ -2313,8 +2313,9 @@ export const portalsApi = {
     return this.getTeacherAcademicReports(params);
   },
 
-  async getTeacherMeetings(): Promise<any[]> {
-    const res = await apiRequest<any>('/api/v1/portals/student/meetings');
+  async getTeacherMeetings(params?: { status?: string }): Promise<any[]> {
+    const qs = params?.status ? `?status=${encodeURIComponent(params.status)}` : '';
+    const res = await apiRequest<any>(`/api/v1/portals/teacher/meetings${qs}`);
     return res?.data ?? res ?? [];
   },
 
@@ -2347,10 +2348,21 @@ export const portalsApi = {
     return res?.data ?? res;
   },
 
-  async updateMeetingStatus(meetingId: string, data: { status: string; notes?: string; joiningUrl?: string }): Promise<any> {
+  async updateMeeting(meetingId: string, data: any): Promise<any> {
     const res = await apiRequest<any>(`/api/v1/portals/teacher/meetings/${encodeURIComponent(meetingId)}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
+    });
+    return res?.data ?? res;
+  },
+
+  async updateMeetingStatus(meetingId: string, data: { status?: string; notes?: string; joiningUrl?: string; scheduledDate?: string; startTime?: string; endTime?: string }): Promise<any> {
+    return this.updateMeeting(meetingId, data);
+  },
+
+  async deleteMeeting(meetingId: string): Promise<any> {
+    const res = await apiRequest<any>(`/api/v1/portals/teacher/meetings/${encodeURIComponent(meetingId)}`, {
+      method: 'DELETE',
     });
     return res?.data ?? res;
   },

@@ -1819,7 +1819,15 @@ export type UpdateGradingCriteriaDTO = z.infer<typeof UpdateGradingCriteriaSchem
 export const ScheduleMeetingSchema = z.object({
   title: z.string().min(1, 'Meeting title is required'),
   description: z.string().optional(),
-  meetingType: z.enum(['PARENT_TEACHER', 'STAFF_INTERNAL', 'STUDENT_COUNSELING']).default('PARENT_TEACHER'),
+  meetingType: z.enum([
+    'PARENT_TEACHER',
+    'PTM',
+    'STAFF_INTERNAL',
+    'STUDENT_COUNSELING',
+    'ACADEMIC_REVIEW',
+    'DISCIPLINARY',
+    'SPECIAL_COUNSELING',
+  ]).default('PARENT_TEACHER'),
   studentProfileId: z.string().optional(),
   guardianUserId: z.string().optional(),
   scheduledDate: z.string().min(1, 'Meeting date is required'),
@@ -1833,9 +1841,16 @@ export const ScheduleMeetingSchema = z.object({
 export type ScheduleMeetingDTO = z.infer<typeof ScheduleMeetingSchema>;
 
 export const UpdateMeetingStatusSchema = z.object({
-  status: z.enum(['SCHEDULED', 'COMPLETED', 'CANCELLED', 'RESCHEDULED']),
+  status: z.enum(['SCHEDULED', 'COMPLETED', 'CANCELLED', 'RESCHEDULED']).optional(),
   notes: z.string().optional(),
   joiningUrl: z.string().optional(),
+  scheduledDate: z.string().optional(),
+  startTime: z.string().optional(),
+  endTime: z.string().optional(),
+  meetingMode: z.enum(['ONLINE', 'IN_PERSON']).optional(),
+  locationOrRoom: z.string().optional(),
+  title: z.string().optional(),
+  description: z.string().optional(),
 });
 export type UpdateMeetingStatusDTO = z.infer<typeof UpdateMeetingStatusSchema>;
 

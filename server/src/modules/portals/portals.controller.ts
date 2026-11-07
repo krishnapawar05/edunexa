@@ -248,10 +248,26 @@ export class PortalsController {
     }
   }
 
+  async getTeacherMeetings(req: Request, res: Response, next: NextFunction) {
+    try {
+      const schoolId = req.schoolId || (req.user as any)?.schoolId;
+      const userId = (req.user as any)?.id || (req.user as any)?.userId;
+      const userRole = (req.user as any)?.role;
+      if (!schoolId || !userId) throw new AppError('Tenant and authenticated context required', 400);
+
+      const status = req.query.status as string | undefined;
+      const data = await portalsService.getTeacherMeetings(schoolId, userId, userRole, status);
+      res.status(200).json({ success: true, data });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   async scheduleMeeting(req: Request, res: Response, next: NextFunction) {
     try {
       const schoolId = req.schoolId || (req.user as any)?.schoolId;
       const hostUserId = (req.user as any)?.id || (req.user as any)?.userId;
+      const userRole = (req.user as any)?.role;
       if (!schoolId || !hostUserId) throw new AppError('Tenant and authenticated context required', 400);
 
       const parsed = ScheduleMeetingSchema.safeParse(req.body);
@@ -259,7 +275,7 @@ export class PortalsController {
         throw new AppError('Validation failed: ' + parsed.error.issues.map((i) => i.message).join(', '), 422);
       }
 
-      const meeting = await portalsService.scheduleMeeting(schoolId, hostUserId, parsed.data);
+      const meeting = await portalsService.scheduleMeeting(schoolId, hostUserId, userRole, parsed.data);
       res.status(201).json({ success: true, data: meeting });
     } catch (err) {
       next(err);
@@ -269,6 +285,8 @@ export class PortalsController {
   async updateMeeting(req: Request, res: Response, next: NextFunction) {
     try {
       const schoolId = req.schoolId || (req.user as any)?.schoolId;
+      const userId = (req.user as any)?.id || (req.user as any)?.userId;
+      const userRole = (req.user as any)?.role;
       const meetingId = req.params.id;
       if (!schoolId || !meetingId) throw new AppError('Missing meetingId', 400);
 
@@ -277,8 +295,23 @@ export class PortalsController {
         throw new AppError('Validation failed: ' + parsed.error.issues.map((i) => i.message).join(', '), 422);
       }
 
-      const updated = await portalsService.updateMeetingStatus(schoolId, meetingId, parsed.data);
+      const updated = await portalsService.updateMeeting(schoolId, userId, userRole, meetingId, parsed.data);
       res.status(200).json({ success: true, data: updated });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async deleteMeeting(req: Request, res: Response, next: NextFunction) {
+    try {
+      const schoolId = req.schoolId || (req.user as any)?.schoolId;
+      const userId = (req.user as any)?.id || (req.user as any)?.userId;
+      const userRole = (req.user as any)?.role;
+      const meetingId = req.params.id;
+      if (!schoolId || !meetingId) throw new AppError('Missing meetingId', 400);
+
+      const data = await portalsService.deleteMeeting(schoolId, userId, userRole, meetingId);
+      res.status(200).json({ success: true, data });
     } catch (err) {
       next(err);
     }
