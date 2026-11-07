@@ -2594,6 +2594,21 @@ export const communicationApi = {
     return res?.data ?? res;
   },
 
+  async updateCalendarEvent(id: string, data: any): Promise<any> {
+    const res = await apiRequest<any>(`/api/v1/communication/calendar/events/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+    return res?.data ?? res;
+  },
+
+  async deleteCalendarEvent(id: string): Promise<any> {
+    const res = await apiRequest<any>(`/api/v1/communication/calendar/events/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    });
+    return res?.data ?? res;
+  },
+
   // Ergonomic Aliases
   getConversations(query?: string) {
     return this.listUserConversations(query);
@@ -2631,6 +2646,12 @@ export const communicationApi = {
   },
   getCalendarEvents(params?: any) {
     return this.listCalendarEvents(params?.month, params?.year);
+  },
+  updateEvent(id: string, data: any) {
+    return this.updateCalendarEvent(id, data);
+  },
+  deleteEvent(id: string) {
+    return this.deleteCalendarEvent(id);
   },
   getGoogleWorkspaceConfig() {
     return this.getGoogleIntegration();

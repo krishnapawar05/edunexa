@@ -9,6 +9,7 @@ import {
   ModerateReportedMessageDTO,
   UpdateCommunicationPermissionConfigDTO,
   CreateCalendarEventDTO,
+  UpdateCalendarEventDTO,
   ConfigureGoogleWorkspaceDTO,
 } from '@edunexa/shared';
 import { broadcastNewMessage, notifyUserNewMessage, broadcastMeetingUpdate } from '../../socket.js';
@@ -1072,6 +1073,233 @@ export class CommunicationService {
     }));
 
     return [...mappedEvents, ...mappedExams];
+  }
+
+  async updateCalendarEvent(schoolId: string, userId: string, userRole: string, eventId: string, data: UpdateCalendarEventDTO) {
+    const event = await prisma.calendarEvent.findFirst({
+      where: { id: eventId, schoolId },
+    });
+
+    if (!event) {
+      throw new AppError('Calendar event not found in this institutional tenant', 404);
+    }
+
+    // Role-based authorization: Teachers can only edit events they created
+    if (userRole === PlatformRole.TEACHER) {
+      if (event.createdById !== userId) {
+        throw new AppError(
+          'Access denied. Teachers can only edit calendar events and meetings they created or host.',
+          403
+        );
+      }
+    } else if (
+      userRole !== PlatformRole.SCHOOL_ADMIN &&
+      userRole !== PlatformRole.PRINCIPAL &&
+      userRole !== PlatformRole.SUPER_ADMIN
+    ) {
+      throw new AppError(`Access denied. Role '${userRole}' is not authorized to edit calendar events.`, 403);
+    }
+
+    const updateData: any = {};
+    if (data.title) updateData.title = data.title.trim();
+    if (data.description !== undefined) updateData.description = data.description ? data.description.trim() : null;
+    if (data.category) updateData.category = data.category;
+    if (data.startDate) updateData.startDate = new Date(data.startDate);
+    if (data.endDate) updateData.endDate = new Date(data.endDate);
+    if (data.isAllDay !== undefined) updateData.isAllDay = Boolean(data.isAllDay);
+    if (data.targetAudience) updateData.targetAudience = data.targetAudience;
+    if (data.classId !== undefined) updateData.classId = data.classId || null;
+
+    if (data.googleMeetLink) {
+      updateData.location = data.googleMeetLink;
+    } else if (data.location !== undefined) {
+      updateData.location = data.location ? data.location.trim() : null;
+    }
+
+    const updated = await prisma.calendarEvent.update({
+      where: { id: eventId },
+      data: updateData,
+      include: {
+        createdBy: { select: { id: true, firstName: true, lastName: true, email: true } },
+      },
+    });
+
+    // Synchronize linked Meeting record if this event was created from a meeting
+    try {
+      const cleanTitle = event.title.replace(/^\[Meeting\]\s*/, '').trim();
+      const linkedMeeting = await prisma.meeting.findFirst({
+        where: {
+          schoolId,
+          OR: [
+            { id: eventId },
+            { title: cleanTitle },
+            { title: event.title },
+          ],
+        },
+      });
+
+      if (linkedMeeting) {
+        const meetingUpdate: any = {};
+        if (data.title) meetingUpdate.title = data.title.replace(/^\[Meeting\]\s*/, '').trim();
+        if (data.description !== undefined) meetingUpdate.description = data.description;
+        if (data.startDate) {
+          const d = new Date(data.startDate);
+          meetingUpdate.scheduledDate = d;
+          meetingUpdate.startTime = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+        }
+        if (data.endDate) {
+          const e = new Date(data.endDate);
+          meetingUpdate.endTime = `${String(e.getHours()).padStart(2, '0')}:${String(e.getMinutes()).padStart(2, '0')}`;
+        }
+        if (data.googleMeetLink) meetingUpdate.joiningUrl = data.googleMeetLink;
+        if (updateData.location && !updateData.location.startsWith('http')) {
+          meetingUpdate.locationOrRoom = updateData.location;
+        }
+
+        await prisma.meeting.update({
+          where: { id: linkedMeeting.id },
+          data: meetingUpdate,
+        });
+      }
+    } catch (e) {
+      console.warn('Could not synchronize linked meeting record:', e);
+    }
+
+    return {
+      ...updated,
+      googleMeetLink: updated.location && updated.location.startsWith('http') ? updated.location : null,
+    };
+  }
+
+  async deleteCalendarEvent(schoolId: string, userId: string, userRole: string, eventId: string) {
+    const event = await prisma.calendarEvent.findFirst({
+      where: { id: eventId, schoolId },
+    });
+
+    if (!event) {
+      throw new AppError('Calendar event not found in this institutional tenant', 404);
+    }
+
+    // Role-based authorization: Teachers can only delete events they created
+    if (userRole === PlatformRole.TEACHER) {
+      if (event.createdById !== userId) {
+        throw new AppError(
+          'Access denied. Teachers can only delete calendar events and meetings they created or host.',
+          403
+        );
+      }
+    } else if (
+      userRole !== PlatformRole.SCHOOL_ADMIN &&
+      userRole !== PlatformRole.PRINCIPAL &&
+      userRole !== PlatformRole.SUPER_ADMIN
+    ) {
+      throw new AppError(`Access denied. Role '${userRole}' is not authorized to delete calendar events.`, 403);
+    }
+
+    await prisma.calendarEvent.delete({
+      where: { id: eventId },
+    });
+
+    // Clean up mirrored Meeting record if present
+    try {
+      const cleanTitle = event.title.replace(/^\[Meeting\]\s*/, '').trim();
+      await prisma.meeting.deleteMany({
+        where: {
+          schoolId,
+          OR: [
+            { id: eventId },
+            { title: cleanTitle },
+            { title: event.title },
+          ],
+        },
+      });
+    } catch (e) {
+      console.warn('Could not clean up linked meeting record:', e);
+    }
+
+    return { success: true, message: 'Calendar event removed successfully' };
+  }
+
+  async updateMeetingSchedule(schoolId: string, userId: string, userRole: string, meetingId: string, data: any) {
+    const meeting = await prisma.meeting.findFirst({
+      where: { id: meetingId, schoolId },
+    });
+
+    if (!meeting) {
+      throw new AppError('Meeting schedule not found in this institutional tenant', 404);
+    }
+
+    if (userRole === PlatformRole.TEACHER && meeting.hostUserId !== userId) {
+      throw new AppError('Access denied. Teachers can only modify meetings they host.', 403);
+    }
+
+    const updated = await prisma.meeting.update({
+      where: { id: meetingId },
+      data: {
+        title: data.title ? data.title.trim() : undefined,
+        description: data.description !== undefined ? data.description : undefined,
+        scheduledDate: data.scheduledDate ? new Date(data.scheduledDate) : (data.startDate ? new Date(data.startDate) : undefined),
+        startTime: data.startTime || undefined,
+        endTime: data.endTime || undefined,
+        joiningUrl: data.joiningUrl || data.googleMeetLink || undefined,
+        locationOrRoom: data.locationOrRoom || data.location || undefined,
+        status: data.status || undefined,
+        notes: data.notes || undefined,
+      },
+    });
+
+    // Synchronize corresponding CalendarEvent
+    try {
+      const cleanTitle = meeting.title.replace(/^\[Meeting\]\s*/, '').trim();
+      const calendarEvent = await prisma.calendarEvent.findFirst({
+        where: {
+          schoolId,
+          OR: [{ title: `[Meeting] ${cleanTitle}` }, { title: cleanTitle }, { id: meetingId }],
+        },
+      });
+
+      if (calendarEvent) {
+        await prisma.calendarEvent.update({
+          where: { id: calendarEvent.id },
+          data: {
+            title: `[Meeting] ${updated.title}`,
+            description: updated.description,
+            location: updated.joiningUrl || updated.locationOrRoom || 'Google Meet',
+          },
+        });
+      }
+    } catch (e) {}
+
+    return updated;
+  }
+
+  async deleteMeetingSchedule(schoolId: string, userId: string, userRole: string, meetingId: string) {
+    const meeting = await prisma.meeting.findFirst({
+      where: { id: meetingId, schoolId },
+    });
+
+    if (!meeting) {
+      throw new AppError('Meeting schedule not found in this institutional tenant', 404);
+    }
+
+    if (userRole === PlatformRole.TEACHER && meeting.hostUserId !== userId) {
+      throw new AppError('Access denied. Teachers can only delete meetings they host.', 403);
+    }
+
+    await prisma.meeting.delete({ where: { id: meetingId } });
+
+    // Clean up mirrored CalendarEvent
+    try {
+      const cleanTitle = meeting.title.replace(/^\[Meeting\]\s*/, '').trim();
+      await prisma.calendarEvent.deleteMany({
+        where: {
+          schoolId,
+          OR: [{ title: `[Meeting] ${cleanTitle}` }, { title: cleanTitle }, { id: meetingId }],
+        },
+      });
+    } catch (e) {}
+
+    return { success: true, message: 'Meeting deleted successfully' };
   }
 }
 

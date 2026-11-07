@@ -96,6 +96,8 @@ router.post(
 );
 
 router.post('/meetings/schedule', (req, res, next) => communicationController.scheduleMeetingWithGoogleMeet(req, res, next));
+router.patch('/meetings/:id', (req, res, next) => communicationController.updateMeetingSchedule(req, res, next));
+router.delete('/meetings/:id', (req, res, next) => communicationController.deleteMeetingSchedule(req, res, next));
 
 // ==============================================================================
 // 6. INTEGRATED ERP CALENDAR
@@ -106,6 +108,21 @@ router.post(
   '/calendar/events',
   requireRole(PlatformRole.SUPER_ADMIN, PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.TEACHER),
   (req, res, next) => communicationController.createCalendarEvent(req, res, next)
+);
+router.put(
+  '/calendar/events/:id',
+  requireRole(PlatformRole.SUPER_ADMIN, PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.TEACHER),
+  (req, res, next) => communicationController.updateCalendarEvent(req, res, next)
+);
+router.patch(
+  '/calendar/events/:id',
+  requireRole(PlatformRole.SUPER_ADMIN, PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.TEACHER),
+  (req, res, next) => communicationController.updateCalendarEvent(req, res, next)
+);
+router.delete(
+  '/calendar/events/:id',
+  requireRole(PlatformRole.SUPER_ADMIN, PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL, PlatformRole.TEACHER),
+  (req, res, next) => communicationController.deleteCalendarEvent(req, res, next)
 );
 
 export default router;

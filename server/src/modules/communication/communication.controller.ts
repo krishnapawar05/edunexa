@@ -10,6 +10,7 @@ import {
   ModerateReportedMessageSchema,
   UpdateCommunicationPermissionConfigSchema,
   CreateCalendarEventSchema,
+  UpdateCalendarEventSchema,
   ConfigureGoogleWorkspaceSchema,
 } from '@edunexa/shared';
 
@@ -346,6 +347,67 @@ export class CommunicationController {
 
       const events = await communicationService.listCalendarEvents(schoolId, role, month, year);
       res.status(200).json({ success: true, data: events });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async updateCalendarEvent(req: Request, res: Response, next: NextFunction) {
+    try {
+      const schoolId = req.schoolId || (req.user as any)?.schoolId;
+      const userId = (req.user as any)?.id || (req.user as any)?.userId;
+      const userRole = (req.user as any)?.role;
+      const eventId = req.params.id;
+      if (!schoolId || !eventId) throw new AppError('Missing school context or eventId', 400);
+
+      const parsed = UpdateCalendarEventSchema.parse(req.body);
+      const event = await communicationService.updateCalendarEvent(schoolId, userId, userRole, eventId, parsed);
+      res.status(200).json({ success: true, data: event });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async deleteCalendarEvent(req: Request, res: Response, next: NextFunction) {
+    try {
+      const schoolId = req.schoolId || (req.user as any)?.schoolId;
+      const userId = (req.user as any)?.id || (req.user as any)?.userId;
+      const userRole = (req.user as any)?.role;
+      const eventId = req.params.id;
+      if (!schoolId || !eventId) throw new AppError('Missing school context or eventId', 400);
+
+      const result = await communicationService.deleteCalendarEvent(schoolId, userId, userRole, eventId);
+      res.status(200).json({ success: true, data: result });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async updateMeetingSchedule(req: Request, res: Response, next: NextFunction) {
+    try {
+      const schoolId = req.schoolId || (req.user as any)?.schoolId;
+      const userId = (req.user as any)?.id || (req.user as any)?.userId;
+      const userRole = (req.user as any)?.role;
+      const meetingId = req.params.id;
+      if (!schoolId || !meetingId) throw new AppError('Missing school context or meetingId', 400);
+
+      const updated = await communicationService.updateMeetingSchedule(schoolId, userId, userRole, meetingId, req.body);
+      res.status(200).json({ success: true, data: updated });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async deleteMeetingSchedule(req: Request, res: Response, next: NextFunction) {
+    try {
+      const schoolId = req.schoolId || (req.user as any)?.schoolId;
+      const userId = (req.user as any)?.id || (req.user as any)?.userId;
+      const userRole = (req.user as any)?.role;
+      const meetingId = req.params.id;
+      if (!schoolId || !meetingId) throw new AppError('Missing school context or meetingId', 400);
+
+      const result = await communicationService.deleteMeetingSchedule(schoolId, userId, userRole, meetingId);
+      res.status(200).json({ success: true, data: result });
     } catch (err) {
       next(err);
     }

@@ -2008,16 +2008,30 @@ export type UpdateCommunicationPermissionConfigDTO = z.infer<typeof UpdateCommun
 
 export const CreateCalendarEventSchema = z.object({
   title: z.string().min(1, 'Event title is required'),
-  description: z.string().optional(),
-  category: z.enum(['ACADEMIC', 'EXAM', 'MEETING', 'HOLIDAY', 'SPORTS', 'PTM']).default('ACADEMIC'),
+  description: z.string().optional().nullable(),
+  category: z.enum(['ACADEMIC', 'EXAM', 'MEETING', 'HOLIDAY', 'SPORTS', 'PTM', 'CULTURAL', 'OTHER']).default('ACADEMIC'),
   startDate: z.string().min(1, 'Start date is required'),
   endDate: z.string().min(1, 'End date is required'),
   isAllDay: z.boolean().default(false),
-  location: z.string().optional(),
+  location: z.string().optional().nullable(),
   targetAudience: z.enum(['ALL', 'TEACHERS_ONLY', 'STUDENTS_ONLY', 'PARENTS_ONLY']).default('ALL'),
-  classId: z.string().optional(),
+  classId: z.string().optional().nullable(),
 });
 export type CreateCalendarEventDTO = z.infer<typeof CreateCalendarEventSchema>;
+
+export const UpdateCalendarEventSchema = z.object({
+  title: z.string().min(1, 'Event title is required').optional(),
+  description: z.string().optional().nullable(),
+  category: z.enum(['ACADEMIC', 'EXAM', 'MEETING', 'HOLIDAY', 'SPORTS', 'PTM', 'CULTURAL', 'OTHER']).optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  isAllDay: z.boolean().optional(),
+  location: z.string().optional().nullable(),
+  targetAudience: z.enum(['ALL', 'TEACHERS_ONLY', 'STUDENTS_ONLY', 'PARENTS_ONLY']).optional(),
+  classId: z.string().optional().nullable(),
+  googleMeetLink: z.string().optional().nullable(),
+});
+export type UpdateCalendarEventDTO = z.infer<typeof UpdateCalendarEventSchema>;
 
 export const ConfigureGoogleWorkspaceSchema = z.object({
   clientId: z.string().optional(),

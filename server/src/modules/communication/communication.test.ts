@@ -428,6 +428,8 @@ describe('SECTION 9: INTERNAL CHAT, MESSAGING, MEETINGS & CALENDAR TEST SUITE', 
       expect(res.body.data.joiningUrl).toMatch(/^https:\/\/meet\.google\.com\/[a-z]{3}-[a-z]{4}-[a-z]{3}$/);
     });
 
+    let testCalendarEventId: string;
+
     it('5.4 Teacher creates an ERP Calendar Event', async () => {
       const res = await request(app)
         .post('/api/v1/communication/calendar/events')
@@ -445,6 +447,7 @@ describe('SECTION 9: INTERNAL CHAT, MESSAGING, MEETINGS & CALENDAR TEST SUITE', 
 
       expect(res.status).toBe(201);
       expect(res.body.data.title).toContain('National Science Day');
+      testCalendarEventId = res.body.data.id;
     });
 
     it('5.5 List Calendar Events retrieves both custom events and formal examination schedules', async () => {
@@ -455,6 +458,86 @@ describe('SECTION 9: INTERNAL CHAT, MESSAGING, MEETINGS & CALENDAR TEST SUITE', 
       expect(res.status).toBe(200);
       expect(Array.isArray(res.body.data)).toBe(true);
       expect(res.body.data.some((e: any) => e.category === 'ACADEMIC')).toBe(true);
+    });
+
+    it('5.6 Teacher edits their own scheduled calendar event', async () => {
+      const res = await request(app)
+        .put(`/api/v1/communication/calendar/events/${testCalendarEventId}`)
+        .set('Authorization', `Bearer ${teacherToken}`)
+        .send({
+          title: 'National Science Day Exhibition & Robotics Arena (Updated)',
+          description: 'Updated STEM robotics demonstration & keynote lecture.',
+          category: 'ACADEMIC',
+          startDate: '2026-11-28T10:00:00Z',
+          endDate: '2026-11-28T17:00:00Z',
+          location: 'Auditorium Hall A & Robotics Lab',
+          targetAudience: 'ALL',
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.title).toContain('(Updated)');
+      expect(res.body.data.location).toBe('Auditorium Hall A & Robotics Lab');
+    });
+
+    it('5.7 School Admin can edit any calendar event in the institutional tenant', async () => {
+      const res = await request(app)
+        .patch(`/api/v1/communication/calendar/events/${testCalendarEventId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          description: 'Verified by Institutional School Admin. High priority attendance.',
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.description).toContain('Verified by Institutional School Admin');
+    });
+
+    it('5.8 Security: Student role is rejected from modifying calendar events (403)', async () => {
+      const res = await request(app)
+        .put(`/api/v1/communication/calendar/events/${testCalendarEventId}`)
+        .set('Authorization', `Bearer ${studentToken}`)
+        .send({
+          title: 'Malicious Event Override by Student',
+        });
+
+      expect(res.status).toBe(403);
+      expect(res.body.success).toBe(false);
+    });
+
+    it('5.9 Security & Tenant Isolation: Foreign school token cannot edit or delete event (404)', async () => {
+      const foreignAdminToken = generateToken({
+        userId: 'usr-foreign-admin-01',
+        email: 'foreign.admin@other.edu',
+        schoolId: '00000000-0000-0000-0000-000000000000',
+        role: PlatformRole.SCHOOL_ADMIN,
+      });
+
+      const res = await request(app)
+        .delete(`/api/v1/communication/calendar/events/${testCalendarEventId}`)
+        .set('Authorization', `Bearer ${foreignAdminToken}`);
+
+      expect(res.status).toBe(404);
+      expect(res.body.success).toBe(false);
+    });
+
+    it('5.10 Teacher deletes their scheduled calendar event', async () => {
+      const res = await request(app)
+        .delete(`/api/v1/communication/calendar/events/${testCalendarEventId}`)
+        .set('Authorization', `Bearer ${teacherToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+    });
+
+    it('5.11 Deleted calendar event no longer appears in event list', async () => {
+      const res = await request(app)
+        .get('/api/v1/communication/calendar/events')
+        .set('Authorization', `Bearer ${teacherToken}`);
+
+      expect(res.status).toBe(200);
+      const found = res.body.data.find((e: any) => e.id === testCalendarEventId);
+      expect(found).toBeUndefined();
     });
   });
 });
