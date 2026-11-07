@@ -536,6 +536,7 @@ export class GovernanceService {
 
   public async seedDefaultPermissions(schoolId?: string) {
     const roles = Object.values(PlatformRole);
+    const targetSchoolId = schoolId || null;
     const records: any[] = [];
 
     for (const role of roles) {
@@ -554,7 +555,7 @@ export class GovernanceService {
         const canView = true;
 
         records.push({
-          schoolId: schoolId || null,
+          schoolId: targetSchoolId,
           role,
           moduleKey: mod,
           canView,
@@ -569,24 +570,23 @@ export class GovernanceService {
       }
     }
 
-    // Insert safely by checking existing records without nullable compound unique constraint error
-    for (const r of records) {
-      const existing = await prisma.modulePermission.findFirst({
-        where: {
-          schoolId: r.schoolId,
-          role: r.role,
-          moduleKey: r.moduleKey,
-        },
+    // Retrieve existing permissions for this tenant scope in one query
+    const existingList = await prisma.modulePermission.findMany({
+      where: { schoolId: targetSchoolId },
+      select: { role: true, moduleKey: true },
+    });
+    const existingKeys = new Set(existingList.map((p) => `${p.role}:${p.moduleKey}`));
+    const toCreate = records.filter((r) => !existingKeys.has(`${r.role}:${r.moduleKey}`));
+
+    if (toCreate.length > 0) {
+      await prisma.modulePermission.createMany({
+        data: toCreate,
+        skipDuplicates: true,
       });
-      if (!existing) {
-        await prisma.modulePermission.create({
-          data: r,
-        });
-      }
     }
 
     return prisma.modulePermission.findMany({
-      where: { schoolId: schoolId || null },
+      where: { schoolId: targetSchoolId },
       orderBy: [{ role: 'asc' }, { moduleKey: 'asc' }],
     });
   }

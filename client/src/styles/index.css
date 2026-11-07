@@ -1606,9 +1606,15 @@ html.dark .ed-academic-footer {
 
 /* Institutional Footer Newsletter & Marketing Banner */
 .ed-footer-newsletter-wrap {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-  padding-bottom: 2.5rem;
-  margin-bottom: 2.75rem;
+  padding-bottom: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.ed-footer-divider {
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(212, 175, 55, 0.25) 25%, rgba(255, 255, 255, 0.12) 50%, rgba(212, 175, 55, 0.25) 75%, transparent 100%);
+  margin-top: 2.25rem;
 }
 
 .ed-footer-newsletter-card {

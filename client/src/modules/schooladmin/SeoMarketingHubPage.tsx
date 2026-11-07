@@ -189,7 +189,7 @@ export const SeoMarketingHubPage: React.FC = () => {
             canonicalUrl: `https://apexacademy.edu.in${selectedPath === '/' ? '' : selectedPath}`,
             ogTitle: `Apex Academy | Excellence in Education`,
             ogDescription: `Admissions open for academic session 2026-27.`,
-            ogImage: `https://images.unsplash.com/photo-1580582932707-520aed937b7b?auto=format&fit=crop&w=1200&q=80`,
+            ogImage: ``,
             imageAltText: `Apex Academy School Campus`,
             isPublished: true,
           });
@@ -224,7 +224,7 @@ export const SeoMarketingHubPage: React.FC = () => {
         canonicalUrl: `https://apexacademy.edu.in${path === '/' ? '' : path}`,
         ogTitle: `Apex Academy — ${path === '/' ? 'Home' : path.replace('/', '')}`,
         ogDescription: `Learn more about our educational approach and offerings.`,
-        ogImage: `https://images.unsplash.com/photo-1580582932707-520aed937b7b?auto=format&fit=crop&w=1200&q=80`,
+        ogImage: ``,
         imageAltText: `Apex Academy campus environment`,
         isPublished: true,
       });
@@ -674,16 +674,26 @@ export const SeoMarketingHubPage: React.FC = () => {
               </div>
 
               <div className="border border-slate-200 rounded-2xl overflow-hidden bg-slate-50">
-                <div className="h-40 bg-slate-200 relative overflow-hidden">
-                  <img
-                    src={seoForm.ogImage || 'https://images.unsplash.com/photo-1580582932707-520aed937b7b?auto=format&fit=crop&w=800&q=80'}
-                    alt="Social Card Preview"
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute bottom-2 left-2 px-2 py-0.5 bg-black/70 text-white rounded text-[10px] uppercase font-bold">
-                    apexacademy.edu.in
+                {seoForm.ogImage ? (
+                  <div className="h-40 bg-slate-200 relative overflow-hidden">
+                    <img
+                      src={seoForm.ogImage}
+                      alt="Social Card Preview"
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute bottom-2 left-2 px-2 py-0.5 bg-black/70 text-white rounded text-[10px] uppercase font-bold">
+                      apexacademy.edu.in
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="px-4 py-3 bg-gradient-to-r from-slate-100 to-slate-200 border-b border-slate-200 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-5 h-5 rounded-full bg-emerald-700 text-white flex items-center justify-center font-bold text-[10px]">A</div>
+                      <span className="text-[11px] font-semibold text-slate-700">apexacademy.edu.in</span>
+                    </div>
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Social Card Snippet</span>
+                  </div>
+                )}
                 <div className="p-3.5 bg-white">
                   <h6 className="text-xs font-bold text-slate-900 line-clamp-1">{seoForm.ogTitle || seoForm.pageTitle}</h6>
                   <p className="text-[11px] text-slate-500 line-clamp-2 mt-0.5">{seoForm.ogDescription || seoForm.metaDescription}</p>

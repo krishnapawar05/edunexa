@@ -922,6 +922,7 @@ export const PublicLayout: React.FC = () => {
                 {newsletterMsg}
               </p>
             )}
+            <div className="ed-footer-divider" />
           </div>
         </div>
 
