@@ -80,9 +80,17 @@ export const SuperAdminGovernanceHubPage: React.FC = () => {
         status: admissionFilter.status || undefined,
         search: admissionFilter.search || undefined,
       });
-      setAdmissions(res?.enquiries || res || []);
+      const items = Array.isArray(res)
+        ? res
+        : Array.isArray(res?.items)
+        ? res.items
+        : Array.isArray(res?.enquiries)
+        ? res.enquiries
+        : [];
+      setAdmissions(items);
     } catch (err: any) {
       setFeedback({ type: 'error', text: err.message || 'Failed to load admission enquiries' });
+      setAdmissions([]);
     } finally {
       setLoading(false);
     }
@@ -91,12 +99,20 @@ export const SuperAdminGovernanceHubPage: React.FC = () => {
   const loadMarksheets = async () => {
     setLoading(true);
     try {
-      const res = await governanceApi.listMarksheetRequests({
+      const res: any = await governanceApi.listMarksheetRequests({
         status: marksheetFilter.status || undefined,
       });
-      setMarksheets(Array.isArray(res) ? res : []);
+      const list = Array.isArray(res)
+        ? res
+        : Array.isArray(res?.items)
+        ? res.items
+        : Array.isArray(res?.requests)
+        ? res.requests
+        : [];
+      setMarksheets(list);
     } catch (err: any) {
       setFeedback({ type: 'error', text: err.message || 'Failed to load marksheet requests' });
+      setMarksheets([]);
     } finally {
       setLoading(false);
     }
@@ -105,10 +121,24 @@ export const SuperAdminGovernanceHubPage: React.FC = () => {
   const loadTemplates = async () => {
     setLoading(true);
     try {
-      const res = await governanceApi.listTemplates();
-      if (res) setTemplates(res);
+      const res: any = await governanceApi.listTemplates();
+      if (res) {
+        setTemplates({
+          idCards: Array.isArray(res.idCards)
+            ? res.idCards
+            : Array.isArray(res.idCardTemplates)
+            ? res.idCardTemplates
+            : [],
+          certificates: Array.isArray(res.certificates)
+            ? res.certificates
+            : Array.isArray(res.certificatesIssued)
+            ? res.certificatesIssued
+            : [],
+        });
+      }
     } catch (err: any) {
       setFeedback({ type: 'error', text: err.message || 'Failed to load institutional templates' });
+      setTemplates({ idCards: [], certificates: [] });
     } finally {
       setLoading(false);
     }
@@ -117,10 +147,18 @@ export const SuperAdminGovernanceHubPage: React.FC = () => {
   const loadBackups = async () => {
     setLoading(true);
     try {
-      const res = await governanceApi.listBackups();
-      setBackups(Array.isArray(res) ? res : []);
+      const res: any = await governanceApi.listBackups();
+      const list = Array.isArray(res)
+        ? res
+        : Array.isArray(res?.items)
+        ? res.items
+        : Array.isArray(res?.backups)
+        ? res.backups
+        : [];
+      setBackups(list);
     } catch (err: any) {
       setFeedback({ type: 'error', text: err.message || 'Failed to load backup records' });
+      setBackups([]);
     } finally {
       setLoading(false);
     }
@@ -371,7 +409,7 @@ export const SuperAdminGovernanceHubPage: React.FC = () => {
             </div>
 
             <span className="text-xs text-gray-500 font-medium">
-              Showing {admissions.length} Enquiries Across All School Tenants
+              Showing {Array.isArray(admissions) ? admissions.length : 0} Enquiries Across All School Tenants
             </span>
           </div>
 
@@ -382,7 +420,7 @@ export const SuperAdminGovernanceHubPage: React.FC = () => {
                 <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-purple-600" />
                 <p className="text-sm">Loading enquiries...</p>
               </div>
-            ) : admissions.length === 0 ? (
+            ) : !Array.isArray(admissions) || admissions.length === 0 ? (
               <div className="p-12 text-center text-gray-400">
                 <p className="text-sm">No admission enquiries recorded yet.</p>
               </div>
@@ -401,7 +439,7 @@ export const SuperAdminGovernanceHubPage: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {admissions.map((enq) => (
+                    {(Array.isArray(admissions) ? admissions : []).map((enq) => (
                       <tr key={enq.id} className="hover:bg-gray-50">
                         <td className="py-3 px-4">
                           <div className="font-semibold text-gray-900">{enq.studentName}</div>
@@ -481,7 +519,7 @@ export const SuperAdminGovernanceHubPage: React.FC = () => {
                 <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-purple-600" />
                 <p className="text-sm">Loading publication requests...</p>
               </div>
-            ) : marksheets.length === 0 ? (
+            ) : !Array.isArray(marksheets) || marksheets.length === 0 ? (
               <div className="p-12 text-center text-gray-400">
                 <p className="text-sm">No marksheet publication requests found.</p>
               </div>
@@ -500,7 +538,7 @@ export const SuperAdminGovernanceHubPage: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {marksheets.map((req) => (
+                    {(Array.isArray(marksheets) ? marksheets : []).map((req) => (
                       <tr key={req.id} className="hover:bg-gray-50">
                         <td className="py-3 px-4">
                           <div className="font-semibold text-gray-900">{req.termName}</div>
@@ -637,17 +675,17 @@ export const SuperAdminGovernanceHubPage: React.FC = () => {
                 <h3 className="font-bold text-gray-900 text-sm">Virtual ID Card Templates</h3>
               </div>
               <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-semibold">
-                {templates.idCards.length} Templates
+                {templates.idCards?.length || 0} Templates
               </span>
             </div>
 
             {loading ? (
               <div className="p-8 text-center text-gray-400">Loading...</div>
-            ) : templates.idCards.length === 0 ? (
+            ) : !Array.isArray(templates.idCards) || templates.idCards.length === 0 ? (
               <p className="text-xs text-gray-400 text-center py-6">No ID Card templates registered.</p>
             ) : (
               <div className="space-y-2">
-                {templates.idCards.map((t) => (
+                {(Array.isArray(templates.idCards) ? templates.idCards : []).map((t) => (
                   <div
                     key={t.id}
                     className="p-3 bg-gray-50 rounded-xl border border-gray-200 flex items-center justify-between text-xs"
@@ -679,17 +717,17 @@ export const SuperAdminGovernanceHubPage: React.FC = () => {
                 <h3 className="font-bold text-gray-900 text-sm">Certificate Templates</h3>
               </div>
               <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-semibold">
-                {templates.certificates.length} Templates
+                {templates.certificates?.length || 0} Templates
               </span>
             </div>
 
             {loading ? (
               <div className="p-8 text-center text-gray-400">Loading...</div>
-            ) : templates.certificates.length === 0 ? (
+            ) : !Array.isArray(templates.certificates) || templates.certificates.length === 0 ? (
               <p className="text-xs text-gray-400 text-center py-6">No Certificate templates registered.</p>
             ) : (
               <div className="space-y-2">
-                {templates.certificates.map((c) => (
+                {(Array.isArray(templates.certificates) ? templates.certificates : []).map((c) => (
                   <div
                     key={c.id}
                     className="p-3 bg-gray-50 rounded-xl border border-gray-200 flex items-center justify-between text-xs"
@@ -740,7 +778,7 @@ export const SuperAdminGovernanceHubPage: React.FC = () => {
                 <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-purple-600" />
                 <p className="text-sm">Loading backup records...</p>
               </div>
-            ) : backups.length === 0 ? (
+            ) : !Array.isArray(backups) || backups.length === 0 ? (
               <div className="p-12 text-center text-gray-400">
                 <p className="text-sm">No backups generated yet. Click "Initiate New Backup" to begin.</p>
               </div>
@@ -758,7 +796,7 @@ export const SuperAdminGovernanceHubPage: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {backups.map((b) => (
+                    {(Array.isArray(backups) ? backups : []).map((b) => (
                       <tr key={b.id} className="hover:bg-gray-50">
                         <td className="py-3 px-4">
                           <div className="font-semibold text-gray-900">{b.fileName}</div>
