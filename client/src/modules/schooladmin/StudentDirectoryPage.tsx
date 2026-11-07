@@ -23,6 +23,8 @@ import {
   Send,
   KeyRound,
   FileCheck,
+  Camera,
+  UploadCloud,
 } from 'lucide-react';
 import { Badge } from '../../components/ui/Badge.js';
 import { Button } from '../../components/ui/Button.js';
@@ -106,7 +108,25 @@ export const StudentDirectoryPage: React.FC = () => {
     guardianEmail: '',
     guardianPhone: '',
     guardianRelationship: 'Father',
+    photoUrl: '',
   });
+  const [studentPhotoPreview, setStudentPhotoPreview] = useState<string | null>(null);
+
+  const handleStudentPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('Photo file size must not exceed 5MB.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (loadEv) => {
+      const dataUrl = loadEv.target?.result as string;
+      setStudentPhotoPreview(dataUrl);
+      setNewStudent((prev) => ({ ...prev, photoUrl: dataUrl }));
+    };
+    reader.readAsDataURL(file);
+  };
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -332,11 +352,13 @@ export const StudentDirectoryPage: React.FC = () => {
         guardianEmail: guardianEmail,
         guardianPhone: guardianPhone,
         guardianRelationship: newStudent.guardianRelationship || 'Father',
+        photoUrl: newStudent.photoUrl || undefined,
       };
 
       await coreApi.createStudent(payload);
       showToast(`Student ${payload.firstName} ${payload.lastName} successfully enrolled with ${admissionNum}!`);
       setShowEnrollModal(false);
+      setStudentPhotoPreview(null);
       setNewStudent({
         firstName: '',
         lastName: '',
@@ -353,6 +375,7 @@ export const StudentDirectoryPage: React.FC = () => {
         guardianEmail: '',
         guardianPhone: '',
         guardianRelationship: 'Father',
+        photoUrl: '',
       });
       loadStudents();
     } catch (err: any) {
@@ -687,8 +710,8 @@ export const StudentDirectoryPage: React.FC = () => {
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                           <div
                             style={{
-                              width: '32px',
-                              height: '32px',
+                              width: '36px',
+                              height: '36px',
                               borderRadius: '50%',
                               backgroundColor: 'var(--primary-100)',
                               color: 'var(--primary-800)',
@@ -698,10 +721,22 @@ export const StudentDirectoryPage: React.FC = () => {
                               fontWeight: 700,
                               fontSize: '0.8rem',
                               flexShrink: 0,
+                              overflow: 'hidden',
+                              border: '1px solid var(--border-default)',
                             }}
                           >
-                            {s.firstName[0]}
-                            {s.lastName[0]}
+                            {(s as any).photoUrl || (s as any).avatarUrl ? (
+                              <img
+                                src={(s as any).photoUrl || (s as any).avatarUrl}
+                                alt={s.firstName}
+                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                              />
+                            ) : (
+                              <>
+                                {s.firstName[0]}
+                                {s.lastName[0]}
+                              </>
+                            )}
                           </div>
                           <div>
                             <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
@@ -818,6 +853,98 @@ export const StudentDirectoryPage: React.FC = () => {
           title="Enroll New Student to Institutional SIS"
         >
           <form onSubmit={handleEnrollStudent} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+            {/* Passport Photograph Upload */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '16px',
+                padding: '12px 14px',
+                backgroundColor: 'var(--bg-subtle)',
+                borderRadius: '8px',
+                border: '1px solid var(--border-default)',
+              }}
+            >
+              <div
+                style={{
+                  width: '68px',
+                  height: '84px',
+                  borderRadius: '6px',
+                  border: '1px dashed var(--border-default)',
+                  backgroundColor: '#ffffff',
+                  overflow: 'hidden',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                }}
+              >
+                {studentPhotoPreview ? (
+                  <img
+                    src={studentPhotoPreview}
+                    alt="Student Preview"
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                ) : (
+                  <Camera size={24} color="#94a3b8" />
+                )}
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '2px' }}>
+                  Student Passport Photograph (Optional)
+                </label>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                  Accepted: JPG, PNG, WebP (Max 5MB). Automatically integrated with Virtual ID Card.
+                </div>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <label
+                    className="ed-btn ed-btn-secondary"
+                    style={{
+                      fontSize: '0.75rem',
+                      padding: '5px 12px',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                    }}
+                  >
+                    <UploadCloud size={13} />
+                    {studentPhotoPreview ? 'Change Photo' : 'Upload Photo'}
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/jpg"
+                      style={{ display: 'none' }}
+                      onChange={handleStudentPhotoChange}
+                    />
+                  </label>
+                  {studentPhotoPreview && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStudentPhotoPreview(null);
+                        setNewStudent((prev) => ({ ...prev, photoUrl: '' }));
+                      }}
+                      className="ed-btn"
+                      style={{
+                        fontSize: '0.75rem',
+                        padding: '5px 10px',
+                        color: '#dc2626',
+                        backgroundColor: '#fee2e2',
+                        border: '1px solid #fecaca',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                      }}
+                    >
+                      <Trash2 size={12} />
+                      Remove
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '4px' }}>

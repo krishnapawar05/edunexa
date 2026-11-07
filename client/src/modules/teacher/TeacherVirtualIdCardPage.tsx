@@ -49,6 +49,7 @@ export const TeacherVirtualIdCardPage: React.FC = () => {
       subDetail: `${cardData.department} • ${cardData.designation}`,
       joiningDate: cardData.joiningDate,
       emergencyPhone: cardData.emergencyPhone,
+      avatarUrl: cardData.avatarUrl || cardData.photoUrl,
       cardNumber: cardData.idCard?.cardNumber || 'CR80-PENDING',
       verificationToken: cardData.idCard?.verificationToken || 'N/A',
       status: cardData.idCard?.status || 'ACTIVE',

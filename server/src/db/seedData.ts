@@ -363,16 +363,24 @@ export async function seedInstitutionalData(customPrisma?: PrismaClient) {
   if (teacherMembership) {
     teacherStaffProfile = await prisma.staffProfile.upsert({
       where: { employeeId: 'EMP-2026-0012' },
-      update: {},
+      update: {
+        photoUrl: '/images/avatars/julian_thorne_passport.jpg',
+      },
       create: {
         membershipId: teacherMembership.id,
         employeeId: 'EMP-2026-0012',
         designation: 'Senior Faculty & Dept Head',
         departmentId: deptMap['Science & Physics']?.id,
+        photoUrl: '/images/avatars/julian_thorne_passport.jpg',
         joiningDate: new Date('2023-08-01'),
         employmentStatus: EmploymentStatus.ACTIVE,
       },
     });
+
+    await prisma.user.update({
+      where: { email: 'julian.thorne@apexacademy.edu' },
+      data: { avatarUrl: '/images/avatars/julian_thorne_passport.jpg' },
+    }).catch(() => {});
 
     // Assign to Grade 10 Physics
     if (subjectMap['PHY-10']) {
@@ -481,10 +489,13 @@ export async function seedInstitutionalData(customPrisma?: PrismaClient) {
   if (aaravMembership) {
     aaravProfile = await prisma.studentProfile.upsert({
       where: { admissionNumber: 'ADM-2026-0042' },
-      update: {},
+      update: {
+        photoUrl: '/images/avatars/aarav_sharma_passport.jpg',
+      },
       create: {
         membershipId: aaravMembership.id,
         admissionNumber: 'ADM-2026-0042',
+        photoUrl: '/images/avatars/aarav_sharma_passport.jpg',
         gender: 'Male',
         dateOfBirth: new Date('2010-04-12'),
         bloodGroup: 'O+',
@@ -493,6 +504,11 @@ export async function seedInstitutionalData(customPrisma?: PrismaClient) {
         status: StudentStatus.ACTIVE,
       },
     });
+
+    await prisma.user.update({
+      where: { email: 'aarav.sharma@apexacademy.edu' },
+      data: { avatarUrl: '/images/avatars/aarav_sharma_passport.jpg' },
+    }).catch(() => {});
 
     // Enroll in Grade 10-A
     const grade10SecA = sectionMap['Grade 10-A'];
@@ -543,10 +559,13 @@ export async function seedInstitutionalData(customPrisma?: PrismaClient) {
   if (ananyaMembership) {
     ananyaProfile = await prisma.studentProfile.upsert({
       where: { admissionNumber: 'ADM-2026-0089' },
-      update: {},
+      update: {
+        photoUrl: '/images/avatars/ananya_sharma_passport.jpg',
+      },
       create: {
         membershipId: ananyaMembership.id,
         admissionNumber: 'ADM-2026-0089',
+        photoUrl: '/images/avatars/ananya_sharma_passport.jpg',
         gender: 'Female',
         dateOfBirth: new Date('2010-09-21'),
         bloodGroup: 'B+',
@@ -555,6 +574,11 @@ export async function seedInstitutionalData(customPrisma?: PrismaClient) {
         status: StudentStatus.ACTIVE,
       },
     });
+
+    await prisma.user.update({
+      where: { email: 'ananya.deshmukh@apexacademy.edu' },
+      data: { avatarUrl: '/images/avatars/ananya_sharma_passport.jpg' },
+    }).catch(() => {});
 
     const grade10SecA = sectionMap['Grade 10-A'];
     if (grade10SecA) {

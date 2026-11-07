@@ -365,6 +365,8 @@ export class CoreSchoolService {
         sectionName: activeEnrollment?.section?.name || 'A',
         rollNumber: activeEnrollment?.rollNumber || 1,
         status: s.status,
+        photoUrl: s.photoUrl || s.membership.user.avatarUrl || null,
+        avatarUrl: s.photoUrl || s.membership.user.avatarUrl || null,
         guardians: s.parentLinks.map((p) => ({
           name: `${p.parentMembership.user.firstName} ${p.parentMembership.user.lastName}`,
           relationship: p.relationship,
@@ -728,6 +730,8 @@ export class CoreSchoolService {
       sectionName: activeEnrollment?.section?.name || 'A',
       rollNumber: activeEnrollment?.rollNumber || 1,
       status: student.status,
+      photoUrl: student.photoUrl || student.membership.user.avatarUrl || null,
+      avatarUrl: student.photoUrl || student.membership.user.avatarUrl || null,
       guardians,
       account,
       idCard: student.virtualIdCard
@@ -810,6 +814,8 @@ export class CoreSchoolService {
       joiningDate: s.joiningDate.toISOString().split('T')[0],
       employmentStatus: s.employmentStatus,
       phone: s.membership.user.phone || '+91 11 2659 1000',
+      photoUrl: s.photoUrl || s.membership.user.avatarUrl || null,
+      avatarUrl: s.photoUrl || s.membership.user.avatarUrl || null,
       assignments: s.teacherAssignments.map((a) => ({
         className: a.subject.class.name,
         sectionName: 'A',
@@ -896,10 +902,18 @@ export class CoreSchoolService {
           employeeId: data.employeeId,
           designation: data.designation,
           departmentId: department.id,
+          photoUrl: data.photoUrl || undefined,
           joiningDate: new Date(data.joiningDate),
           employmentStatus: data.employmentStatus as EmploymentStatus,
         },
       });
+
+      if (data.photoUrl) {
+        await tx.user.update({
+          where: { id: user.id },
+          data: { avatarUrl: data.photoUrl },
+        });
+      }
 
       await tx.auditLog.create({
         data: {
@@ -985,6 +999,8 @@ export class CoreSchoolService {
       joiningDate: staff.joiningDate.toISOString().split('T')[0],
       employmentStatus: staff.employmentStatus,
       phone: staff.membership.user.phone || '',
+      photoUrl: staff.photoUrl || staff.membership.user.avatarUrl || null,
+      avatarUrl: staff.photoUrl || staff.membership.user.avatarUrl || null,
       assignments: staff.teacherAssignments.map((a) => ({
         className: a.subject.class.name,
         sectionName: 'A',
@@ -2004,6 +2020,7 @@ export class CoreSchoolService {
       departmentName?: string;
       phone?: string;
       employmentStatus?: EmploymentStatus;
+      photoUrl?: string;
     }
   ) {
     const school = await resolveSchool(schoolIdOrIdentifier);
@@ -2042,12 +2059,20 @@ export class CoreSchoolService {
         });
       }
 
+      if (data.photoUrl !== undefined && staff.membership?.userId) {
+        await tx.user.update({
+          where: { id: staff.membership.userId },
+          data: { avatarUrl: data.photoUrl || null },
+        });
+      }
+
       const updatedProfile = await tx.staffProfile.update({
         where: { id: staff.id },
         data: {
           ...(data.designation ? { designation: data.designation.trim() } : {}),
           ...(departmentId ? { departmentId } : {}),
           ...(data.employmentStatus ? { employmentStatus: data.employmentStatus } : {}),
+          ...(data.photoUrl !== undefined ? { photoUrl: data.photoUrl || null } : {}),
         },
         include: {
           membership: { include: { user: true } },
@@ -2282,7 +2307,8 @@ export class CoreSchoolService {
         name: `${user.firstName} ${user.lastName}`.trim(),
         email: user.email,
         phone: user.phone || null,
-        avatarUrl: user.avatarUrl || null,
+        photoUrl: student.photoUrl || user.avatarUrl || null,
+        avatarUrl: student.photoUrl || user.avatarUrl || null,
         bloodGroup: student.bloodGroup || null,
         status: student.status,
         relationship: link.relationship,

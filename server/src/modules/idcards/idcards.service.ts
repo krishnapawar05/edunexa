@@ -311,6 +311,7 @@ export class IdCardsService {
         bloodGroup: s.bloodGroup,
         emergencyPhone: s.emergencyPhone,
         address: s.address,
+        photoUrl: s.photoUrl || u.avatarUrl,
         avatarUrl: s.photoUrl || u.avatarUrl,
         classId: enrollment?.classId || null,
         className,
@@ -444,6 +445,7 @@ export class IdCardsService {
         departmentName: deptName,
         joiningDate: st.joiningDate?.toISOString().split('T')[0] || null,
         emergencyPhone: u.phone,
+        photoUrl: st.photoUrl || u.avatarUrl,
         avatarUrl: st.photoUrl || u.avatarUrl,
         school,
         idCard: card

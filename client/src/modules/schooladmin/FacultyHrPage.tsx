@@ -21,6 +21,8 @@ import {
   Download,
   KeyRound,
   FileCheck,
+  Camera,
+  UploadCloud,
 } from 'lucide-react';
 import { Badge } from '../../components/ui/Badge.js';
 import { Button } from '../../components/ui/Button.js';
@@ -46,6 +48,8 @@ interface StaffRecord {
   designation: string;
   joiningDate: string;
   employmentStatus: string;
+  photoUrl?: string;
+  avatarUrl?: string;
   assignments: Array<{
     className: string;
     sectionName: string;
@@ -98,7 +102,25 @@ export const FacultyHrPage: React.FC = () => {
     designation: 'Senior Faculty',
     joiningDate: '2026-01-15',
     employmentStatus: 'ACTIVE',
+    photoUrl: '',
   });
+  const [staffPhotoPreview, setStaffPhotoPreview] = useState<string | null>(null);
+
+  const handleStaffPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('Photo file size must not exceed 5MB.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (loadEv) => {
+      const dataUrl = loadEv.target?.result as string;
+      setStaffPhotoPreview(dataUrl);
+      setNewStaff((prev) => ({ ...prev, photoUrl: dataUrl }));
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Assign Form State
   const [assignForm, setAssignForm] = useState({
@@ -172,10 +194,12 @@ export const FacultyHrPage: React.FC = () => {
         designation: newStaff.designation,
         joiningDate: newStaff.joiningDate,
         employmentStatus: newStaff.employmentStatus,
+        photoUrl: newStaff.photoUrl || undefined,
       });
 
       showToast(`Staff member ${newStaff.firstName} ${newStaff.lastName} onboarded as ${empId}!`);
       setShowAddStaffModal(false);
+      setStaffPhotoPreview(null);
       setNewStaff({
         firstName: '',
         lastName: '',
@@ -186,6 +210,7 @@ export const FacultyHrPage: React.FC = () => {
         designation: 'Senior Faculty',
         joiningDate: '2026-01-15',
         employmentStatus: 'ACTIVE',
+        photoUrl: '',
       });
       loadStaff();
     } catch (err: any) {
@@ -605,8 +630,8 @@ export const FacultyHrPage: React.FC = () => {
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <div
                           style={{
-                            width: '32px',
-                            height: '32px',
+                            width: '36px',
+                            height: '36px',
                             borderRadius: '50%',
                             backgroundColor: 'rgba(16, 185, 129, 0.15)',
                             color: '#10b981',
@@ -616,10 +641,22 @@ export const FacultyHrPage: React.FC = () => {
                             fontWeight: 700,
                             fontSize: '0.8rem',
                             flexShrink: 0,
+                            overflow: 'hidden',
+                            border: '1px solid var(--border-default)',
                           }}
                         >
-                          {s.firstName[0]}
-                          {s.lastName[0]}
+                          {s.photoUrl || s.avatarUrl ? (
+                            <img
+                              src={s.photoUrl || s.avatarUrl}
+                              alt={s.firstName}
+                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                            />
+                          ) : (
+                            <>
+                              {s.firstName[0]}
+                              {s.lastName[0]}
+                            </>
+                          )}
                         </div>
                         <div>
                           <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
@@ -764,6 +801,98 @@ export const FacultyHrPage: React.FC = () => {
           title="Onboard Institutional Staff Member"
         >
           <form onSubmit={handleAddStaff} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+            {/* Passport Photograph Upload */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '16px',
+                padding: '12px 14px',
+                backgroundColor: 'var(--bg-subtle)',
+                borderRadius: '8px',
+                border: '1px solid var(--border-default)',
+              }}
+            >
+              <div
+                style={{
+                  width: '68px',
+                  height: '84px',
+                  borderRadius: '6px',
+                  border: '1px dashed var(--border-default)',
+                  backgroundColor: '#ffffff',
+                  overflow: 'hidden',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                }}
+              >
+                {staffPhotoPreview ? (
+                  <img
+                    src={staffPhotoPreview}
+                    alt="Staff Preview"
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                ) : (
+                  <Camera size={24} color="#94a3b8" />
+                )}
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '2px' }}>
+                  Faculty Passport Photograph (Optional)
+                </label>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                  Accepted formats: JPG, PNG, WebP (Max 5MB). Automatically rendered on ID Card.
+                </div>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <label
+                    className="ed-btn ed-btn-secondary"
+                    style={{
+                      fontSize: '0.75rem',
+                      padding: '5px 12px',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                    }}
+                  >
+                    <UploadCloud size={13} />
+                    {staffPhotoPreview ? 'Change Photo' : 'Upload Photo'}
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/jpg"
+                      style={{ display: 'none' }}
+                      onChange={handleStaffPhotoChange}
+                    />
+                  </label>
+                  {staffPhotoPreview && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStaffPhotoPreview(null);
+                        setNewStaff((prev) => ({ ...prev, photoUrl: '' }));
+                      }}
+                      className="ed-btn"
+                      style={{
+                        fontSize: '0.75rem',
+                        padding: '5px 10px',
+                        color: '#dc2626',
+                        backgroundColor: '#fee2e2',
+                        border: '1px solid #fecaca',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                      }}
+                    >
+                      <Trash2 size={12} />
+                      Remove
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '4px' }}>

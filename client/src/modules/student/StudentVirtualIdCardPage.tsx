@@ -72,7 +72,7 @@ export const StudentVirtualIdCardPage: React.FC = () => {
         emergencyPhone: profile?.emergencyPhone || profile?.parentPhone,
         address: profile?.address,
         academicSession: profile?.academicSession || '2026–2027',
-        avatarUrl: profile?.avatarUrl,
+        avatarUrl: profile?.avatarUrl || profile?.photoUrl,
         cardNumber: cardNumber,
         verificationToken: verificationToken,
         status: cardStatus,

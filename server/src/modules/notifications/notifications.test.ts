@@ -198,7 +198,7 @@ describe('SECTION 15: NOTIFICATION & ALERT MANAGEMENT TEST SUITE', () => {
         parentName: 'Rajesh Sharma',
         feeAmount: '38,500',
         paymentDate: '2026-11-05',
-        message: 'Payment received via Online Gateway. Receipt REC-2026-8842 issued.',
+        message: 'Payment of ₹38,500 received via Online Gateway. Receipt REC-2026-8842 issued.',
       },
     });
 

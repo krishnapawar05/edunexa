@@ -23,12 +23,15 @@ import {
   RefreshCw,
   Sparkles,
   Clock,
+  Camera,
+  UploadCloud,
 } from 'lucide-react';
 import { Badge } from '../../components/ui/Badge.js';
 import { Button } from '../../components/ui/Button.js';
 import { useSchoolBranding } from '../../context/SchoolBrandingContext.js';
 import {
   coreApi,
+  idCardsApi,
   triggerUserPasswordResetApi,
   updateUserAccountStatusApi,
   resendInvitationApi,
@@ -79,6 +82,34 @@ export const StudentDossierPage: React.FC = () => {
     } finally {
       setActionLoading(false);
     }
+  };
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !student) return;
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Photo must be less than 5MB');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      try {
+        setActionLoading(true);
+        const base64 = ev.target?.result as string;
+        await idCardsApi.uploadStudentPhoto(student.id, {
+          photoData: base64,
+          fileName: file.name,
+          mimeType: file.type,
+        });
+        setSuccessToast('Student photograph updated successfully.');
+        await fetchStudent();
+      } catch (err: any) {
+        alert(err.message || 'Failed to upload photo.');
+      } finally {
+        setActionLoading(false);
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleTriggerPasswordReset = async () => {
@@ -210,21 +241,63 @@ export const StudentDossierPage: React.FC = () => {
         }}
       >
         <div style={{ display: 'flex', gap: 'var(--space-4)', alignItems: 'center' }}>
-          <div
-            style={{
-              width: '64px',
-              height: '64px',
-              borderRadius: '50%',
-              backgroundColor: 'var(--primary-100)',
-              color: 'var(--primary-700)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 800,
-              fontSize: '1.4rem',
-            }}
-          >
-            {student.firstName[0]}{student.lastName[0]}
+          <div style={{ position: 'relative' }}>
+            <div
+              style={{
+                width: '68px',
+                height: '84px',
+                borderRadius: '8px',
+                backgroundColor: 'var(--primary-100)',
+                color: 'var(--primary-700)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 800,
+                fontSize: '1.4rem',
+                overflow: 'hidden',
+                border: '2px solid var(--border-default)',
+                boxShadow: '0 2px 5px rgba(0,0,0,0.08)',
+              }}
+            >
+              {student.photoUrl || student.account?.avatarUrl ? (
+                <img
+                  src={student.photoUrl || student.account?.avatarUrl}
+                  alt={student.firstName}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+              ) : (
+                <span>
+                  {student.firstName[0]}
+                  {student.lastName[0]}
+                </span>
+              )}
+            </div>
+            <label
+              title="Upload / Replace Student Photo"
+              style={{
+                position: 'absolute',
+                bottom: '-4px',
+                right: '-4px',
+                backgroundColor: '#1e3a8a',
+                color: '#ffffff',
+                borderRadius: '50%',
+                width: '24px',
+                height: '24px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.25)',
+              }}
+            >
+              <Camera size={13} />
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/jpg"
+                style={{ display: 'none' }}
+                onChange={handlePhotoUpload}
+              />
+            </label>
           </div>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
@@ -463,33 +536,110 @@ export const StudentDossierPage: React.FC = () => {
               <div
                 style={{
                   width: '320px',
-                  height: '190px',
-                  borderRadius: '12px',
-                  background: 'linear-gradient(135deg, #173327 0%, #1d3d2f 100%)',
-                  border: '1px solid var(--academic-gold-500)',
-                  color: '#ffffff',
-                  padding: '16px',
+                  height: '200px',
+                  borderRadius: '10px',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #cbd5e1',
                   boxShadow: 'var(--shadow-md)',
                   display: 'flex',
                   flexDirection: 'column',
-                  justifyContent: 'space-between',
+                  overflow: 'hidden',
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.8rem', fontWeight: 800 }}>{branding.shortName}</span>
-                  <Badge variant="success">{student.idCard.status}</Badge>
-                </div>
-                <div>
-                  <div style={{ fontSize: '1rem', fontWeight: 700 }}>{student.firstName} {student.lastName}</div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--academic-gold-500)' }}>{student.admissionNumber} • {student.className}-{student.sectionName || 'A'}</div>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '6px' }}>
-                  <div style={{ fontSize: '0.62rem', color: '#94a3b8' }}>
-                    NO: {student.idCard.cardNumber}
+                {/* Header Banner */}
+                <div
+                  style={{
+                    backgroundColor: '#1e3a8a',
+                    color: '#ffffff',
+                    padding: '8px 12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    borderBottom: '3px solid #d97706',
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: '0.74rem', fontWeight: 800 }}>
+                      {branding.shortName || 'APEX ACADEMY'}
+                    </div>
+                    <div style={{ fontSize: '0.54rem', opacity: 0.9 }}>STUDENT CREDENTIAL</div>
                   </div>
-                  <div style={{ background: '#fff', padding: '2px', borderRadius: '4px', color: '#0F172A' }}>
-                    <QrCode size={22} />
+                  <Badge variant="success" style={{ fontSize: '0.62rem' }}>
+                    {student.idCard.status}
+                  </Badge>
+                </div>
+
+                {/* Card Body */}
+                <div style={{ display: 'flex', padding: '10px 12px', gap: '10px', flex: 1, alignItems: 'center' }}>
+                  <div
+                    style={{
+                      width: '60px',
+                      height: '76px',
+                      borderRadius: '5px',
+                      border: '1.5px solid #1e3a8a',
+                      backgroundColor: '#f8fafc',
+                      overflow: 'hidden',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                    }}
+                  >
+                    {student.photoUrl || student.account?.avatarUrl ? (
+                      <img
+                        src={student.photoUrl || student.account?.avatarUrl}
+                        alt={student.firstName}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                    ) : (
+                      <span style={{ fontSize: '1.1rem', fontWeight: 800, color: '#1e3a8a' }}>
+                        {student.firstName[0]}
+                      </span>
+                    )}
                   </div>
+
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a' }}>
+                      {student.firstName} {student.lastName}
+                    </div>
+                    <div style={{ fontSize: '0.68rem', color: '#1e3a8a', fontWeight: 600 }}>
+                      {student.className}-{student.sectionName || 'A'} • Roll #{student.rollNumber || 1}
+                    </div>
+                    <div style={{ fontSize: '0.64rem', color: '#64748b', marginTop: '2px' }}>
+                      Adm: {student.admissionNumber}
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      background: '#fff',
+                      padding: '3px',
+                      borderRadius: '4px',
+                      border: '1px solid #e2e8f0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <QrCode size={32} color="#0f172a" />
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div
+                  style={{
+                    padding: '4px 12px',
+                    backgroundColor: '#f8fafc',
+                    borderTop: '1px solid #e2e8f0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    fontSize: '0.58rem',
+                    color: '#64748b',
+                  }}
+                >
+                  <span>{student.idCard.cardNumber}</span>
+                  <span style={{ color: '#1e3a8a', fontWeight: 700 }}>ISO CR80</span>
                 </div>
               </div>
 

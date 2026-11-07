@@ -18,6 +18,7 @@ import {
   Calendar,
   Sparkles,
   BookOpen,
+  IdCard,
 } from 'lucide-react';
 import { Breadcrumbs } from '../../components/Breadcrumbs.js';
 import {
@@ -35,6 +36,8 @@ interface Ward {
   className: string;
   sectionName: string;
   rollNumber: number;
+  photoUrl?: string;
+  avatarUrl?: string;
 }
 
 export const ParentDashboard: React.FC = () => {
@@ -80,6 +83,8 @@ export const ParentDashboard: React.FC = () => {
         sectionName: s.sectionName || 'A',
         admissionNumber: s.admissionNumber,
         rollNumber: s.rollNumber || 1,
+        photoUrl: s.photoUrl,
+        avatarUrl: s.avatarUrl || s.photoUrl,
       }));
 
       setChildren(mappedChildren);
@@ -289,6 +294,87 @@ export const ParentDashboard: React.FC = () => {
 
       {activeChild && (
         <>
+          {/* Child Identity Card & Details Banner */}
+          <div
+            className="ed-card"
+            style={{
+              padding: '16px 20px',
+              marginBottom: 'var(--space-6)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '16px',
+              backgroundColor: 'var(--bg-surface)',
+              borderLeft: '4px solid #1e3a8a',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <div
+                style={{
+                  width: '54px',
+                  height: '68px',
+                  borderRadius: '6px',
+                  border: '1.5px solid #1e3a8a',
+                  backgroundColor: '#f8fafc',
+                  overflow: 'hidden',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.06)',
+                }}
+              >
+                {activeChild.photoUrl || activeChild.avatarUrl ? (
+                  <img
+                    src={activeChild.photoUrl || activeChild.avatarUrl}
+                    alt={activeChild.name}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                ) : (
+                  <Users size={24} color="#94a3b8" />
+                )}
+              </div>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
+                    {activeChild.name}
+                  </h3>
+                  <span
+                    style={{
+                      fontSize: '0.72rem',
+                      fontWeight: 600,
+                      padding: '2px 8px',
+                      borderRadius: '12px',
+                      backgroundColor: '#dcfce7',
+                      color: '#166534',
+                    }}
+                  >
+                    Enrolled
+                  </span>
+                </div>
+                <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '4px', display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
+                  <span>Class: <strong>{activeChild.className}-{activeChild.sectionName}</strong></span>
+                  <span>•</span>
+                  <span>Roll: <strong>#{activeChild.rollNumber}</strong></span>
+                  <span>•</span>
+                  <span>Admission No: <strong style={{ fontFamily: 'var(--font-mono)' }}>{activeChild.admissionNumber}</strong></span>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <Link
+                to="/student/id-card"
+                className="ed-btn ed-btn-outline"
+                style={{ fontSize: '0.82rem', padding: '6px 14px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+              >
+                <IdCard size={14} />
+                <span>Virtual ID Card</span>
+              </Link>
+            </div>
+          </div>
+
           {/* Child Metrics Overview */}
           <div className="ed-grid-4" style={{ marginBottom: 'var(--space-6)' }}>
             <div className="ed-metric-tile">
