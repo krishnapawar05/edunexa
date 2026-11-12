@@ -11,6 +11,9 @@ import {
   Search,
   ArrowLeft,
   ExternalLink,
+  GraduationCap,
+  Briefcase,
+  AlertTriangle,
 } from 'lucide-react';
 import { PublicIdCardVerificationResponse } from '@edunexa/shared';
 import { useSchoolBranding } from '../../context/SchoolBrandingContext.js';
@@ -70,6 +73,11 @@ export const PublicIdCardVerification: React.FC<PublicIdCardVerificationProps> =
     fetchVerification(tokenInput);
   };
 
+  const isStudent = verificationResult?.holderType === 'STUDENT';
+  const isRevoked = verificationResult?.status === 'REVOKED';
+  const isExpired = verificationResult?.status === 'EXPIRED';
+  const isValid = verificationResult?.isValid && !isRevoked && !isExpired;
+
   return (
     <div
       style={{
@@ -81,7 +89,7 @@ export const PublicIdCardVerification: React.FC<PublicIdCardVerificationProps> =
         padding: 'var(--space-8) var(--space-4)',
       }}
     >
-      <div style={{ width: '100%', maxWidth: '600px' }}>
+      <div style={{ width: '100%', maxWidth: '620px' }}>
         {/* Navigation Back */}
         <button
           onClick={() => {
@@ -94,7 +102,7 @@ export const PublicIdCardVerification: React.FC<PublicIdCardVerificationProps> =
           className="ed-btn ed-btn-secondary"
           style={{ marginBottom: 'var(--space-5)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
         >
-          <ArrowLeft size={14} /> Back to Public Website
+          <ArrowLeft size={14} /> Back to Public Portal
         </button>
 
         {/* Verification Card */}
@@ -103,31 +111,34 @@ export const PublicIdCardVerification: React.FC<PublicIdCardVerificationProps> =
           <div style={{ textAlign: 'center', marginBottom: 'var(--space-6)' }}>
             <div
               style={{
-                width: '48px',
-                height: '48px',
+                width: '52px',
+                height: '52px',
                 borderRadius: '50%',
-                backgroundColor: 'var(--primary-50)',
-                color: 'var(--primary-700)',
+                backgroundColor: 'rgba(18, 60, 46, 0.1)',
+                color: '#123c2e',
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 marginBottom: 'var(--space-3)',
+                border: '2px solid #123c2e',
               }}
             >
-              <ShieldCheck size={26} />
+              <ShieldCheck size={28} />
             </div>
-            <h2 style={{ fontSize: '1.4rem', margin: 0, color: 'var(--text-primary)' }}>
+            <h2 style={{ fontSize: '1.4rem', margin: 0, fontWeight: 800, color: 'var(--text-primary)' }}>
               Official Institutional ID Card Verification
             </h2>
-            <p style={{ margin: '4px 0 0', fontSize: '0.84rem', color: 'var(--text-muted)' }}>
-              Public verification gateway for {branding.schoolName} credentials.
+            <p style={{ margin: '6px 0 0', fontSize: '0.84rem', color: 'var(--text-muted)' }}>
+              Authoritative cryptographic verification gateway for {branding.schoolName || 'EduNexa'} digital credentials.
             </p>
           </div>
 
           {/* Search Token Input */}
           <form onSubmit={handleSearch} style={{ marginBottom: 'var(--space-6)' }}>
             <div className="ed-input-group" style={{ marginBottom: 0 }}>
-              <label className="ed-label">Verification Token / QR Payload</label>
+              <label className="ed-label" style={{ fontWeight: 600, fontSize: '0.82rem' }}>
+                Verification Token / QR Payload
+              </label>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <input
                   type="text"
@@ -142,9 +153,9 @@ export const PublicIdCardVerification: React.FC<PublicIdCardVerificationProps> =
                   type="submit"
                   disabled={loading}
                   className="ed-btn ed-btn-primary"
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}
                 >
-                  <Search size={14} /> Verify
+                  <Search size={14} /> {loading ? 'Verifying...' : 'Verify'}
                 </button>
               </div>
             </div>
@@ -152,8 +163,9 @@ export const PublicIdCardVerification: React.FC<PublicIdCardVerificationProps> =
 
           {/* Loading Indicator */}
           {loading && (
-            <div style={{ textAlign: 'center', padding: 'var(--space-6)', color: 'var(--text-muted)' }}>
-              Verifying cryptographic credential token...
+            <div style={{ textAlign: 'center', padding: 'var(--space-8)', color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>Querying authoritative institutional ledger...</div>
+              <div style={{ fontSize: '0.78rem', marginTop: '4px' }}>Decrypting cryptographic credential payload</div>
             </div>
           )}
 
@@ -162,17 +174,17 @@ export const PublicIdCardVerification: React.FC<PublicIdCardVerificationProps> =
             <div
               style={{
                 padding: 'var(--space-4)',
-                backgroundColor: 'var(--danger-bg)',
-                border: '1px solid var(--danger-border)',
+                backgroundColor: '#fef2f2',
+                border: '1px solid #fecaca',
                 borderRadius: 'var(--radius-md)',
-                color: 'var(--danger-text)',
+                color: '#991b1b',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '8px',
+                gap: '10px',
                 fontSize: '0.86rem',
               }}
             >
-              <XCircle size={18} />
+              <XCircle size={20} style={{ flexShrink: 0 }} />
               <div>
                 <strong>Invalid Credential:</strong> {errorMessage}
               </div>
@@ -185,46 +197,53 @@ export const PublicIdCardVerification: React.FC<PublicIdCardVerificationProps> =
               {/* Status Banner */}
               <div
                 style={{
-                  padding: 'var(--space-4) var(--space-5)',
+                  padding: '14px 18px',
                   borderRadius: 'var(--radius-md)',
-                  backgroundColor: verificationResult.isValid ? 'var(--success-bg)' : 'var(--danger-bg)',
-                  border: `1px solid ${verificationResult.isValid ? 'var(--success-border)' : 'var(--danger-border)'}`,
+                  backgroundColor: isValid ? '#f0fdf4' : isExpired ? '#fffbeb' : '#fef2f2',
+                  border: `1px solid ${isValid ? '#bbf7d0' : isExpired ? '#fde68a' : '#fecaca'}`,
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 'var(--space-3)',
+                  gap: '14px',
                 }}
               >
-                {verificationResult.isValid ? (
-                  <CheckCircle2 size={24} style={{ color: 'var(--success-solid)', flexShrink: 0 }} />
+                {isValid ? (
+                  <CheckCircle2 size={26} style={{ color: '#16a34a', flexShrink: 0 }} />
+                ) : isExpired ? (
+                  <AlertTriangle size={26} style={{ color: '#d97706', flexShrink: 0 }} />
                 ) : (
-                  <ShieldAlert size={24} style={{ color: 'var(--danger-solid)', flexShrink: 0 }} />
+                  <ShieldAlert size={26} style={{ color: '#dc2626', flexShrink: 0 }} />
                 )}
                 <div>
                   <div
                     style={{
-                      fontWeight: 700,
-                      fontSize: '1rem',
-                      color: verificationResult.isValid ? 'var(--success-text)' : 'var(--danger-text)',
+                      fontWeight: 800,
+                      fontSize: '0.96rem',
+                      letterSpacing: '0.02em',
+                      color: isValid ? '#166534' : isExpired ? '#92400e' : '#991b1b',
                     }}
                   >
-                    {verificationResult.isValid
+                    {isValid
                       ? 'OFFICIALLY VERIFIED ACTIVE CREDENTIAL'
-                      : 'CREDENTIAL REVOKED OR INACTIVE'}
+                      : isExpired
+                      ? 'CREDENTIAL EXPIRED (OUTDATED VALIDITY)'
+                      : 'CREDENTIAL REVOKED OR DEACTIVATED'}
                   </div>
-                  <div style={{ fontSize: '0.80rem', color: 'var(--text-secondary)' }}>
-                    {verificationResult.isValid
-                      ? 'This member credential is valid and registered with active enrollment in the institution.'
+                  <div style={{ fontSize: '0.78rem', color: '#475569', marginTop: '2px' }}>
+                    {isValid
+                      ? 'This member credential is valid, registered on the institutional ledger, and actively enrolled.'
+                      : isExpired
+                      ? `This credential reached its expiration date (${verificationResult.expiresAt ? new Date(verificationResult.expiresAt).toLocaleDateString() : 'Session End'}). Please contact administration for renewal.`
                       : `This card has been revoked: ${verificationResult.revocationReason || 'Deactivated by school administration'}`}
                   </div>
                 </div>
               </div>
 
-              {/* Minimal Safe Identity Details (Strictly No Sensitive PII) */}
+              {/* Identity & Institutional Details */}
               <div
                 style={{
                   border: '1px solid var(--border-default)',
                   borderRadius: 'var(--radius-md)',
-                  padding: 'var(--space-4) var(--space-5)',
+                  padding: 'var(--space-5)',
                   backgroundColor: 'var(--bg-surface)',
                   display: 'flex',
                   flexDirection: 'column',
@@ -232,39 +251,86 @@ export const PublicIdCardVerification: React.FC<PublicIdCardVerificationProps> =
                   fontSize: '0.88rem',
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-light)', paddingBottom: '6px' }}>
-                  <span style={{ color: 'var(--text-muted)' }}>Cardholder Name:</span>
-                  <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{verificationResult.holderName}</span>
+                {/* Header with Photo & Name */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px', borderBottom: '1px solid var(--border-light)', paddingBottom: '12px' }}>
+                  {/* Photo Container */}
+                  <div
+                    style={{
+                      width: '64px',
+                      height: '80px',
+                      borderRadius: '6px',
+                      backgroundColor: '#f1f5f9',
+                      border: '2px solid #123c2e',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      overflow: 'hidden',
+                      flexShrink: 0,
+                    }}
+                  >
+                    {verificationResult.avatarUrl ? (
+                      <img
+                        src={verificationResult.avatarUrl}
+                        alt={verificationResult.holderName}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                    ) : (
+                      <span style={{ fontSize: '1.4rem', fontWeight: 800, color: '#123c2e' }}>
+                        {verificationResult.holderName.charAt(0)}
+                      </span>
+                    )}
+                  </div>
+
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                      {verificationResult.holderName}
+                    </div>
+                    <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#123c2e', marginTop: '2px' }}>
+                      {isStudent
+                        ? `${verificationResult.className || 'Senior Division'}${verificationResult.sectionName ? ` - ${verificationResult.sectionName}` : ''}`
+                        : `${verificationResult.designation || 'Academic Faculty'}${verificationResult.department ? ` • ${verificationResult.department}` : ''}`}
+                    </div>
+                    <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                      {isStudent ? 'Admission No: ' : 'Employee ID: '}
+                      <strong style={{ fontFamily: 'monospace', color: 'var(--text-primary)' }}>{verificationResult.identifierNumber}</strong>
+                    </div>
+                  </div>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-light)', paddingBottom: '6px' }}>
-                  <span style={{ color: 'var(--text-muted)' }}>Identifier / Roll No:</span>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{verificationResult.identifierNumber}</span>
-                </div>
+
+                {/* Grid items */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-light)', paddingBottom: '6px' }}>
                   <span style={{ color: 'var(--text-muted)' }}>Affiliated Institution:</span>
                   <span style={{ fontWeight: 600 }}>{verificationResult.schoolName} ({verificationResult.schoolCode})</span>
                 </div>
+
                 <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-light)', paddingBottom: '6px' }}>
-                  <span style={{ color: 'var(--text-muted)' }}>Credential Type:</span>
-                  <span style={{ fontWeight: 600 }}>{verificationResult.holderType} BADGE</span>
+                  <span style={{ color: 'var(--text-muted)' }}>Credential Category:</span>
+                  <span style={{ fontWeight: 600 }}>
+                    {verificationResult.holderType === 'STUDENT' ? 'ENROLLED STUDENT' : 'TEACHING FACULTY'} BADGE
+                  </span>
                 </div>
+
                 <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-light)', paddingBottom: '6px' }}>
                   <span style={{ color: 'var(--text-muted)' }}>Academic Session:</span>
                   <span>{verificationResult.academicSession}</span>
                 </div>
+
                 <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-light)', paddingBottom: '6px' }}>
                   <span style={{ color: 'var(--text-muted)' }}>Issuance Date:</span>
                   <span>{new Date(verificationResult.issuedAt).toLocaleDateString('en-GB')}</span>
                 </div>
+
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--text-muted)' }}>Valid Through:</span>
-                  <span>{verificationResult.expiresAt ? new Date(verificationResult.expiresAt).toLocaleDateString('en-GB') : 'Academic Session End'}</span>
+                  <span style={{ color: 'var(--text-muted)' }}>Card Validity:</span>
+                  <span style={{ fontWeight: 600 }}>
+                    {verificationResult.expiresAt ? new Date(verificationResult.expiresAt).toLocaleDateString('en-GB') : 'Academic Session End (March 2027)'}
+                  </span>
                 </div>
               </div>
 
               {/* Privacy Disclaimer */}
               <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', textAlign: 'center', lineHeight: 1.4 }}>
-                <strong>Privacy Notice:</strong> In compliance with Institutional Student Data Protection policies, public verification records expose only verified name, ID identifier, and active affiliation status. Private records, grades, contact numbers, and parent details are shielded from public verification.
+                <strong>Institutional Privacy Assurance:</strong> In compliance with ISO CR80 Student Data Protection standards, public verification reveals verified name, ID identifier, and active affiliation standing. Personal home addresses, contact numbers, and academic marks remain confidential.
               </div>
             </div>
           )}

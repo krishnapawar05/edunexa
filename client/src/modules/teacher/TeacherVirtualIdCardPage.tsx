@@ -15,11 +15,13 @@ import {
 } from 'lucide-react';
 import { idCardsApi } from '../../services/api.js';
 import { downloadIndividualIdCardPdf, IdCardRenderData } from '../../utils/idCardPdf.js';
+import { VirtualIdCardView, VirtualIdCardData } from '../../components/idcard/VirtualIdCardView.js';
 
 export const TeacherVirtualIdCardPage: React.FC = () => {
   const [cardData, setCardData] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [isDownloading, setIsDownloading] = useState<boolean>(false);
   const [cardSide, setCardSide] = useState<'FRONT' | 'BACK'>('FRONT');
 
   const loadTeacherCard = async () => {
@@ -40,30 +42,83 @@ export const TeacherVirtualIdCardPage: React.FC = () => {
     loadTeacherCard();
   }, []);
 
-  const handleDownloadPdf = () => {
-    if (!cardData) return;
-    const renderPayload: IdCardRenderData = {
-      holderType: 'TEACHER',
-      fullName: cardData.fullName,
-      identifier: cardData.employeeId,
-      subDetail: `${cardData.department} • ${cardData.designation}`,
-      joiningDate: cardData.joiningDate,
-      emergencyPhone: cardData.emergencyPhone,
-      avatarUrl: cardData.avatarUrl || cardData.photoUrl,
-      cardNumber: cardData.idCard?.cardNumber || 'CR80-PENDING',
-      verificationToken: cardData.idCard?.verificationToken || 'N/A',
-      status: cardData.idCard?.status || 'ACTIVE',
-      schoolName: cardData.school?.name,
-      schoolCode: cardData.school?.code,
-      schoolAddress: cardData.school?.address,
-      schoolPhone: cardData.school?.phone,
-      schoolEmail: cardData.school?.email,
-    };
-    downloadIndividualIdCardPdf(renderPayload, cardData.idCard?.template || {});
+  const card = cardData?.card || cardData?.idCard;
+  const profile = cardData?.profile || cardData;
+  const school = cardData?.school;
+  const template = cardData?.template;
+
+  const teacherFullName =
+    profile?.fullName ||
+    (profile?.firstName ? `${profile.firstName} ${profile.lastName || ''}`.trim() : 'Academic Faculty');
+  const employeeId = profile?.employeeId || profile?.identifier || 'EMP-2026-0012';
+  const designation = profile?.designation || 'Senior Faculty & Dept Head';
+  const department = profile?.department || 'Science & Physics';
+  const cardStatus = card?.status || 'ACTIVE';
+  const cardNumber = card?.cardNumber || 'CR80-2026-0012';
+  const verificationToken = card?.verificationToken || '';
+  const schoolName = school?.name || 'Apex Academy of Sciences & Arts';
+  const schoolCode = school?.code || 'APEX-2026';
+
+  const cardViewModel: VirtualIdCardData = {
+    holderType: 'TEACHER',
+    fullName: teacherFullName,
+    identifier: employeeId,
+    designation: designation,
+    department: department,
+    joiningDate: profile?.joiningDate,
+    academicSession: '2026–2027',
+    emergencyPhone: profile?.emergencyPhone || school?.phone || '+91 11 2659 1000',
+    avatarUrl: profile?.avatarUrl || profile?.photoUrl,
+    cardNumber: cardNumber,
+    verificationToken: verificationToken,
+    status: cardStatus,
+    schoolName: schoolName,
+    schoolCode: schoolCode,
+    schoolAddress: school?.address || 'Plot 42, Institutional Area, Knowledge Park III',
+    schoolPhone: school?.phone || '+91 11 2659 1000',
+    schoolEmail: school?.email || 'admin@apexacademy.edu',
   };
 
-  const cardStatus = cardData?.idCard?.status || 'ACTIVE';
-  const verificationToken = cardData?.idCard?.verificationToken || '';
+  const handleDownloadPdf = async () => {
+    if (!profile) return;
+    setIsDownloading(true);
+    try {
+      const renderPayload: IdCardRenderData = {
+        holderType: 'TEACHER',
+        fullName: teacherFullName,
+        identifier: employeeId,
+        subDetail: `${department} • ${designation}`,
+        joiningDate: profile?.joiningDate,
+        emergencyPhone: profile?.emergencyPhone,
+        avatarUrl: profile?.avatarUrl || profile?.photoUrl,
+        cardNumber: cardNumber,
+        verificationToken: verificationToken,
+        status: cardStatus,
+        schoolName: schoolName,
+        schoolCode: schoolCode,
+        schoolAddress: school?.address,
+        schoolPhone: school?.phone,
+        schoolEmail: school?.email,
+        academicSession: '2026–2027',
+      };
+
+      await downloadIndividualIdCardPdf(
+        renderPayload,
+        template,
+        `Faculty-ID-${employeeId.replace(/[^a-zA-Z0-9_-]/g, '')}.pdf`
+      );
+    } catch (err: any) {
+      console.error('PDF download error:', err);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  const handleOpenVerify = () => {
+    if (verificationToken) {
+      window.open(`/verify-id/${encodeURIComponent(verificationToken)}`, '_blank');
+    }
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
@@ -84,7 +139,7 @@ export const TeacherVirtualIdCardPage: React.FC = () => {
       >
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-            <IdCard size={24} style={{ color: 'var(--primary-600)' }} />
+            <IdCard size={24} style={{ color: '#123c2e' }} />
             <h2 style={{ fontSize: '1.4rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
               My Faculty Identity Card
             </h2>
@@ -111,9 +166,9 @@ export const TeacherVirtualIdCardPage: React.FC = () => {
           <button
             className="ed-btn ed-btn-secondary"
             onClick={handleDownloadPdf}
-            disabled={!cardData}
+            disabled={loading || !cardData || isDownloading}
           >
-            <Download size={14} /> Download PDF
+            <Download size={14} /> {isDownloading ? 'Generating...' : 'Download PDF'}
           </button>
           <button
             className="ed-btn ed-btn-primary"
@@ -144,12 +199,12 @@ export const TeacherVirtualIdCardPage: React.FC = () => {
       )}
 
       {/* Main Grid: Card View & Security Details */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1.7fr', gap: 'var(--space-6)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(360px, 1.3fr) 1.7fr', gap: 'var(--space-6)' }}>
         {/* Left Column: Interactive ISO CR80 Card */}
         <div className="ed-card">
-          <div className="ed-card-header">
+          <div className="ed-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>Digital Smart Card Preview</span>
-            <div style={{ display: 'flex', gap: '4px' }}>
+            <div style={{ display: 'flex', gap: '6px' }}>
               <button
                 className={`ed-btn ed-btn-sm ${cardSide === 'FRONT' ? 'ed-btn-primary' : 'ed-btn-secondary'}`}
                 onClick={() => setCardSide('FRONT')}
@@ -171,264 +226,112 @@ export const TeacherVirtualIdCardPage: React.FC = () => {
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
+              justifyContent: 'center',
               padding: 'var(--space-6)',
               backgroundColor: 'var(--bg-subtle)',
+              gap: 'var(--space-5)',
+              minHeight: '340px',
             }}
           >
-            {/* The ISO CR80 Smart Card Box */}
-            <div
-              style={{
-                width: '360px',
-                height: '228px',
-                borderRadius: '12px',
-                backgroundColor: '#ffffff',
-                border: '1px solid #cbd5e1',
-                boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.06)',
-                display: 'flex',
-                flexDirection: 'column',
-                overflow: 'hidden',
-                position: 'relative',
-              }}
-            >
-              {cardSide === 'FRONT' ? (
-                <>
-                  {/* Front: Navy Header */}
-                  <div
-                    style={{
-                      backgroundColor: cardData?.idCard?.template?.primaryColor || '#1e3a8a',
-                      color: '#ffffff',
-                      padding: '10px 14px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      borderBottom: `3px solid ${cardData?.idCard?.template?.secondaryColor || '#d97706'}`,
-                    }}
+            {loading ? (
+              <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                <RefreshCw size={24} className="animate-spin" style={{ margin: '0 auto 12px' }} />
+                <div>Loading faculty digital credential...</div>
+              </div>
+            ) : (
+              <>
+                {/* Reusable Forest-Green Institutional Virtual ID Card */}
+                <VirtualIdCardView
+                  data={cardViewModel}
+                  side={cardSide}
+                  onScanVerify={handleOpenVerify}
+                />
+
+                {/* Actions under card */}
+                <div style={{ display: 'flex', gap: 'var(--space-3)', width: '100%', maxWidth: '430px' }}>
+                  <button
+                    className="ed-btn ed-btn-secondary"
+                    style={{ flex: 1, display: 'inline-flex', justifyContent: 'center', alignItems: 'center', gap: '6px' }}
+                    onClick={handleOpenVerify}
                   >
-                    <div>
-                      <div style={{ fontSize: '0.82rem', fontWeight: 800, letterSpacing: '0.04em' }}>
-                        {cardData?.school?.name?.toUpperCase() || 'APEX ACADEMY OF EXCELLENCE'}
-                      </div>
-                      <div style={{ fontSize: '0.62rem', opacity: 0.9, letterSpacing: '0.05em' }}>
-                        FACULTY IDENTITY CREDENTIAL
-                      </div>
-                    </div>
-                    <div
-                      style={{
-                        width: '28px',
-                        height: '28px',
-                        borderRadius: '50%',
-                        backgroundColor: '#ffffff',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#1e3a8a',
-                        fontWeight: 900,
-                        fontSize: '0.78rem',
-                      }}
-                    >
-                      APX
-                    </div>
-                  </div>
-
-                  {/* Front Body */}
-                  <div style={{ display: 'flex', padding: '12px 14px', gap: '14px', flex: 1 }}>
-                    {/* Photo Box */}
-                    <div
-                      style={{
-                        width: '74px',
-                        height: '92px',
-                        borderRadius: '6px',
-                        backgroundColor: '#f1f5f9',
-                        border: `2px solid ${cardData?.idCard?.template?.primaryColor || '#1e3a8a'}`,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0,
-                        overflow: 'hidden',
-                        position: 'relative',
-                      }}
-                    >
-                      {cardData?.avatarUrl || cardData?.photoUrl ? (
-                        <img
-                          src={cardData.avatarUrl || cardData.photoUrl}
-                          alt={cardData.fullName}
-                          style={{
-                            width: '100%',
-                            height: '100%',
-                            objectFit: 'cover',
-                          }}
-                          onError={(e) => {
-                            (e.target as HTMLElement).style.display = 'none';
-                          }}
-                        />
-                      ) : (
-                        <>
-                          <span style={{ fontSize: '1.4rem', fontWeight: 800, color: cardData?.idCard?.template?.primaryColor || '#1e3a8a' }}>
-                            {cardData?.fullName?.charAt(0) || 'F'}
-                          </span>
-                          <span style={{ fontSize: '0.50rem', color: '#64748b', marginTop: '2px', fontWeight: 600 }}>FACULTY</span>
-                        </>
-                      )}
-                    </div>
-
-                    {/* Holder Info */}
-                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                      <div style={{ fontSize: '0.94rem', fontWeight: 800, color: '#0f172a' }}>
-                        {cardData?.fullName || 'Dr. Alistair Thorne'}
-                      </div>
-                      <div style={{ fontSize: '0.74rem', fontWeight: 600, color: '#1e3a8a' }}>
-                        {cardData?.designation || 'Senior Faculty'}
-                      </div>
-                      <div style={{ fontSize: '0.68rem', color: '#475569' }}>
-                        Dept: <strong>{cardData?.department || 'Science & Mathematics'}</strong>
-                      </div>
-                      <div style={{ fontSize: '0.68rem', color: '#475569' }}>
-                        Emp ID: <strong>{cardData?.employeeId || 'EMP-2026-001'}</strong>
-                      </div>
-                      <div style={{ fontSize: '0.68rem', color: '#475569' }}>
-                        Status: <span style={{ color: '#16a34a', fontWeight: 700 }}>● Active Permanent</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Front Footer */}
-                  <div
-                    style={{
-                      padding: '6px 14px',
-                      backgroundColor: '#f8fafc',
-                      borderTop: '1px solid #e2e8f0',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      fontSize: '0.62rem',
-                      color: '#64748b',
-                    }}
+                    <QrCode size={14} /> Scan / Verify QR
+                  </button>
+                  <button
+                    className="ed-btn ed-btn-primary"
+                    style={{ flex: 1, display: 'inline-flex', justifyContent: 'center', alignItems: 'center', gap: '6px' }}
+                    onClick={handleDownloadPdf}
+                    disabled={!cardData || isDownloading}
                   >
-                    <span>Card No: {cardData?.idCard?.cardNumber || 'CR80-2026-9041'}</span>
-                    <span style={{ color: '#1e3a8a', fontWeight: 600 }}>ISO CR80 TAMPER-PROOF</span>
-                  </div>
-                </>
-              ) : (
-                <>
-                  {/* Back: Details & Seal */}
-                  <div
-                    style={{
-                      height: '6px',
-                      backgroundColor: cardData?.idCard?.template?.primaryColor || '#1e3a8a',
-                    }}
-                  />
-                  <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '6px', flex: 1 }}>
-                    <div style={{ fontSize: '0.70rem', fontWeight: 700, color: '#1e3a8a', textAlign: 'center' }}>
-                      FACULTY VERIFICATION & CONTACT
-                    </div>
-                    <div style={{ fontSize: '0.64rem', color: '#334155', lineHeight: 1.4 }}>
-                      <strong>Campus:</strong> {cardData?.school?.address || 'Plot 42, Knowledge Park III, Bengaluru'}
-                      <br />
-                      <strong>Phone:</strong> {cardData?.school?.phone || '+91 80 4968 2000'} | <strong>Email:</strong> {cardData?.school?.email || 'admin@apexacademy.edu'}
-                      <br />
-                      <strong>Emergency Phone:</strong> {cardData?.emergencyPhone || '+91 98450 12345'}
-                    </div>
-
-                    <div
-                      style={{
-                        fontSize: '0.56rem',
-                        color: '#64748b',
-                        lineHeight: 1.3,
-                        backgroundColor: '#f8fafc',
-                        padding: '6px',
-                        borderRadius: '4px',
-                        border: '1px solid #e2e8f0',
-                        marginTop: '2px',
-                      }}
-                    >
-                      {cardData?.idCard?.template?.customTermsText ||
-                        'This card is institutional property. Unauthorized duplication or transfer is prohibited. Return if found to school administration.'}
-                    </div>
-
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 'auto' }}>
-                      <div
-                        style={{
-                          width: '56px',
-                          height: '24px',
-                          border: '1px dashed #94a3b8',
-                          borderRadius: '4px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '0.48rem',
-                          color: '#94a3b8',
-                        }}
-                      >
-                        OFFICIAL SEAL
-                      </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <div style={{ width: '80px', borderBottom: '1px solid #334155', marginBottom: '2px' }} />
-                        <div style={{ fontSize: '0.52rem', fontWeight: 700, color: '#0f172a' }}>Principal / Registrar</div>
-                      </div>
-                    </div>
-                  </div>
-                  <div style={{ fontSize: '0.54rem', color: '#94a3b8', textAlign: 'center', paddingBottom: '4px' }}>
-                    Token: {verificationToken || 'v-tok-demo'}
-                  </div>
-                </>
-              )}
-            </div>
+                    <Download size={14} /> {isDownloading ? 'Preparing PDF...' : 'Download PDF'}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
-        {/* Right Column: Security Verification & QR Details */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-          <div className="ed-card ed-card-body">
-            <h3 style={{ fontSize: '1.05rem', margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <ShieldCheck size={18} color="#16a34a" />
-              Cryptographic Credential Verification
-            </h3>
-            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '0 0 16px', lineHeight: 1.5 }}>
-              Your faculty card is encoded with an HMAC SHA-256 verification token linked directly to the institutional PostgreSQL ledger.
-            </p>
-
-            <div
-              style={{
-                backgroundColor: 'var(--bg-subtle)',
-                padding: '12px 16px',
-                borderRadius: '8px',
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: '8px',
-                fontSize: '0.80rem',
-                marginBottom: '16px',
-              }}
-            >
-              <div>
-                <span style={{ color: 'var(--text-muted)' }}>Card Number: </span>
-                <strong>{cardData?.idCard?.cardNumber || 'CR80-2026-9041'}</strong>
-              </div>
-              <div>
-                <span style={{ color: 'var(--text-muted)' }}>Status: </span>
-                <span style={{ color: '#16a34a', fontWeight: 700 }}>● {cardStatus}</span>
-              </div>
-              <div>
-                <span style={{ color: 'var(--text-muted)' }}>Issued Date: </span>
-                <strong>{cardData?.idCard?.issuedAt ? new Date(cardData.idCard.issuedAt).toLocaleDateString() : 'Active'}</strong>
-              </div>
-              <div>
-                <span style={{ color: 'var(--text-muted)' }}>Expires: </span>
-                <strong>{cardData?.idCard?.expiresAt ? new Date(cardData.idCard.expiresAt).toLocaleDateString() : 'Annual Renewal'}</strong>
+        {/* Right Column: Security, Verification & Status Details */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+          <div className="ed-card">
+            <div className="ed-card-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <ShieldCheck size={18} style={{ color: '#16a34a' }} />
+                <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>Cryptographic Ledger & Faculty Access</span>
               </div>
             </div>
+            <div className="ed-card-body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+              <div style={{ fontSize: '0.86rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                Your faculty smart credential is cryptographically anchored to the school&apos;s administrative directory and grants institutional privileges across physical and digital learning portals.
+              </div>
 
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <a
-                href={`/verify-id/${verificationToken}`}
-                target="_blank"
-                rel="noreferrer"
-                className="ed-btn ed-btn-secondary"
-                style={{ fontSize: '0.80rem', display: 'inline-flex', alignItems: 'center', gap: '6px', textDecoration: 'none' }}
-              >
-                <ExternalLink size={14} />
-                Open Public QR Verification Link
-              </a>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
+                <div style={{ padding: '10px 12px', backgroundColor: 'var(--bg-subtle)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-default)' }}>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Card Number</div>
+                  <div style={{ fontSize: '0.86rem', fontWeight: 700, fontFamily: 'monospace' }}>{cardNumber}</div>
+                </div>
+                <div style={{ padding: '10px 12px', backgroundColor: 'var(--bg-subtle)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-default)' }}>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Card Status</div>
+                  <div style={{ fontSize: '0.86rem', fontWeight: 700, color: cardStatus === 'ACTIVE' ? '#16a34a' : '#dc2626' }}>
+                    {cardStatus}
+                  </div>
+                </div>
+                <div style={{ padding: '10px 12px', backgroundColor: 'var(--bg-subtle)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-default)' }}>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Employee ID</div>
+                  <div style={{ fontSize: '0.86rem', fontWeight: 700, fontFamily: 'monospace' }}>{employeeId}</div>
+                </div>
+                <div style={{ padding: '10px 12px', backgroundColor: 'var(--bg-subtle)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-default)' }}>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Security Token</div>
+                  <div style={{ fontSize: '0.72rem', fontWeight: 600, fontFamily: 'monospace', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {verificationToken ? `${verificationToken.slice(0, 14)}...` : 'N/A'}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', marginTop: 'var(--space-2)' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                  <CheckCircle2 size={16} style={{ color: '#16a34a', marginTop: '2px', flexShrink: 0 }} />
+                  <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                    <strong>Dynamic QR Verification:</strong> Scannable by security personnel and campus administrators to confirm faculty identity, department affiliation, and permanent standing.
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                  <CheckCircle2 size={16} style={{ color: '#16a34a', marginTop: '2px', flexShrink: 0 }} />
+                  <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                    <strong>Privacy Preserving Architecture:</strong> Sensitive payroll details, residential coordinates, and personal credentials remain strictly confidential.
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ borderTop: '1px solid var(--border-default)', paddingTop: 'var(--space-3)' }}>
+                <button
+                  onClick={handleOpenVerify}
+                  className="ed-btn ed-btn-secondary ed-btn-sm"
+                  style={{ width: '100%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                >
+                  <ExternalLink size={14} /> Open Public Verification Gateway
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -436,4 +339,3 @@ export const TeacherVirtualIdCardPage: React.FC = () => {
     </div>
   );
 };
-

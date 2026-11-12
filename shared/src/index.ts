@@ -332,12 +332,17 @@ export type AdmissionReviewDTO = z.infer<typeof AdmissionReviewSchema>;
 export interface PublicIdCardVerificationResponse {
   isValid: boolean;
   status: CardStatusType;
-  holderType: 'STUDENT' | 'STAFF';
+  holderType: 'STUDENT' | 'TEACHER' | 'STAFF';
   holderName: string;
   identifierNumber: string; // e.g. ADM-2026-0042 or EMP-2026-0012
   schoolName: string;
   schoolCode: string;
   academicSession: string;
+  className?: string | null;
+  sectionName?: string | null;
+  designation?: string | null;
+  department?: string | null;
+  avatarUrl?: string | null;
   issuedAt: string;
   expiresAt: string | null;
   revokedAt?: string | null;

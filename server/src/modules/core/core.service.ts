@@ -1295,11 +1295,16 @@ export class CoreSchoolService {
         student: {
           include: {
             membership: { include: { user: true, school: true } },
+            enrollments: {
+              include: { class: true, section: true, academicSession: true },
+              take: 1,
+            },
           },
         },
         staff: {
           include: {
             membership: { include: { user: true, school: true } },
+            department: true,
           },
         },
       },
@@ -1311,33 +1316,61 @@ export class CoreSchoolService {
 
     let holderName = 'Institutional Member';
     let identifierNumber = 'ID-XXXX';
-    let holderType = 'STUDENT';
+    let holderType: 'STUDENT' | 'TEACHER' | 'STAFF' = 'STUDENT';
     let schoolName = 'Apex Academy of Sciences & Arts';
     let schoolCode = 'APEX-2026';
+    let className: string | null = null;
+    let sectionName: string | null = null;
+    let designation: string | null = null;
+    let department: string | null = null;
+    let avatarUrl: string | null = null;
+    let academicSession = '2026–2027';
 
     if (card.student) {
       holderType = 'STUDENT';
-      holderName = `${card.student.membership.user.firstName} ${card.student.membership.user.lastName}`;
+      const u = card.student.membership.user;
+      holderName = `${u.firstName} ${u.lastName}`.trim();
       identifierNumber = card.student.admissionNumber;
       schoolName = card.student.membership.school.name;
       schoolCode = card.student.membership.school.code;
+      const enrollment = card.student.enrollments?.[0];
+      className = enrollment?.class?.name || null;
+      sectionName = enrollment?.section?.name || null;
+      if (enrollment?.academicSession?.name) {
+        academicSession = enrollment.academicSession.name;
+      }
+      avatarUrl = card.student.photoUrl || u.avatarUrl || null;
     } else if (card.staff) {
-      holderType = 'STAFF';
-      holderName = `${card.staff.membership.user.firstName} ${card.staff.membership.user.lastName}`;
+      holderType = card.staff.membership.role === PlatformRole.TEACHER ? 'TEACHER' : 'STAFF';
+      const u = card.staff.membership.user;
+      holderName = `${u.firstName} ${u.lastName}`.trim();
       identifierNumber = card.staff.employeeId;
+      designation = card.staff.designation || null;
+      department = card.staff.department?.name || 'Faculty';
       schoolName = card.staff.membership.school.name;
       schoolCode = card.staff.membership.school.code;
+      avatarUrl = card.staff.photoUrl || u.avatarUrl || null;
     }
 
+    const isExpired = Boolean(card.expiresAt && new Date() > card.expiresAt);
+    const isRevoked = card.status === CardStatus.REVOKED;
+    const computedStatus = isRevoked ? CardStatus.REVOKED : isExpired ? CardStatus.EXPIRED : card.status;
+    const isValid = computedStatus === CardStatus.ACTIVE;
+
     return {
-      isValid: card.status === CardStatus.ACTIVE,
-      status: card.status as any,
-      holderType: holderType as any,
+      isValid,
+      status: computedStatus as any,
+      holderType,
       holderName,
       identifierNumber,
       schoolName,
       schoolCode,
-      academicSession: '2026–2027',
+      academicSession,
+      className,
+      sectionName,
+      designation,
+      department,
+      avatarUrl,
       issuedAt: card.issuedAt.toISOString(),
       expiresAt: card.expiresAt?.toISOString() || null,
       revokedAt: card.revokedAt?.toISOString() || null,

@@ -1,4 +1,5 @@
 import { jsPDF } from 'jspdf';
+import QRCode from 'qrcode';
 
 export interface IdCardRenderData {
   holderType: 'STUDENT' | 'TEACHER' | 'STAFF';
@@ -12,6 +13,7 @@ export interface IdCardRenderData {
   address?: string | null;
   academicSession?: string | null;
   avatarUrl?: string | null;
+  qrDataUrl?: string | null;
   cardNumber: string;
   verificationToken: string;
   status: string;
@@ -23,8 +25,8 @@ export interface IdCardRenderData {
 }
 
 export interface IdCardTemplateSettings {
-  primaryColor?: string; // Header & accent
-  secondaryColor?: string; // Gold or sub-accent
+  primaryColor?: string; // Header & accent (Default: #123c2e Forest Green)
+  secondaryColor?: string; // Sub-accent (Default: #c59b27 Muted Gold)
   headerTextColor?: string;
   cardOrientation?: 'LANDSCAPE' | 'PORTRAIT';
   showBloodGroup?: boolean;
@@ -48,18 +50,18 @@ export function drawCardFront(
 ) {
   const w = 85.6;
   const h = 53.98;
-  const primaryColor = template.primaryColor || '#1e3a8a';
-  const secondaryColor = template.secondaryColor || '#d97706';
-  const schoolName = (data.schoolName || 'Apex Academy of Excellence').toUpperCase();
+  const primaryColor = template.primaryColor || '#123c2e'; // EduNexa Forest Green
+  const secondaryColor = template.secondaryColor || '#c59b27'; // Institutional Muted Gold
+  const schoolName = (data.schoolName || 'APEX ACADEMY OF SCIENCES & ARTS').toUpperCase();
   const isStudent = data.holderType === 'STUDENT';
 
-  // Card Outer Rounded Box & Shadow
+  // Card Outer Rounded Box & Crisp Border
   doc.setDrawColor(203, 213, 225);
   doc.setLineWidth(0.3);
   doc.setFillColor(255, 255, 255);
   doc.roundedRect(x, y, w, h, 2, 2, 'FD');
 
-  // Header Banner
+  // Header Banner (Deep Forest Green)
   doc.setFillColor(primaryColor);
   doc.roundedRect(x, y, w, 11, 2, 2, 'F');
   doc.rect(x, y + 8, w, 3, 'F'); // square bottom edges of header
@@ -68,32 +70,36 @@ export function drawCardFront(
   doc.setFillColor(secondaryColor);
   doc.rect(x, y + 11, w, 0.8, 'F');
 
-  // Header text
+  // Header School Official Name
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(7.5);
   doc.text(schoolName, x + w / 2, y + 5.5, { align: 'center' });
 
+  // Subtitle (Credential Role & Session)
   doc.setFontSize(5);
   doc.setFont('helvetica', 'normal');
-  const roleSub = isStudent ? 'STUDENT IDENTITY CREDENTIAL' : `${data.holderType} IDENTITY CREDENTIAL`;
+  const roleSub = isStudent
+    ? `OFFICIAL STUDENT IDENTITY CREDENTIAL • ${data.academicSession || '2026–2027'}`
+    : `OFFICIAL FACULTY IDENTITY CREDENTIAL • ${data.academicSession || '2026–2027'}`;
   doc.text(roleSub, x + w / 2, y + 9, { align: 'center' });
 
-  // Photo Box (Left)
-  const photoX = x + 5;
+  // Photo Box (Left) - Standard 3:4 Passport Aspect Ratio
+  const photoX = x + 4.5;
   const photoY = y + 14.5;
-  const photoW = 20;
+  const photoW = 19.5;
   const photoH = 26;
 
   doc.setFillColor(241, 245, 249);
-  doc.setDrawColor(primaryColor);
+  doc.setDrawColor(18, 60, 46);
   doc.setLineWidth(0.4);
   doc.roundedRect(photoX, photoY, photoW, photoH, 1, 1, 'FD');
 
   let imageDrawn = false;
   if (data.avatarUrl) {
     try {
-      doc.addImage(data.avatarUrl, 'JPEG', photoX + 0.3, photoY + 0.3, photoW - 0.6, photoH - 0.6);
+      const format = data.avatarUrl.includes('image/png') ? 'PNG' : 'JPEG';
+      doc.addImage(data.avatarUrl, format, photoX + 0.3, photoY + 0.3, photoW - 0.6, photoH - 0.6);
       imageDrawn = true;
     } catch {
       imageDrawn = false;
@@ -101,39 +107,39 @@ export function drawCardFront(
   }
 
   if (!imageDrawn) {
-    // Silhouette / Initials
-    doc.setTextColor(primaryColor);
+    // Silhouette / Initials placeholder
+    doc.setTextColor(18, 60, 46);
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(14);
+    doc.setFontSize(13);
     const initials = data.fullName
       .split(/\s+/)
       .slice(0, 2)
       .map((p) => p.charAt(0))
       .join('');
-    doc.text(initials || 'ID', photoX + photoW / 2, photoY + 14, { align: 'center' });
+    doc.text(initials || (isStudent ? 'S' : 'F'), photoX + photoW / 2, photoY + 14, { align: 'center' });
 
     doc.setFontSize(3.8);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(100, 116, 139);
-    doc.text('PHOTO PENDING', photoX + photoW / 2, photoY + 22, { align: 'center' });
+    doc.text(isStudent ? 'STUDENT' : 'FACULTY', photoX + photoW / 2, photoY + 22, { align: 'center' });
   }
 
   // Right Side Data
-  const textX = x + 28;
+  const textX = x + 26.5;
   let curY = y + 16.5;
 
   // Name
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
+  doc.setFontSize(8.2);
   doc.setTextColor(15, 23, 42);
-  const truncatedName = doc.splitTextToSize(data.fullName, 54);
+  const truncatedName = doc.splitTextToSize(data.fullName, 42);
   doc.text(truncatedName[0] || data.fullName, textX, curY);
   curY += 4.5;
 
-  // Key / SubDetail
+  // Key / SubDetail (Class or Designation in Forest Green)
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(6.5);
-  doc.setTextColor(primaryColor);
+  doc.setTextColor(18, 60, 46);
   doc.text(data.subDetail, textX, curY);
   curY += 4;
 
@@ -165,34 +171,44 @@ export function drawCardFront(
   // Status Badge Pill
   const isActive = data.status === 'ACTIVE';
   doc.setFillColor(isActive ? 220 : 254, isActive ? 252 : 226, isActive ? 231 : 226);
-  doc.roundedRect(textX, curY, 24, 4, 1, 1, 'F');
+  doc.roundedRect(textX, curY, 25, 3.8, 0.8, 0.8, 'F');
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(4.8);
+  doc.setFontSize(4.6);
   doc.setTextColor(isActive ? 22 : 185, isActive ? 101 : 28, isActive ? 52 : 28);
-  doc.text(isActive ? '● VERIFIED ACTIVE' : `● ${data.status}`, textX + 12, curY + 2.8, { align: 'center' });
+  doc.text(isActive ? '● ACTIVE ENROLLED' : `● ${data.status}`, textX + 12.5, curY + 2.7, { align: 'center' });
 
-  // QR Block (Bottom Right)
-  const qrX = x + w - 17;
-  const qrY = y + h - 17;
+  // Dynamic QR Code Block (Bottom Right)
+  const qrX = x + w - 17.5;
+  const qrY = y + h - 18.5;
+  const qrSize = 13.5;
+
   doc.setDrawColor(203, 213, 225);
   doc.setLineWidth(0.3);
-  doc.setFillColor(248, 250, 252);
-  doc.rect(qrX, qrY, 13, 13, 'FD');
+  doc.setFillColor(255, 255, 255);
+  doc.roundedRect(qrX, qrY, qrSize, qrSize, 0.8, 0.8, 'FD');
 
-  // Simulated QR graphic pattern
-  doc.setFillColor(15, 23, 42);
-  doc.rect(qrX + 1.5, qrY + 1.5, 3.5, 3.5, 'F');
-  doc.rect(qrX + 8, qrY + 1.5, 3.5, 3.5, 'F');
-  doc.rect(qrX + 1.5, qrY + 8, 3.5, 3.5, 'F');
-  doc.rect(qrX + 6, qrY + 6, 2, 2, 'F');
-  doc.rect(qrX + 9, qrY + 9, 2.5, 2.5, 'F');
+  if (data.qrDataUrl) {
+    try {
+      doc.addImage(data.qrDataUrl, 'PNG', qrX + 0.5, qrY + 0.5, qrSize - 1, qrSize - 1);
+    } catch {
+      // Fallback border
+    }
+  }
+
+  // QR label
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(3.8);
+  doc.setTextColor(18, 60, 46);
+  doc.text('SCAN TO VERIFY', qrX + qrSize / 2, qrY + qrSize + 2.5, { align: 'center' });
 
   // Footer Serial / Card Number
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(4.5);
-  doc.setTextColor(148, 163, 184);
-  doc.text(`CARD NO: ${data.cardNumber}`, x + 5, y + h - 2.5);
-  doc.text(`SCAN QR TO VERIFY CREDENTIAL`, qrX - 1, y + h - 2.5, { align: 'right' });
+  doc.setTextColor(100, 116, 139);
+  doc.text(`CARD NO: ${data.cardNumber}`, x + 4.5, y + h - 2.5);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(18, 60, 46);
+  doc.text(`ISO CR80 TAMPER-PROOF`, x + 38, y + h - 2.5);
 }
 
 /**
@@ -207,11 +223,11 @@ export function drawCardBack(
 ) {
   const w = 85.6;
   const h = 53.98;
-  const primaryColor = template.primaryColor || '#1e3a8a';
-  const schoolName = data.schoolName || 'Apex Academy of Excellence';
-  const schoolAddress = data.schoolAddress || 'Plot 42, Knowledge Park III, Silicon Valley, Bengaluru 560100';
-  const schoolPhone = data.schoolPhone || '+91 80 4968 2000';
-  const schoolEmail = data.schoolEmail || 'office@apexacademy.edu';
+  const primaryColor = template.primaryColor || '#123c2e';
+  const schoolName = (data.schoolName || 'APEX ACADEMY OF SCIENCES & ARTS').toUpperCase();
+  const schoolAddress = data.schoolAddress || 'Plot 42, Knowledge Park III, Institutional Area';
+  const schoolPhone = data.schoolPhone || '+91 11 2659 1000';
+  const schoolEmail = data.schoolEmail || 'admin@apexacademy.edu';
   const isStudent = data.holderType === 'STUDENT';
 
   // Card Outer Rounded Box
@@ -220,7 +236,7 @@ export function drawCardBack(
   doc.setFillColor(255, 255, 255);
   doc.roundedRect(x, y, w, h, 2, 2, 'FD');
 
-  // Top Accent Strip
+  // Top Forest Green Accent Strip
   doc.setFillColor(primaryColor);
   doc.rect(x, y, w, 2.5, 'F');
 
@@ -228,17 +244,22 @@ export function drawCardBack(
 
   // Title
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(6);
-  doc.setTextColor(primaryColor);
-  doc.text('INSTITUTIONAL CONTACT & VERIFICATION RECORD', x + w / 2, curY, { align: 'center' });
-  curY += 4;
+  doc.setFontSize(6.2);
+  doc.setTextColor(18, 60, 46);
+  doc.text(
+    isStudent ? 'STUDENT VERIFICATION & INSTITUTIONAL RECORD' : 'FACULTY VERIFICATION & INSTITUTIONAL RECORD',
+    x + w / 2,
+    curY,
+    { align: 'center' }
+  );
+  curY += 4.5;
 
   // Contact Grid
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(5);
+  doc.setFontSize(5.2);
   doc.setTextColor(51, 65, 85);
   doc.text(`Campus: ${schoolAddress}`, x + 5, curY);
-  curY += 3;
+  curY += 3.2;
   doc.text(`Telephone: ${schoolPhone} | Email: ${schoolEmail}`, x + 5, curY);
   curY += 3.5;
 
@@ -246,57 +267,66 @@ export function drawCardBack(
   if (template.showEmergencyPhone !== false && data.emergencyPhone) {
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(185, 28, 28); // Alert red
-    const phoneLabel = isStudent ? 'Parent / Emergency Contact:' : 'Emergency Contact:';
+    const phoneLabel = isStudent ? 'Emergency / Parent Contact:' : 'Emergency Contact:';
     doc.text(`${phoneLabel} ${data.emergencyPhone}`, x + 5, curY);
-    curY += 3.5;
+    curY += 3.8;
   }
 
-  if (isStudent && data.dateOfBirth) {
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(51, 65, 85);
-    doc.text(`Date of Birth: ${data.dateOfBirth}`, x + 5, curY);
-    curY += 3.5;
-  }
+  // Terms and Conditions text box
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(226, 232, 240);
+  doc.setLineWidth(0.2);
+  doc.roundedRect(x + 5, curY, w - 10, 11, 1, 1, 'FD');
 
-  // Terms and Conditions text
-  const terms =
-    template.customTermsText ||
-    'This credential is non-transferable and remains institutional property. If found, return to school office or call security helpline. Verification: apexacademy.edu/verify-id';
   doc.setFontSize(4);
-  doc.setTextColor(100, 116, 139);
-  const splitTerms = doc.splitTextToSize(terms, w - 10);
-  doc.text(splitTerms, x + 5, curY);
-  curY += splitTerms.length * 2.2 + 2;
+  doc.setTextColor(71, 85, 105);
+  doc.setFont('helvetica', 'normal');
+  doc.text('• This smart credential is institutional property and must be carried on campus premises.', x + 6.5, curY + 3);
+  doc.text('• Required for campus access, library circulation, and official examinations.', x + 6.5, curY + 6);
+  doc.text('• If lost or found, please surrender immediately to the School Administration Office.', x + 6.5, curY + 9);
+  curY += 13.5;
 
   // Signatures Area
   const sigY = y + h - 11;
 
-  // Seal placeholder box
+  // Official Seal box
   if (template.showSchoolSeal !== false) {
-    doc.setDrawColor(203, 213, 225);
-    doc.setLineWidth(0.2);
-    doc.roundedRect(x + 8, sigY - 1, 14, 8, 1, 1);
-    doc.setFontSize(3.8);
-    doc.setTextColor(148, 163, 184);
-    doc.text('OFFICIAL SEAL', x + 15, sigY + 3.5, { align: 'center' });
+    doc.setDrawColor(197, 155, 39); // Gold
+    doc.setLineWidth(0.3);
+    doc.roundedRect(x + 8, sigY - 1.5, 17, 8.5, 1, 1);
+    doc.setFontSize(3.6);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(18, 60, 46);
+    doc.text('OFFICIAL SEAL', x + 16.5, sigY + 2.5, { align: 'center' });
+    doc.setFontSize(3.0);
+    doc.setTextColor(197, 155, 39);
+    doc.text('EDUNEXA VERIFIED', x + 16.5, sigY + 5.5, { align: 'center' });
   }
 
   // Principal Signature Line
   if (template.showPrincipalSign !== false) {
-    doc.setDrawColor(100, 116, 139);
-    doc.setLineWidth(0.3);
-    doc.line(x + w - 32, sigY + 4, x + w - 6, sigY + 4);
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(4.5);
-    doc.setTextColor(30, 41, 59);
-    doc.text('Principal / Authorized Signatory', x + w - 19, sigY + 7, { align: 'center' });
+    doc.setFontSize(5);
+    doc.setTextColor(18, 60, 46);
+    doc.text('Principal Signature', x + w - 18, sigY + 1.5, { align: 'center' });
+
+    doc.setDrawColor(51, 65, 85);
+    doc.setLineWidth(0.3);
+    doc.line(x + w - 30, sigY + 3.5, x + w - 6, sigY + 3.5);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(4.2);
+    doc.setTextColor(15, 23, 42);
+    doc.text('Principal / Registrar', x + w - 18, sigY + 6.5, { align: 'center' });
   }
 
-  // Bottom token
+  // Bottom token & verification URL
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(3.8);
-  doc.setTextColor(148, 163, 184);
-  doc.text(`Token: ${data.verificationToken}`, x + w / 2, y + h - 1.5, { align: 'center' });
+  doc.setFontSize(4.0);
+  doc.setTextColor(100, 116, 139);
+  doc.text(`Token: ${data.verificationToken}  |  Web: edunexa.up.railway.app/verify-id`, x + w / 2, y + h - 1.8, {
+    align: 'center',
+  });
 }
 
 /**
@@ -349,7 +379,7 @@ export async function resolveImageBase64(url: string): Promise<string | null> {
 }
 
 /**
- * Download Individual ID Card PDF with embedded photograph.
+ * Download Individual ID Card PDF with embedded photograph and dynamic scannable QR code.
  */
 export async function downloadIndividualIdCardPdf(
   data: IdCardRenderData,
@@ -357,10 +387,33 @@ export async function downloadIndividualIdCardPdf(
   fileName?: string
 ): Promise<void> {
   const cloned = { ...data };
+
+  // 1. Resolve avatar image to base64 if provided as a remote or local URL
   if (cloned.avatarUrl && !cloned.avatarUrl.startsWith('data:image')) {
     const b64 = await resolveImageBase64(cloned.avatarUrl);
     if (b64) cloned.avatarUrl = b64;
   }
+
+  // 2. Generate genuine high-resolution scannable QR code dataURL
+  if (!cloned.qrDataUrl && cloned.verificationToken) {
+    try {
+      const verificationUrl =
+        typeof window !== 'undefined'
+          ? `${window.location.origin}/verify-id/${encodeURIComponent(cloned.verificationToken)}`
+          : `https://edunexa.up.railway.app/verify-id/${encodeURIComponent(cloned.verificationToken)}`;
+      cloned.qrDataUrl = await QRCode.toDataURL(verificationUrl, {
+        width: 320,
+        margin: 1,
+        color: {
+          dark: '#0f172a',
+          light: '#ffffff',
+        },
+      });
+    } catch (err) {
+      console.warn('[downloadIndividualIdCardPdf] QR generation notice:', err);
+    }
+  }
+
   const doc = generateIndividualIdCardPdf(cloned, template);
   const cleanId = (cloned.identifier || 'id-card').toLowerCase().replace(/[^a-z0-9_-]/g, '');
   doc.save(fileName || `id-card-${cleanId}.pdf`);
@@ -369,8 +422,6 @@ export async function downloadIndividualIdCardPdf(
 /**
  * Generate Print-Ready Bulk ID Cards PDF on Standard A4 Sheets.
  * Layout: 8 Cards per A4 Sheet (2 columns x 4 rows).
- * Page N: Front sides of cards 1..8
- * Page N+1: Matching Back sides of cards 1..8 (mirrored horizontally for 2-sided duplex printing).
  */
 export function generateBulkIdCardsPdf(
   cards: IdCardRenderData[],
@@ -400,50 +451,25 @@ export function generateBulkIdCardsPdf(
   for (let batchIdx = 0; batchIdx < totalBatches; batchIdx++) {
     const batchCards = cards.slice(batchIdx * CARDS_PER_PAGE, (batchIdx + 1) * CARDS_PER_PAGE);
 
-    if (batchIdx > 0) {
-      doc.addPage('a4', 'portrait');
-    }
-
-    // FRONT SIDES PAGE
-    // Top print header
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7);
-    doc.setTextColor(148, 163, 184);
-    doc.text(
-      `EduNexa Batch Printing — Sheet ${batchIdx + 1} of ${totalBatches} (Front Sides)`,
-      pageWidth / 2,
-      startY - 5,
-      { align: 'center' }
-    );
+    // Front Sides
+    if (batchIdx > 0) doc.addPage('a4', 'portrait');
 
     batchCards.forEach((c, idx) => {
       const col = idx % 2;
       const row = Math.floor(idx / 2);
-      const posX = startX + col * (cardW + colGap);
-      const posY = startY + row * (cardH + rowGap);
-      drawCardFront(doc, posX, posY, c, template);
+      const x = startX + col * (cardW + colGap);
+      const y = startY + row * (cardH + rowGap);
+      drawCardFront(doc, x, y, c, template);
     });
 
-    // BACK SIDES PAGE (Duplex Mirrored)
+    // Back Sides (Mirrored Horizontally for 2-sided duplex printing)
     doc.addPage('a4', 'portrait');
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7);
-    doc.setTextColor(148, 163, 184);
-    doc.text(
-      `EduNexa Batch Printing — Sheet ${batchIdx + 1} of ${totalBatches} (Back Sides - Duplex Mirrored)`,
-      pageWidth / 2,
-      startY - 5,
-      { align: 'center' }
-    );
-
     batchCards.forEach((c, idx) => {
-      const col = idx % 2;
+      const col = 1 - (idx % 2); // Mirrored column
       const row = Math.floor(idx / 2);
-      // For horizontal duplex alignment on flip, col 0 matches col 1 on reverse side
-      const mirroredCol = col === 0 ? 1 : 0;
-      const posX = startX + mirroredCol * (cardW + colGap);
-      const posY = startY + row * (cardH + rowGap);
-      drawCardBack(doc, posX, posY, c, template);
+      const x = startX + col * (cardW + colGap);
+      const y = startY + row * (cardH + rowGap);
+      drawCardBack(doc, x, y, c, template);
     });
   }
 
@@ -451,23 +477,40 @@ export function generateBulkIdCardsPdf(
 }
 
 /**
- * Download Bulk ID Cards PDF with resolved photos.
+ * Download Bulk ID Cards PDF.
  */
 export async function downloadBulkIdCardsPdf(
   cards: IdCardRenderData[],
   template: IdCardTemplateSettings = {},
   fileName = 'edunexa-id-cards-batch.pdf'
 ): Promise<void> {
-  const resolvedCards = await Promise.all(
+  const preparedCards = await Promise.all(
     cards.map(async (c) => {
       const cloned = { ...c };
       if (cloned.avatarUrl && !cloned.avatarUrl.startsWith('data:image')) {
         const b64 = await resolveImageBase64(cloned.avatarUrl);
         if (b64) cloned.avatarUrl = b64;
       }
+      if (!cloned.qrDataUrl && cloned.verificationToken) {
+        try {
+          const verificationUrl =
+            typeof window !== 'undefined'
+              ? `${window.location.origin}/verify-id/${encodeURIComponent(cloned.verificationToken)}`
+              : `https://edunexa.up.railway.app/verify-id/${encodeURIComponent(cloned.verificationToken)}`;
+          cloned.qrDataUrl = await QRCode.toDataURL(verificationUrl, {
+            width: 240,
+            margin: 1,
+            color: { dark: '#0f172a', light: '#ffffff' },
+          });
+        } catch {
+          // fallback
+        }
+      }
       return cloned;
     })
   );
-  const doc = generateBulkIdCardsPdf(resolvedCards, template);
+
+  const doc = generateBulkIdCardsPdf(preparedCards, template);
   doc.save(fileName);
 }
+

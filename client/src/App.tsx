@@ -166,6 +166,8 @@ export const App: React.FC = () => {
         />
         <Route path="/verify-id" element={<PublicIdCardVerification />} />
         <Route path="/verify-id/:token" element={<PublicIdCardVerification />} />
+        <Route path="/verify/id-card/:token" element={<PublicIdCardVerification />} />
+        <Route path="/verify/id/:token" element={<PublicIdCardVerification />} />
         <Route path="/verify-admit-card" element={<PublicAdmitCardVerification />} />
         <Route path="/verify-admit-card/:token" element={<PublicAdmitCardVerification />} />
         <Route path="/verify-marksheet" element={<PublicMarksheetVerification />} />
