@@ -201,7 +201,7 @@ export const AdmitCardManagementPage: React.FC = () => {
     }
   };
 
-  const handleBulkDownload = () => {
+  const handleBulkDownload = async () => {
     if (bulk.selectedCount === 0) return;
     const selectedCards = cards.filter((c) => bulk.isSelected(c.id));
     if (selectedCards.length === 0) return;
@@ -212,8 +212,8 @@ export const AdmitCardManagementPage: React.FC = () => {
       examTitle: c.examTitle,
       examType: c.examType,
       sessionName: c.academicSession?.name || 'Academic Session 2026-2027',
-      studentName: `${c.studentProfile?.user?.firstName || ''} ${c.studentProfile?.user?.lastName || ''}`.trim() || 'Candidate',
-      admissionNumber: c.studentProfile?.admissionNumber || 'ADM-0000',
+      studentName: `${c.studentProfile?.user?.firstName || ''} ${c.studentProfile?.user?.lastName || ''}`.trim() || c.fullName || 'Candidate',
+      admissionNumber: c.studentProfile?.admissionNumber || c.admissionNumber || 'ADM-0000',
       rollNumber: c.rollNumber || c.studentProfile?.rollNumber || '00',
       className: c.className || c.studentProfile?.class?.name || 'Grade 10',
       sectionName: c.sectionName || c.studentProfile?.section?.name || 'Section A',
@@ -228,25 +228,27 @@ export const AdmitCardManagementPage: React.FC = () => {
       schoolAddress: branding.address,
       schoolPhone: branding.contactPhone,
       schoolEmail: branding.contactEmail,
+      logoUrl: branding.logoUrl || null,
+      studentPhotoUrl: c.studentProfile?.user?.avatarUrl || c.studentProfile?.avatarUrl || c.studentProfile?.photoUrl || c.avatarUrl || null,
       timetable: Array.isArray(c.timetable) ? c.timetable : [],
     }));
 
-    downloadBulkAdmitCardsPdf(pdfDataList, `AdmitCards_Batch_${new Date().toISOString().slice(0, 10)}.pdf`);
+    await downloadBulkAdmitCardsPdf(pdfDataList, `AdmitCards_Batch_${new Date().toISOString().slice(0, 10)}.pdf`);
     setFeedbackMsg({
       type: 'success',
       text: `Generated multi-page printable A4 PDF for ${selectedCards.length} candidates.`,
     });
   };
 
-  const handleSingleDownload = (c: any) => {
+  const handleSingleDownload = async (c: any) => {
     const pdfData: AdmitCardPdfData = {
       id: c.id,
       admitCardNumber: c.admitCardNumber,
       examTitle: c.examTitle,
       examType: c.examType,
       sessionName: c.academicSession?.name || 'Academic Session 2026-2027',
-      studentName: `${c.studentProfile?.user?.firstName || ''} ${c.studentProfile?.user?.lastName || ''}`.trim() || 'Candidate',
-      admissionNumber: c.studentProfile?.admissionNumber || 'ADM-0000',
+      studentName: `${c.studentProfile?.user?.firstName || ''} ${c.studentProfile?.user?.lastName || ''}`.trim() || c.fullName || 'Candidate',
+      admissionNumber: c.studentProfile?.admissionNumber || c.admissionNumber || 'ADM-0000',
       rollNumber: c.rollNumber || c.studentProfile?.rollNumber || '00',
       className: c.className || c.studentProfile?.class?.name || 'Grade 10',
       sectionName: c.sectionName || c.studentProfile?.section?.name || 'Section A',
@@ -261,9 +263,11 @@ export const AdmitCardManagementPage: React.FC = () => {
       schoolAddress: branding.address,
       schoolPhone: branding.contactPhone,
       schoolEmail: branding.contactEmail,
+      logoUrl: branding.logoUrl || null,
+      studentPhotoUrl: c.studentProfile?.user?.avatarUrl || c.studentProfile?.avatarUrl || c.studentProfile?.photoUrl || c.avatarUrl || null,
       timetable: Array.isArray(c.timetable) ? c.timetable : [],
     };
-    downloadIndividualAdmitCardPdf(pdfData, `AdmitCard_${c.admitCardNumber}.pdf`);
+    await downloadIndividualAdmitCardPdf(pdfData, `AdmitCard_${c.admitCardNumber}.pdf`);
   };
 
   // Launch Bulk Generation

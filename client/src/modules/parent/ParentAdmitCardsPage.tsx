@@ -104,15 +104,15 @@ export const ParentAdmitCardsPage: React.FC = () => {
     }
   };
 
-  const handleDownload = (c: any) => {
+  const handleDownload = async (c: any) => {
     const pdfData: AdmitCardPdfData = {
       id: c.id,
       admitCardNumber: c.admitCardNumber,
       examTitle: c.examTitle,
       examType: c.examType,
-      sessionName: c.academicSession?.name || 'Academic Session 2026-2027',
-      studentName: `${c.studentProfile?.user?.firstName || ''} ${c.studentProfile?.user?.lastName || ''}`.trim() || currentChild?.name || 'Candidate',
-      admissionNumber: c.studentProfile?.admissionNumber || currentChild?.admissionNumber || 'ADM-0000',
+      sessionName: c.academicSession?.name || c.sessionName || 'Academic Session 2026-2027',
+      studentName: `${c.studentProfile?.user?.firstName || ''} ${c.studentProfile?.user?.lastName || ''}`.trim() || c.studentName || currentChild?.name || 'Candidate',
+      admissionNumber: c.studentProfile?.admissionNumber || c.admissionNumber || currentChild?.admissionNumber || 'ADM-0000',
       rollNumber: c.rollNumber || String(currentChild?.rollNumber || '00'),
       className: c.className || currentChild?.className || 'Grade 10',
       sectionName: c.sectionName || currentChild?.sectionName || 'Section A',
@@ -127,9 +127,11 @@ export const ParentAdmitCardsPage: React.FC = () => {
       schoolAddress: branding.address,
       schoolPhone: branding.contactPhone,
       schoolEmail: branding.contactEmail,
+      logoUrl: branding.logoUrl || null,
+      studentPhotoUrl: c.studentProfile?.user?.avatarUrl || c.studentProfile?.avatarUrl || c.studentProfile?.photoUrl || c.avatarUrl || null,
       timetable: Array.isArray(c.timetable) ? c.timetable : [],
     };
-    downloadIndividualAdmitCardPdf(pdfData, `AdmitCard_${c.admitCardNumber}.pdf`);
+    await downloadIndividualAdmitCardPdf(pdfData, `AdmitCard_${c.admitCardNumber}.pdf`);
   };
 
   return (

@@ -316,7 +316,9 @@ export class AdmitCardsService {
         studentProfile: {
           ...ac.student,
           user: u,
+          avatarUrl: u?.avatarUrl || ac.student?.photoUrl || null,
         },
+        avatarUrl: u?.avatarUrl || ac.student?.photoUrl || null,
         id: ac.id,
         admitCardNumber: ac.admitCardNumber,
         examTitle: ac.examTitle,
@@ -736,6 +738,12 @@ export class AdmitCardsService {
           roomNumber: c.roomNumber,
           candidateInstructions: c.candidateInstructions,
           qrToken: c.qrToken,
+          avatarUrl: u.avatarUrl || student.photoUrl || null,
+          studentProfile: {
+            ...student,
+            user: u,
+            avatarUrl: u.avatarUrl || student.photoUrl || null,
+          },
           status: c.status,
           publishedAt: c.publishedAt?.toISOString(),
           school: {
@@ -835,6 +843,12 @@ export class AdmitCardsService {
           roomNumber: c.roomNumber,
           candidateInstructions: c.candidateInstructions,
           qrToken: c.qrToken,
+          avatarUrl: u.avatarUrl || student.photoUrl || null,
+          studentProfile: {
+            ...student,
+            user: u,
+            avatarUrl: u.avatarUrl || student.photoUrl || null,
+          },
           status: c.status,
           publishedAt: c.publishedAt?.toISOString(),
           school: {

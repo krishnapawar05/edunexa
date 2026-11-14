@@ -663,3 +663,4 @@ export const VirtualIdCardView: React.FC<VirtualIdCardViewProps> = ({
     </div>
   );
 };
+
