@@ -204,7 +204,8 @@ router.get(
     PlatformRole.SCHOOL_ADMIN,
     PlatformRole.PRINCIPAL,
     PlatformRole.HR_STAFF,
-    PlatformRole.SUPER_ADMIN
+    PlatformRole.SUPER_ADMIN,
+    PlatformRole.TEACHER
   ),
   (req, res, next) => {
     coreSchoolController.listStaff(req, res, next);

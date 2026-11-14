@@ -890,10 +890,12 @@ export class PortalsService {
 
       // Teacher can see:
       // 1. Meetings hosted by the teacher
-      // 2. Meetings for students in the teacher's assigned classes/sections
-      // 3. Staff internal meetings for the school
+      // 2. Meetings where the teacher is an invited participant / target user
+      // 3. Meetings for students in the teacher's assigned classes/sections
+      // 4. Staff internal meetings for the school
       const orClauses: any[] = [
         { hostUserId: userId },
+        { guardianUserId: userId },
         { meetingType: 'STAFF_INTERNAL' },
       ];
       if (assignedStudentProfileIds.length > 0) {
@@ -944,6 +946,11 @@ export class PortalsService {
         email: true,
         phone: true,
         avatarUrl: true,
+        memberships: {
+          where: { schoolId },
+          select: { role: true },
+          take: 1,
+        },
       },
     });
     const userMap = new Map(users.map((u) => [u.id, u]));
@@ -972,10 +979,16 @@ export class PortalsService {
         updatedAt: m.updatedAt,
         hostUserId: m.hostUserId,
         guardianUserId: m.guardianUserId,
+        participantUserId: m.guardianUserId,
+        participantName: guardian ? `${guardian.firstName} ${guardian.lastName}`.trim() : undefined,
+        participantEmail: guardian?.email,
+        participantPhone: guardian?.phone,
+        participantRole: guardian?.memberships?.[0]?.role || undefined,
         studentProfileId: m.studentProfileId,
         hostName: host ? `${host.firstName} ${host.lastName}`.trim() : 'Faculty Host',
         hostEmail: host?.email,
         hostAvatar: host?.avatarUrl,
+        hostRole: host?.memberships?.[0]?.role || undefined,
         hostUser: host
           ? {
               id: host.id,
@@ -1010,7 +1023,7 @@ export class PortalsService {
     const userRole = dataParam !== undefined ? userRoleOrData : PlatformRole.SCHOOL_ADMIN;
     const data = dataParam !== undefined ? dataParam : userRoleOrData;
 
-    let guardianUserId = data.guardianUserId || null;
+    let guardianUserId = data.targetUserId || data.participantUserId || data.guardianUserId || null;
 
     if (data.studentProfileId) {
       const student = await prisma.studentProfile.findFirst({
@@ -1142,9 +1155,10 @@ export class PortalsService {
     // Authorization check for TEACHER role
     if (userRole === PlatformRole.TEACHER) {
       const isHost = meeting.hostUserId === userId;
+      const isParticipant = meeting.guardianUserId === userId;
 
       let isAssignedTeacher = false;
-      if (!isHost && meeting.student?.enrollments?.[0]?.sectionId) {
+      if (!isHost && !isParticipant && meeting.student?.enrollments?.[0]?.sectionId) {
         const staff = await prisma.staffProfile.findFirst({
           where: { membership: { schoolId, userId } },
           include: {
@@ -1159,7 +1173,7 @@ export class PortalsService {
         isAssignedTeacher = assignedSectionIds.includes(meeting.student.enrollments[0].sectionId);
       }
 
-      if (!isHost && !isAssignedTeacher) {
+      if (!isHost && !isParticipant && !isAssignedTeacher) {
         throw new AppError(
           'Access denied. Teachers can only manage or reschedule their own consultations or meetings for their assigned students.',
           403

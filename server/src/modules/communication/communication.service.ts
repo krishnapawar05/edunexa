@@ -883,6 +883,102 @@ export class CommunicationService {
     return `https://meet.google.com/${part1}-${part2}-${part3}`;
   }
 
+  async getMeetingParticipants(schoolId: string, currentUserId?: string) {
+    // 1. Fetch active memberships for Teachers, Principals, and School Admins
+    const memberships = await prisma.userMembership.findMany({
+      where: {
+        schoolId,
+        isActive: true,
+        role: { in: [PlatformRole.TEACHER, PlatformRole.PRINCIPAL, PlatformRole.SCHOOL_ADMIN, PlatformRole.SUPER_ADMIN] },
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true,
+            avatarUrl: true,
+          },
+        },
+        staffProfile: {
+          select: {
+            id: true,
+            employeeId: true,
+            designation: true,
+            department: { select: { id: true, name: true } },
+          },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    const teachers: any[] = [];
+    const principals: any[] = [];
+    const admins: any[] = [];
+
+    for (const m of memberships) {
+      const u = m.user;
+      if (!u) continue;
+      const profile = m.staffProfile;
+      const item = {
+        userId: u.id,
+        name: `${u.firstName} ${u.lastName}`.trim(),
+        fullName: `${u.firstName} ${u.lastName}`.trim(),
+        email: u.email,
+        phone: u.phone,
+        avatarUrl: u.avatarUrl,
+        role: m.role,
+        designation: profile?.designation || (m.role === PlatformRole.PRINCIPAL ? 'Principal & Head of School' : m.role === PlatformRole.SCHOOL_ADMIN ? 'School Administrator' : 'Faculty Teacher'),
+        department: profile?.department?.name || (m.role === PlatformRole.TEACHER ? 'Academic Faculty' : 'Administration & Governance'),
+        employeeCode: profile?.employeeId || undefined,
+        employeeId: profile?.employeeId,
+      };
+
+      if (m.role === PlatformRole.TEACHER) {
+        teachers.push(item);
+      } else if (m.role === PlatformRole.PRINCIPAL) {
+        principals.push(item);
+      } else if (m.role === PlatformRole.SCHOOL_ADMIN || m.role === PlatformRole.SUPER_ADMIN) {
+        admins.push(item);
+      }
+    }
+
+    // 2. Fetch active students in this school for PTM scheduling
+    const students = await prisma.studentProfile.findMany({
+      where: { membership: { schoolId }, status: 'ACTIVE' },
+      include: {
+        membership: { include: { user: { select: { id: true, firstName: true, lastName: true, email: true, phone: true } } } },
+        enrollments: { include: { class: true, section: true }, take: 1, orderBy: { enrolledAt: 'desc' } },
+        parentLinks: { include: { parentMembership: { include: { user: { select: { id: true, firstName: true, lastName: true, email: true, phone: true } } } } }, take: 1 },
+      },
+      take: 100,
+      orderBy: { admissionNumber: 'asc' },
+    });
+
+    const studentList = students.map((s) => ({
+      id: s.id,
+      userId: s.membership.userId,
+      name: `${s.membership.user.firstName} ${s.membership.user.lastName}`.trim(),
+      admissionNumber: s.admissionNumber,
+      className: s.enrollments[0]?.class?.name || 'Class',
+      sectionName: s.enrollments[0]?.section?.name || 'A',
+      rollNumber: s.enrollments[0]?.rollNumber,
+      guardianName: s.parentLinks[0]?.parentMembership?.user
+        ? `${s.parentLinks[0].parentMembership.user.firstName} ${s.parentLinks[0].parentMembership.user.lastName}`.trim()
+        : undefined,
+      guardianUserId: s.parentLinks[0]?.parentMembership?.userId,
+    }));
+
+    return {
+      teachers,
+      principals,
+      admins,
+      students: studentList,
+    };
+  }
+
   async scheduleMeetingWithGoogleMeet(schoolId: string, hostUserId: string, data: any) {
     // 1. Safe Date Parsing (support scheduledDate, startDate, or current timestamp)
     let scheduledDate = new Date();
@@ -923,9 +1019,11 @@ export class CommunicationService {
       meetUrl = data.joiningUrl || (await this.generateGenuineGoogleMeetLink(schoolId, data.title || 'Academic Meeting'));
     }
 
-    // 4. Meeting Type normalization
+    // 4. Meeting Type & Target Participant normalization
     let meetingType = data.meetingType || data.category || 'PARENT_TEACHER';
     if (meetingType === 'PTM') meetingType = 'PARENT_TEACHER';
+
+    const targetUserId = data.targetUserId || data.participantUserId || data.guardianUserId || null;
 
     const meeting = await prisma.meeting.create({
       data: {
@@ -935,7 +1033,7 @@ export class CommunicationService {
         meetingType,
         hostUserId,
         studentProfileId: data.studentProfileId || null,
-        guardianUserId: data.guardianUserId || null,
+        guardianUserId: targetUserId,
         scheduledDate,
         startTime,
         endTime,
@@ -943,7 +1041,7 @@ export class CommunicationService {
         joiningUrl: meetUrl || data.joiningUrl || null,
         locationOrRoom: data.locationOrRoom || (meetUrl ? 'Google Meet Video' : null),
         status: 'SCHEDULED',
-        notes: data.notes || null,
+        notes: data.notes || (data.participantName ? `Participant: ${data.participantName} (${data.participantRole || 'Staff'})` : null),
       },
       include: {
         student: { include: { membership: { include: { user: true } } } },
@@ -960,6 +1058,8 @@ export class CommunicationService {
     const eventEnd = new Date(scheduledDate);
     eventEnd.setHours(endH, endM, 0, 0);
 
+    const targetAudience = data.targetAudience || (meetingType === 'ALL_TEACHERS' ? 'TEACHERS_ONLY' : 'ALL');
+
     await prisma.calendarEvent.create({
       data: {
         schoolId,
@@ -970,7 +1070,7 @@ export class CommunicationService {
         endDate: eventEnd,
         location: meetUrl || meeting.locationOrRoom || 'Google Meet',
         createdById: hostUserId,
-        targetAudience: 'ALL',
+        targetAudience,
       },
     });
 
@@ -983,8 +1083,7 @@ export class CommunicationService {
       recipientUserIds: [meeting.hostUserId, meeting.guardianUserId].filter(Boolean) as string[],
       variables: {
         meetingDate: meeting.scheduledDate.toISOString().split('T')[0],
-        meetingTime: meeting.startTime || '10:00 AM',
-        message: `Parent-Teacher Meeting "${meeting.title}" scheduled. Joining link: ${meeting.joiningUrl || 'On-campus conference'}.`,
+        joiningUrl: meetUrl || '',
       },
     }).catch(() => {});
 

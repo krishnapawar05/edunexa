@@ -804,10 +804,13 @@ export class CoreSchoolService {
 
     const items = staffList.map((s) => ({
       id: s.id,
+      userId: s.membership.user.id,
       schoolId: s.membership.schoolId,
       employeeId: s.employeeId,
       firstName: s.membership.user.firstName,
       lastName: s.membership.user.lastName,
+      fullName: `${s.membership.user.firstName} ${s.membership.user.lastName}`.trim(),
+      role: s.membership.role,
       email: s.membership.user.email,
       departmentName: s.department?.name || 'General',
       designation: s.designation,

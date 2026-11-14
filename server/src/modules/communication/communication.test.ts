@@ -540,4 +540,62 @@ describe('SECTION 9: INTERNAL CHAT, MESSAGING, MEETINGS & CALENDAR TEST SUITE', 
       expect(found).toBeUndefined();
     });
   });
+
+  // ============================================================================
+  // 6. Multi-Role Peer & Cross-Role Meeting Scheduling (Teacher, Principal, Admin)
+  // ============================================================================
+  describe('6. Multi-Role Peer & Cross-Role Meeting Scheduling', () => {
+    it('6.1 Fetch meeting participants directory returns faculty, principals, and admins', async () => {
+      const res = await request(app)
+        .get('/api/v1/communication/meeting-participants')
+        .set('Authorization', `Bearer ${teacherToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toBeDefined();
+      expect(Array.isArray(res.body.data.teachers)).toBe(true);
+      expect(Array.isArray(res.body.data.principals)).toBe(true);
+      expect(Array.isArray(res.body.data.admins)).toBe(true);
+    });
+
+    it('6.2 Teacher schedules a 1-on-1 Google Meet with a specific colleague teacher', async () => {
+      const res = await request(app)
+        .post('/api/v1/communication/meetings/schedule')
+        .set('Authorization', `Bearer ${teacherToken}`)
+        .send({
+          title: 'Physics & Math Cross-Disciplinary Planning',
+          description: 'Joint lesson design for kinematics and calculus',
+          meetingType: 'TEACHER_TO_TEACHER',
+          targetUserId: adminUserId, // pairing colleague
+          scheduledDate: new Date().toISOString(),
+          startTime: '15:00',
+          endTime: '15:45',
+          meetingMode: 'ONLINE',
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.joiningUrl).toMatch(/^https:\/\/meet\.google\.com\//);
+      expect(res.body.data.meetingType).toBe('TEACHER_TO_TEACHER');
+      expect(res.body.data.guardianUserId).toBe(adminUserId);
+    });
+
+    it('6.3 School Admin schedules a meeting with Principal with Google Meet', async () => {
+      const res = await request(app)
+        .post('/api/v1/communication/meetings/schedule')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          title: 'Quarterly Academic Progress & Staffing Review',
+          meetingType: 'ADMIN_TO_PRINCIPAL',
+          scheduledDate: new Date().toISOString(),
+          startTime: '11:00',
+          endTime: '12:00',
+          meetingMode: 'ONLINE',
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.joiningUrl).toMatch(/^https:\/\/meet\.google\.com\//);
+    });
+  });
 });

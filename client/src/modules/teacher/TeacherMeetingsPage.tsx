@@ -20,7 +20,7 @@ import {
   Trash2,
   Users,
 } from 'lucide-react';
-import { portalsApi, coreApi } from '../../services/api.js';
+import { portalsApi, coreApi, communicationApi, getStoredUser } from '../../services/api.js';
 
 interface StudentOption {
   id: string;
@@ -37,6 +37,12 @@ interface StudentOption {
 export const TeacherMeetingsPage: React.FC = () => {
   const [meetings, setMeetings] = useState<any[]>([]);
   const [students, setStudents] = useState<StudentOption[]>([]);
+  const [participants, setParticipants] = useState<{
+    teachers: Array<{ userId: string; fullName: string; email: string; role: string; employeeCode?: string; department?: string }>;
+    principals: Array<{ userId: string; fullName: string; email: string; role: string }>;
+    admins: Array<{ userId: string; fullName: string; email: string; role: string }>;
+    students: Array<{ studentProfileId: string; userId?: string; fullName: string; admissionNumber?: string }>;
+  }>({ teachers: [], principals: [], admins: [], students: [] });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -48,10 +54,12 @@ export const TeacherMeetingsPage: React.FC = () => {
 
   // Schedule Modal State
   const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [meetingScope, setMeetingScope] = useState<'TEACHER_PEER' | 'ALL_TEACHERS' | 'TEACHER_TO_PRINCIPAL' | 'TEACHER_TO_ADMIN' | 'PTM'>('TEACHER_PEER');
+  const [selectedTargetUserId, setSelectedTargetUserId] = useState('');
   const [selectedStudentId, setSelectedStudentId] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [meetingType, setMeetingType] = useState('PARENT_TEACHER');
+  const [meetingType, setMeetingType] = useState('TEACHER_TO_TEACHER');
   const [meetingMode, setMeetingMode] = useState<'ONLINE' | 'IN_PERSON'>('ONLINE');
   const [scheduledDate, setScheduledDate] = useState(new Date().toISOString().split('T')[0]);
   const [startTime, setStartTime] = useState('14:00');
@@ -80,9 +88,10 @@ export const TeacherMeetingsPage: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      const [meetingsRes, studentsRes] = await Promise.allSettled([
+      const [meetingsRes, studentsRes, participantsRes] = await Promise.allSettled([
         portalsApi.getTeacherMeetings(),
         coreApi.listStudents({ limit: 100 }),
+        communicationApi.getMeetingParticipants(),
       ]);
 
       if (meetingsRes.status === 'fulfilled') {
@@ -106,6 +115,21 @@ export const TeacherMeetingsPage: React.FC = () => {
           guardianName: s.guardianName,
         }));
         setStudents(mapped);
+      }
+
+      if (participantsRes.status === 'fulfilled') {
+        const pData: any = participantsRes.value;
+        if (pData) {
+          setParticipants({
+            teachers: pData.teachers || [],
+            principals: pData.principals || [],
+            admins: pData.admins || [],
+            students: pData.students || [],
+          });
+          if (pData.teachers && pData.teachers.length > 0 && !selectedTargetUserId) {
+            setSelectedTargetUserId(pData.teachers[0].userId);
+          }
+        }
       }
     } catch (err: any) {
       setError(err.message || 'Failed to initialize consultation workspace.');
@@ -131,19 +155,57 @@ export const TeacherMeetingsPage: React.FC = () => {
   };
 
   const handleOpenScheduleModal = () => {
-    setTitle('Parent-Teacher Academic Performance Review');
-    setDescription('Review term assessments, classroom engagement, and recommended study plan.');
-    setMeetingType('PARENT_TEACHER');
+    setTitle('Faculty Peer Academic Collaboration');
+    setDescription('Collaborate on curriculum alignment, student progress reviews, and joint lesson planning.');
+    setMeetingScope('TEACHER_PEER');
+    setMeetingType('TEACHER_TO_TEACHER');
     setMeetingMode('ONLINE');
     setScheduledDate(new Date().toISOString().split('T')[0]);
     setStartTime('14:00');
     setEndTime('14:30');
     setJoiningUrl(generateAutoMeetLink());
     setLocationOrRoom('Room 204, Academic Block');
+    if (participants.teachers.length > 0) {
+      setSelectedTargetUserId(participants.teachers[0].userId);
+    }
     if (students.length > 0 && !selectedStudentId) {
       setSelectedStudentId(students[0].id);
     }
     setShowScheduleModal(true);
+  };
+
+  const handleScopeChange = (scope: 'TEACHER_PEER' | 'ALL_TEACHERS' | 'TEACHER_TO_PRINCIPAL' | 'TEACHER_TO_ADMIN' | 'PTM') => {
+    setMeetingScope(scope);
+    if (scope === 'TEACHER_PEER') {
+      setTitle('Faculty Peer Academic Collaboration');
+      setDescription('Collaborate on curriculum alignment, student progress reviews, and joint lesson planning.');
+      setMeetingType('TEACHER_TO_TEACHER');
+      if (participants.teachers.length > 0) setSelectedTargetUserId(participants.teachers[0].userId);
+      else setSelectedTargetUserId('');
+    } else if (scope === 'TEACHER_TO_PRINCIPAL') {
+      setTitle('Teacher-Principal Academic Briefing');
+      setDescription('Discussion on departmental objectives, examination readiness, and institutional feedback.');
+      setMeetingType('TEACHER_TO_PRINCIPAL');
+      if (participants.principals.length > 0) setSelectedTargetUserId(participants.principals[0].userId);
+      else setSelectedTargetUserId('');
+    } else if (scope === 'TEACHER_TO_ADMIN') {
+      setTitle('Teacher-Admin Resource Coordination');
+      setDescription('Administrative sync on classroom supplies, scheduling logistics, and portal support.');
+      setMeetingType('TEACHER_TO_ADMIN');
+      if (participants.admins.length > 0) setSelectedTargetUserId(participants.admins[0].userId);
+      else setSelectedTargetUserId('');
+    } else if (scope === 'ALL_TEACHERS') {
+      setTitle('Departmental Faculty Assembly');
+      setDescription('Whole department discussion on upcoming curriculum milestones and academic benchmarks.');
+      setMeetingType('STAFF_INTERNAL');
+      setSelectedTargetUserId('');
+    } else if (scope === 'PTM') {
+      setTitle('Parent-Teacher Academic Performance Review');
+      setDescription('Review term assessments, classroom engagement, and recommended study plan.');
+      setMeetingType('PARENT_TEACHER');
+      if (students.length > 0 && !selectedStudentId) setSelectedStudentId(students[0].id);
+      setSelectedTargetUserId('');
+    }
   };
 
   const handleCreateMeeting = async (e: React.FormEvent) => {
@@ -153,12 +215,40 @@ export const TeacherMeetingsPage: React.FC = () => {
     try {
       setSubmitting(true);
       setError(null);
+
+      let targetUserId: string | undefined = undefined;
+      let participantName: string | undefined = undefined;
+      let participantRole: string | undefined = undefined;
+      let studentProfileId: string | undefined = undefined;
+
+      if (meetingScope === 'TEACHER_PEER') {
+        targetUserId = selectedTargetUserId;
+        const targetTeacher = participants.teachers.find((t) => t.userId === selectedTargetUserId);
+        participantName = targetTeacher?.fullName;
+        participantRole = targetTeacher?.role || 'TEACHER';
+      } else if (meetingScope === 'TEACHER_TO_PRINCIPAL') {
+        targetUserId = selectedTargetUserId;
+        const targetPrincipal = participants.principals.find((p) => p.userId === selectedTargetUserId);
+        participantName = targetPrincipal?.fullName;
+        participantRole = targetPrincipal?.role || 'PRINCIPAL';
+      } else if (meetingScope === 'TEACHER_TO_ADMIN') {
+        targetUserId = selectedTargetUserId;
+        const targetAdmin = participants.admins.find((a) => a.userId === selectedTargetUserId);
+        participantName = targetAdmin?.fullName;
+        participantRole = targetAdmin?.role || 'SCHOOL_ADMIN';
+      } else if (meetingScope === 'PTM') {
+        studentProfileId = selectedStudentId || undefined;
+      }
+
       await portalsApi.scheduleMeeting({
         title: title.trim(),
         description: description.trim() || undefined,
         meetingType: meetingType as any,
         meetingMode,
-        studentProfileId: selectedStudentId || undefined,
+        studentProfileId,
+        targetUserId,
+        participantName,
+        participantRole,
         scheduledDate,
         startTime,
         endTime,
@@ -167,7 +257,7 @@ export const TeacherMeetingsPage: React.FC = () => {
       });
 
       setShowScheduleModal(false);
-      showNotification('Parent-teacher consultation scheduled successfully! Google Meet link generated.');
+      showNotification('Meeting scheduled successfully! Google Meet link generated.');
       loadData();
     } catch (err: any) {
       setError(err.message || 'Failed to schedule consultation meeting.');
@@ -266,7 +356,8 @@ export const TeacherMeetingsPage: React.FC = () => {
       const matchTitle = m.title?.toLowerCase().includes(q);
       const matchStudent = m.studentName?.toLowerCase().includes(q) || m.studentAdmissionNumber?.toLowerCase().includes(q);
       const matchGuardian = m.guardianName?.toLowerCase().includes(q);
-      if (!matchTitle && !matchStudent && !matchGuardian) return false;
+      const matchParticipant = m.participantName?.toLowerCase().includes(q) || m.participantEmail?.toLowerCase().includes(q) || m.hostName?.toLowerCase().includes(q);
+      if (!matchTitle && !matchStudent && !matchGuardian && !matchParticipant) return false;
     }
 
     return true;
@@ -424,12 +515,15 @@ export const TeacherMeetingsPage: React.FC = () => {
               className="ed-select"
               style={{ fontSize: '0.82rem', padding: '6px 10px' }}
             >
-              <option value="ALL">All Types</option>
+              <option value="ALL">All Meeting Types</option>
+              <option value="TEACHER_TO_TEACHER">Teacher to Teacher (Peer 1-on-1)</option>
+              <option value="TEACHER_TO_PRINCIPAL">Teacher to Principal</option>
+              <option value="TEACHER_TO_ADMIN">Teacher to Admin</option>
+              <option value="STAFF_INTERNAL">Staff & Faculty Internal</option>
               <option value="PARENT_TEACHER">Parent-Teacher (PTM)</option>
               <option value="ACADEMIC_REVIEW">Academic Review</option>
               <option value="STUDENT_COUNSELING">Student Counseling</option>
               <option value="DISCIPLINARY">Disciplinary</option>
-              <option value="STAFF_INTERNAL">Staff Internal</option>
             </select>
           </div>
         </div>
@@ -545,30 +639,41 @@ export const TeacherMeetingsPage: React.FC = () => {
                         fontSize: '0.82rem',
                       }}
                     >
-                      {/* Student Info */}
+                      {/* Participant / Candidate Details */}
                       <div>
                         <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '2px' }}>
-                          Candidate Student
+                          {m.studentName ? 'Candidate Student' : 'Invited Colleague / Attendee'}
                         </div>
                         <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
-                          {m.studentName || 'Class Student'}
+                          {m.studentName || m.participantName || m.guardianName || 'Staff Participant'}
                         </div>
                         <div style={{ color: 'var(--text-secondary)', fontSize: '0.78rem' }}>
-                          {m.studentClassName ? `${m.studentClassName} (Sec ${m.studentSectionName || 'A'})` : 'Institutional Class'}
-                          {m.studentRollNumber ? ` • Roll #${m.studentRollNumber}` : ''}
+                          {m.studentName ? (
+                            <>
+                              {m.studentClassName ? `${m.studentClassName} (Sec ${m.studentSectionName || 'A'})` : 'Institutional Class'}
+                              {m.studentRollNumber ? ` • Roll #${m.studentRollNumber}` : ''}
+                            </>
+                          ) : (
+                            <>
+                              {m.participantRole ? `${m.participantRole.replace('_', ' ')}` : 'Faculty / Staff'}
+                              {m.participantEmail ? ` • ${m.participantEmail}` : ''}
+                            </>
+                          )}
                         </div>
                       </div>
 
-                      {/* Guardian Info */}
+                      {/* Organizer / Guardian Info */}
                       <div>
                         <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '2px' }}>
-                          Parent / Guardian
+                          {m.studentName ? 'Parent / Guardian' : 'Host / Organizer'}
                         </div>
                         <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
-                          {m.guardianName || 'Authorized Parent'}
+                          {m.studentName ? (m.guardianName || 'Authorized Parent') : (m.hostName || 'Meeting Organizer')}
                         </div>
                         <div style={{ color: 'var(--text-secondary)', fontSize: '0.78rem' }}>
-                          {m.guardianPhone || m.guardianEmail || 'Contact verified on portal'}
+                          {m.studentName
+                            ? (m.guardianPhone || m.guardianEmail || 'Contact verified on portal')
+                            : (m.hostRole ? `${m.hostRole.replace('_', ' ')} • ` : '') + (m.hostEmail || 'Institutional Faculty')}
                         </div>
                       </div>
 
@@ -673,7 +778,7 @@ export const TeacherMeetingsPage: React.FC = () => {
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800 }}>Schedule Parent Consultation</h3>
+              <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800 }}>Schedule Faculty or Parent Consultation</h3>
               <button
                 onClick={() => setShowScheduleModal(false)}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
@@ -683,32 +788,142 @@ export const TeacherMeetingsPage: React.FC = () => {
             </div>
 
             <form onSubmit={handleCreateMeeting} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              {/* Student Picker */}
+              {/* Meeting Scope & Target Audience */}
               <div>
                 <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '4px' }}>
-                  Select Assigned Student *
+                  Collaboration Scope *
                 </label>
                 <select
-                  value={selectedStudentId}
-                  onChange={(e) => setSelectedStudentId(e.target.value)}
+                  value={meetingScope}
+                  onChange={(e) => handleScopeChange(e.target.value as any)}
                   className="ed-select"
-                  style={{ width: '100%' }}
-                  required
+                  style={{ width: '100%', fontWeight: 600 }}
                 >
-                  <option value="">-- Choose Student from Directory --</option>
-                  {students.map((st) => (
-                    <option key={st.id} value={st.id}>
-                      {st.name} {st.className ? `(${st.className})` : ''} {st.rollNumber ? `[Roll #${st.rollNumber}]` : ''}
-                    </option>
-                  ))}
+                  <option value="TEACHER_PEER">Teacher to Specific Teacher (Peer 1-on-1)</option>
+                  <option value="ALL_TEACHERS">All Teachers / Faculty Department Sync</option>
+                  <option value="TEACHER_TO_PRINCIPAL">Teacher to Principal</option>
+                  <option value="TEACHER_TO_ADMIN">Teacher to School Admin</option>
+                  <option value="PTM">Student & Parent Consultation (PTM)</option>
                 </select>
-                {selectedStudentObj && (
-                  <div style={{ marginTop: '6px', fontSize: '0.76rem', color: '#0369a1', backgroundColor: '#f0f9ff', padding: '6px 10px', borderRadius: '4px' }}>
-                    <strong>Associated Guardian:</strong> {selectedStudentObj.guardianName || 'Primary Parent Contact'}{' '}
-                    {selectedStudentObj.parentContact ? `• Phone: ${selectedStudentObj.parentContact}` : ''}
-                  </div>
-                )}
               </div>
+
+              {/* Dynamic Target Selection */}
+              {meetingScope === 'TEACHER_PEER' && (
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                    Select Specific Teacher Colleague *
+                  </label>
+                  <select
+                    value={selectedTargetUserId}
+                    onChange={(e) => setSelectedTargetUserId(e.target.value)}
+                    className="ed-select"
+                    style={{ width: '100%' }}
+                    required
+                  >
+                    {participants.teachers.length === 0 ? (
+                      <option value="">No other faculty members found</option>
+                    ) : (
+                      participants.teachers.map((t) => (
+                        <option key={t.userId} value={t.userId}>
+                          {t.fullName} {t.department ? `[${t.department}]` : ''} — {t.email}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
+              )}
+
+              {meetingScope === 'TEACHER_TO_PRINCIPAL' && (
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                    Select Principal *
+                  </label>
+                  <select
+                    value={selectedTargetUserId}
+                    onChange={(e) => setSelectedTargetUserId(e.target.value)}
+                    className="ed-select"
+                    style={{ width: '100%' }}
+                    required
+                  >
+                    {participants.principals.length === 0 ? (
+                      <option value="">No principal accounts found</option>
+                    ) : (
+                      participants.principals.map((p) => (
+                        <option key={p.userId} value={p.userId}>
+                          {p.fullName} — {p.email}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
+              )}
+
+              {meetingScope === 'TEACHER_TO_ADMIN' && (
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                    Select School Admin *
+                  </label>
+                  <select
+                    value={selectedTargetUserId}
+                    onChange={(e) => setSelectedTargetUserId(e.target.value)}
+                    className="ed-select"
+                    style={{ width: '100%' }}
+                    required
+                  >
+                    {participants.admins.length === 0 ? (
+                      <option value="">No administrator accounts found</option>
+                    ) : (
+                      participants.admins.map((a) => (
+                        <option key={a.userId} value={a.userId}>
+                          {a.fullName} — {a.email}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
+              )}
+
+              {meetingScope === 'ALL_TEACHERS' && (
+                <div
+                  style={{
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    backgroundColor: 'rgba(59, 130, 246, 0.08)',
+                    fontSize: '0.8rem',
+                    color: '#1d4ed8',
+                  }}
+                >
+                  <strong>All Faculty Meeting:</strong> This Google Meet conference will appear on every faculty member's institutional calendar.
+                </div>
+              )}
+
+              {meetingScope === 'PTM' && (
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                    Select Assigned Student *
+                  </label>
+                  <select
+                    value={selectedStudentId}
+                    onChange={(e) => setSelectedStudentId(e.target.value)}
+                    className="ed-select"
+                    style={{ width: '100%' }}
+                    required
+                  >
+                    <option value="">-- Choose Student from Directory --</option>
+                    {students.map((st) => (
+                      <option key={st.id} value={st.id}>
+                        {st.name} {st.className ? `(${st.className})` : ''} {st.rollNumber ? `[Roll #${st.rollNumber}]` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  {selectedStudentObj && (
+                    <div style={{ marginTop: '6px', fontSize: '0.76rem', color: '#0369a1', backgroundColor: '#f0f9ff', padding: '6px 10px', borderRadius: '4px' }}>
+                      <strong>Associated Guardian:</strong> {selectedStudentObj.guardianName || 'Primary Parent Contact'}{' '}
+                      {selectedStudentObj.parentContact ? `• Phone: ${selectedStudentObj.parentContact}` : ''}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Title */}
               <div>
@@ -720,7 +935,7 @@ export const TeacherMeetingsPage: React.FC = () => {
                   required
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="e.g. Mid-Term Academic Progress Review"
+                  placeholder="e.g. Science Dept Peer Sync / Academic Review"
                   className="ed-input"
                   style={{ width: '100%' }}
                 />
@@ -738,10 +953,22 @@ export const TeacherMeetingsPage: React.FC = () => {
                     className="ed-select"
                     style={{ width: '100%' }}
                   >
-                    <option value="PARENT_TEACHER">Parent-Teacher Meeting (PTM)</option>
-                    <option value="ACADEMIC_REVIEW">Academic Progress Review</option>
-                    <option value="STUDENT_COUNSELING">Student Counseling</option>
-                    <option value="DISCIPLINARY">Disciplinary Consultation</option>
+                    {meetingScope === 'PTM' ? (
+                      <>
+                        <option value="PARENT_TEACHER">Parent-Teacher Meeting (PTM)</option>
+                        <option value="ACADEMIC_REVIEW">Academic Progress Review</option>
+                        <option value="STUDENT_COUNSELING">Student Counseling</option>
+                        <option value="DISCIPLINARY">Disciplinary Consultation</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="TEACHER_TO_TEACHER">Teacher to Teacher (Peer 1-on-1)</option>
+                        <option value="TEACHER_TO_PRINCIPAL">Teacher to Principal</option>
+                        <option value="TEACHER_TO_ADMIN">Teacher to School Admin</option>
+                        <option value="STAFF_INTERNAL">Staff Internal</option>
+                        <option value="ACADEMIC_REVIEW">Academic Review</option>
+                      </>
+                    )}
                   </select>
                 </div>
 

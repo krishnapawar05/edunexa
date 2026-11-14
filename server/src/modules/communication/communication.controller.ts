@@ -305,6 +305,21 @@ export class CommunicationController {
     }
   }
 
+  async getMeetingParticipants(req: Request, res: Response, next: NextFunction) {
+    try {
+      let schoolId = req.schoolId || (req.user as any)?.schoolId;
+      if (!schoolId) {
+        const defaultSchool = await prisma.school.findFirst({ select: { id: true } });
+        schoolId = defaultSchool?.id || '';
+      }
+      const currentUserId = (req.user as any)?.id || (req.user as any)?.userId;
+      const data = await communicationService.getMeetingParticipants(schoolId, currentUserId);
+      res.status(200).json({ success: true, data });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   async scheduleMeetingWithGoogleMeet(req: Request, res: Response, next: NextFunction) {
     try {
       let schoolId = req.schoolId || (req.user as any)?.schoolId || req.body?.schoolId;

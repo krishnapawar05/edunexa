@@ -2573,6 +2573,16 @@ export const communicationApi = {
     return res?.data ?? res;
   },
 
+  async getMeetingParticipants(): Promise<{
+    teachers: Array<{ userId: string; fullName: string; email: string; role: string; employeeCode?: string; department?: string }>;
+    principals: Array<{ userId: string; fullName: string; email: string; role: string }>;
+    admins: Array<{ userId: string; fullName: string; email: string; role: string }>;
+    students: Array<{ studentProfileId: string; userId?: string; fullName: string; admissionNumber?: string }>;
+  }> {
+    const res = await apiRequest<any>('/api/v1/communication/meeting-participants');
+    return res?.data ?? res ?? { teachers: [], principals: [], admins: [], students: [] };
+  },
+
   async scheduleMeetingWithGoogleMeet(data: any): Promise<any> {
     const res = await apiRequest<any>('/api/v1/communication/meetings/schedule', {
       method: 'POST',

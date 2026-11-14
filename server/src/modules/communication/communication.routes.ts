@@ -95,6 +95,7 @@ router.post(
   (req, res, next) => communicationController.configureGoogleWorkspace(req, res, next)
 );
 
+router.get('/meeting-participants', (req, res, next) => communicationController.getMeetingParticipants(req, res, next));
 router.post('/meetings/schedule', (req, res, next) => communicationController.scheduleMeetingWithGoogleMeet(req, res, next));
 router.patch('/meetings/:id', (req, res, next) => communicationController.updateMeetingSchedule(req, res, next));
 router.delete('/meetings/:id', (req, res, next) => communicationController.deleteMeetingSchedule(req, res, next));
