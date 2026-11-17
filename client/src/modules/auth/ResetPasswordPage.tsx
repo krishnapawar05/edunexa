@@ -1,9 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, Link, useNavigate } from 'react-router-dom';
-import { Lock, CheckCircle2, AlertCircle, ArrowRight, ShieldCheck, KeyRound } from 'lucide-react';
+import {
+  Lock,
+  CheckCircle2,
+  AlertCircle,
+  ArrowRight,
+  ShieldCheck,
+  KeyRound,
+  Eye,
+  EyeOff,
+  RefreshCw,
+  Sparkles,
+} from 'lucide-react';
 import { useSchoolBranding } from '../../context/SchoolBrandingContext.js';
 import { verifyResetTokenApi, resetPasswordApi } from '../../services/api.js';
-import { ThemeSwitcher } from '../../components/ThemeSwitcher.js';
+import { AuthLayout, AuthHeader, AuthFooter } from './components/index.js';
 
 export const ResetPasswordPage: React.FC = () => {
   const { branding } = useSchoolBranding();
@@ -21,6 +32,8 @@ export const ResetPasswordPage: React.FC = () => {
 
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -93,301 +106,466 @@ export const ResetPasswordPage: React.FC = () => {
     }
   };
 
-  return (
-    <div
-      style={{
-        minHeight: '100vh',
-        backgroundColor: 'var(--bg-app)',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 'var(--space-6)',
-        position: 'relative',
-      }}
-    >
-      <div style={{ position: 'absolute', top: '16px', right: '20px', zIndex: 10 }}>
-        <ThemeSwitcher compact={false} />
-      </div>
+  const leftFeatures = [
+    { icon: KeyRound, label: 'Secure Reset' },
+    { icon: ShieldCheck, label: 'Identity Protection' },
+    { icon: Lock, label: 'Encrypted Passwords' },
+    { icon: Sparkles, label: 'Instant Access' },
+  ];
 
-      <div style={{ width: '100%', maxWidth: '460px' }}>
-        {/* Brand Banner */}
-        <div style={{ textAlign: 'center', marginBottom: 'var(--space-6)' }}>
+  return (
+    <AuthLayout
+      leftHeading="Secure Account Recovery."
+      leftTagline="Reset your password securely to regain immediate access to your institutional portal and academic workspace."
+      leftFeatures={leftFeatures}
+      cardMaxWidth="490px"
+    >
+      <AuthHeader
+        title="Reset Account Password"
+        subtitle="Identity & Access Security Verification"
+        badge="Account Recovery"
+      />
+
+      {verifying ? (
+        <div style={{ textAlign: 'center', padding: '36px 16px' }}>
+          <RefreshCw
+            size={32}
+            className="animate-spin"
+            style={{ color: 'var(--color-primary, #244c3a)', margin: '0 auto 16px auto' }}
+          />
+          <div style={{ fontSize: '0.94rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+            Verifying password reset token...
+          </div>
+        </div>
+      ) : isSuccess ? (
+        <div style={{ textAlign: 'center', padding: '16px 8px' }}>
           <div
             style={{
-              width: '48px',
-              height: '48px',
-              backgroundColor: branding.primaryAccent,
-              borderRadius: 'var(--radius-sm)',
-              display: 'inline-flex',
+              width: '64px',
+              height: '64px',
+              borderRadius: '50%',
+              backgroundColor: 'rgba(34, 197, 94, 0.12)',
+              display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#ffffff',
-              fontWeight: 800,
-              fontSize: '1.4rem',
-              marginBottom: 'var(--space-3)',
-              boxShadow: 'var(--shadow-md)',
+              margin: '0 auto 16px auto',
+              color: '#16a34a',
             }}
           >
-            {branding.monogram}
+            <CheckCircle2 size={38} />
           </div>
-          <h1 style={{ fontSize: '1.5rem', color: 'var(--text-primary)', margin: 0 }}>
-            Reset Account Password
-          </h1>
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-            {branding.shortName} • Identity & Access Security
-          </p>
-        </div>
-
-        <div
-          className="ed-card ed-card-body"
-          style={{ backgroundColor: 'var(--bg-surface)', boxShadow: 'var(--shadow-md)' }}
-        >
-          {verifying ? (
-            <div style={{ textAlign: 'center', padding: '32px 16px' }}>
-              <div style={{ fontSize: '0.95rem', color: 'var(--text-secondary)' }}>
-                Verifying password reset token...
-              </div>
-            </div>
-          ) : isSuccess ? (
-            <div style={{ textAlign: 'center', padding: '16px 8px' }}>
-              <CheckCircle2
-                size={48}
-                style={{ color: '#16a34a', margin: '0 auto 16px auto' }}
-              />
-              <h2 style={{ fontSize: '1.25rem', color: 'var(--text-primary)', marginBottom: '8px' }}>
-                Password Reset Complete
-              </h2>
-              <p
-                style={{
-                  fontSize: '0.88rem',
-                  color: 'var(--text-secondary)',
-                  lineHeight: 1.5,
-                  marginBottom: '24px',
-                }}
-              >
-                Your institutional password has been updated. You can now log in with your new credentials.
-              </p>
-              <button
-                type="button"
-                onClick={() => navigate('/login')}
-                className="ed-btn ed-btn-primary"
-                style={{ width: '100%', padding: '10px' }}
-              >
-                Sign In with New Password
-                <ArrowRight size={16} />
-              </button>
-            </div>
-          ) : tokenValid === false ? (
-            <div>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: '12px',
-                  padding: '14px',
-                  backgroundColor: 'var(--danger-bg)',
-                  border: '1px solid var(--danger-border)',
-                  borderRadius: 'var(--radius-sm)',
-                  color: 'var(--danger-text)',
-                  marginBottom: '20px',
-                }}
-              >
-                <AlertCircle size={22} style={{ flexShrink: 0, marginTop: '2px' }} />
-                <div>
-                  <strong style={{ display: 'block', marginBottom: '4px' }}>
-                    Invalid or Expired Link
-                  </strong>
-                  <span style={{ fontSize: '0.85rem', lineHeight: 1.5 }}>
-                    {verificationError ||
-                      'This password reset link is invalid, has expired, or was already used.'}
-                  </span>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <Link
-                  to="/login"
-                  className="ed-btn ed-btn-primary"
-                  style={{ textAlign: 'center', padding: '10px' }}
-                >
-                  Return to Login & Request New Link
-                </Link>
-              </div>
-            </div>
-          ) : !tokenParam && !token ? (
-            <div>
-              <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
-                Please enter the security token you received via email:
-              </p>
-              <div className="ed-input-group" style={{ marginBottom: '16px' }}>
-                <label className="ed-label">Password Reset Token</label>
-                <input
-                  type="text"
-                  className="ed-input"
-                  placeholder="Paste token here..."
-                  value={token}
-                  onChange={(e) => setToken(e.target.value)}
-                />
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  if (token.trim()) {
-                    navigate(`/reset-password?token=${encodeURIComponent(token.trim())}`);
-                  }
-                }}
-                className="ed-btn ed-btn-primary"
-                style={{ width: '100%', padding: '10px' }}
-              >
-                Verify Token
-              </button>
-            </div>
-          ) : (
-            <form onSubmit={handleSubmit}>
-              {recipientEmail && (
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '8px 12px',
-                    backgroundColor: 'var(--bg-subtle)',
-                    borderRadius: 'var(--radius-sm)',
-                    marginBottom: '16px',
-                    fontSize: '0.82rem',
-                    color: 'var(--text-secondary)',
-                  }}
-                >
-                  <KeyRound size={16} style={{ color: 'var(--primary-600)' }} />
-                  <span>
-                    Setting password for: <strong>{recipientName || recipientEmail}</strong> ({recipientEmail})
-                  </span>
-                </div>
-              )}
-
-              <div className="ed-input-group" style={{ marginBottom: '14px' }}>
-                <label className="ed-label">New Secure Password</label>
-                <div style={{ position: 'relative' }}>
-                  <Lock
-                    size={16}
-                    style={{ position: 'absolute', left: '10px', top: '10px', color: 'var(--text-muted)' }}
-                  />
-                  <input
-                    required
-                    type="password"
-                    className="ed-input"
-                    style={{ paddingLeft: '34px' }}
-                    placeholder="Enter new password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    autoComplete="new-password"
-                  />
-                </div>
-              </div>
-
-              <div className="ed-input-group" style={{ marginBottom: '16px' }}>
-                <label className="ed-label">Confirm New Password</label>
-                <div style={{ position: 'relative' }}>
-                  <Lock
-                    size={16}
-                    style={{ position: 'absolute', left: '10px', top: '10px', color: 'var(--text-muted)' }}
-                  />
-                  <input
-                    required
-                    type="password"
-                    className="ed-input"
-                    style={{ paddingLeft: '34px' }}
-                    placeholder="Confirm new password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    autoComplete="new-password"
-                  />
-                </div>
-              </div>
-
-              {/* Password Requirements Checklist */}
-              <div
-                style={{
-                  padding: '12px',
-                  backgroundColor: 'var(--bg-subtle)',
-                  borderRadius: 'var(--radius-sm)',
-                  marginBottom: '16px',
-                  fontSize: '0.78rem',
-                }}
-              >
-                <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px' }}>
-                  Password Requirements:
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
-                  <span style={{ color: hasMinLength ? '#16a34a' : 'var(--text-muted)' }}>
-                    {hasMinLength ? '✓' : '○'} 8+ Characters
-                  </span>
-                  <span style={{ color: hasUppercase ? '#16a34a' : 'var(--text-muted)' }}>
-                    {hasUppercase ? '✓' : '○'} Uppercase Letter
-                  </span>
-                  <span style={{ color: hasLowercase ? '#16a34a' : 'var(--text-muted)' }}>
-                    {hasLowercase ? '✓' : '○'} Lowercase Letter
-                  </span>
-                  <span style={{ color: hasNumber ? '#16a34a' : 'var(--text-muted)' }}>
-                    {hasNumber ? '✓' : '○'} Numeric Digit
-                  </span>
-                  <span style={{ color: hasSpecial ? '#16a34a' : 'var(--text-muted)' }}>
-                    {hasSpecial ? '✓' : '○'} Special Symbol
-                  </span>
-                  <span style={{ color: passwordsMatch ? '#16a34a' : 'var(--text-muted)' }}>
-                    {passwordsMatch ? '✓' : '○'} Passwords Match
-                  </span>
-                </div>
-              </div>
-
-              {submitError && (
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    marginBottom: '16px',
-                    padding: '8px 12px',
-                    backgroundColor: 'var(--danger-bg)',
-                    border: '1px solid var(--danger-border)',
-                    borderRadius: 'var(--radius-sm)',
-                    color: 'var(--danger-text)',
-                    fontSize: '0.82rem',
-                  }}
-                >
-                  <AlertCircle size={16} style={{ flexShrink: 0 }} />
-                  <span>{submitError}</span>
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={!isFormValid || submitting}
-                className="ed-btn ed-btn-primary"
-                style={{ width: '100%', padding: '10px' }}
-              >
-                {submitting ? 'Updating Password...' : 'Save New Password & Continue'}
-                <ShieldCheck size={16} />
-              </button>
-            </form>
-          )}
-        </div>
-
-        <div style={{ textAlign: 'center', marginTop: '16px' }}>
-          <Link
-            to="/login"
+          <h3
             style={{
-              color: 'var(--text-muted)',
-              fontSize: '0.82rem',
-              textDecoration: 'none',
+              fontSize: '1.3rem',
+              fontWeight: 800,
+              color: 'var(--text-primary)',
+              marginBottom: '8px',
             }}
           >
-            ← Back to Login
-          </Link>
+            Password Reset Complete!
+          </h3>
+          <p
+            style={{
+              fontSize: '0.88rem',
+              color: 'var(--text-secondary)',
+              lineHeight: 1.55,
+              marginBottom: '24px',
+            }}
+          >
+            Your institutional password has been securely updated. You can now log in to the portal with your new credentials.
+          </p>
+          <button
+            type="button"
+            onClick={() => navigate('/login')}
+            className="ed-btn ed-btn-primary"
+            style={{
+              width: '100%',
+              height: '46px',
+              fontSize: '0.96rem',
+              fontWeight: 700,
+              borderRadius: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              backgroundColor: 'var(--color-primary, #244c3a)',
+            }}
+          >
+            Sign In with New Password
+            <ArrowRight size={17} />
+          </button>
         </div>
-      </div>
-    </div>
+      ) : tokenValid === false ? (
+        <div>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '12px',
+              padding: '14px',
+              backgroundColor: 'var(--danger-bg, #fee2e2)',
+              border: '1px solid var(--danger-border, #fca5a5)',
+              borderRadius: '10px',
+              color: 'var(--danger-text, #991b1b)',
+              marginBottom: '20px',
+            }}
+          >
+            <AlertCircle size={22} style={{ flexShrink: 0, marginTop: '2px' }} />
+            <div>
+              <strong style={{ display: 'block', marginBottom: '4px', fontSize: '0.90rem' }}>
+                Invalid or Expired Link
+              </strong>
+              <span style={{ fontSize: '0.84rem', lineHeight: 1.5 }}>
+                {verificationError ||
+                  'This password reset link is invalid, has expired, or has already been used.'}
+              </span>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <Link
+              to="/login"
+              className="ed-btn ed-btn-primary"
+              style={{
+                width: '100%',
+                height: '44px',
+                borderRadius: '10px',
+                fontWeight: 700,
+                textAlign: 'center',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                textDecoration: 'none',
+              }}
+            >
+              Return to Login
+            </Link>
+          </div>
+        </div>
+      ) : !token ? (
+        <div>
+          <p
+            style={{
+              fontSize: '0.86rem',
+              color: 'var(--text-secondary)',
+              marginBottom: '16px',
+              lineHeight: 1.5,
+            }}
+          >
+            Enter your reset token from your email to create a new password:
+          </p>
+          <div style={{ marginBottom: '16px' }}>
+            <label
+              style={{
+                display: 'block',
+                fontSize: '0.80rem',
+                fontWeight: 700,
+                color: 'var(--text-primary)',
+                marginBottom: '6px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em',
+              }}
+            >
+              Reset Token *
+            </label>
+            <input
+              type="text"
+              className="ed-input"
+              style={{
+                width: '100%',
+                height: '44px',
+                borderRadius: '10px',
+                fontSize: '0.90rem',
+                fontFamily: 'monospace',
+              }}
+              placeholder="Paste password reset token"
+              value={token}
+              onChange={(e) => setToken(e.target.value)}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={async () => {
+              if (!token.trim()) return;
+              try {
+                setVerifying(true);
+                const res = await verifyResetTokenApi(token.trim());
+                setTokenValid(true);
+                setRecipientEmail(res.email);
+                setRecipientName(res.recipientName);
+              } catch (err: any) {
+                setTokenValid(false);
+                setVerificationError(err.message || 'Token verification failed.');
+              } finally {
+                setVerifying(false);
+              }
+            }}
+            disabled={!token.trim()}
+            className="ed-btn ed-btn-primary"
+            style={{
+              width: '100%',
+              height: '46px',
+              fontSize: '0.95rem',
+              fontWeight: 700,
+              borderRadius: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              backgroundColor: 'var(--color-primary, #244c3a)',
+            }}
+          >
+            Verify Token & Proceed
+          </button>
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {recipientEmail && (
+            <div
+              style={{
+                padding: '12px 14px',
+                backgroundColor: 'var(--bg-subtle, #f0f3ee)',
+                borderRadius: '10px',
+                border: '1px solid var(--border-default, #e2e6e0)',
+                fontSize: '0.82rem',
+                color: 'var(--text-secondary)',
+              }}
+            >
+              <div><strong>Recipient:</strong> {recipientName || 'Institutional User'}</div>
+              <div><strong>Account Email:</strong> {recipientEmail}</div>
+            </div>
+          )}
+
+          {/* NEW PASSWORD */}
+          <div>
+            <label
+              style={{
+                display: 'block',
+                fontSize: '0.78rem',
+                fontWeight: 700,
+                color: 'var(--text-primary)',
+                marginBottom: '6px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em',
+              }}
+            >
+              New Password *
+            </label>
+            <div style={{ position: 'relative' }}>
+              <div
+                style={{
+                  position: 'absolute',
+                  left: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: 'var(--text-muted)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  pointerEvents: 'none',
+                }}
+              >
+                <Lock size={16} />
+              </div>
+              <input
+                required
+                type={showNewPassword ? 'text' : 'password'}
+                className="ed-input"
+                style={{
+                  width: '100%',
+                  paddingLeft: '38px',
+                  paddingRight: '40px',
+                  height: '44px',
+                  borderRadius: '10px',
+                  fontSize: '0.90rem',
+                }}
+                placeholder="Enter new password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                autoComplete="new-password"
+              />
+              <button
+                type="button"
+                onClick={() => setShowNewPassword(!showNewPassword)}
+                style={{
+                  position: 'absolute',
+                  right: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+          </div>
+
+          {/* CONFIRM PASSWORD */}
+          <div>
+            <label
+              style={{
+                display: 'block',
+                fontSize: '0.78rem',
+                fontWeight: 700,
+                color: 'var(--text-primary)',
+                marginBottom: '6px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em',
+              }}
+            >
+              Confirm New Password *
+            </label>
+            <div style={{ position: 'relative' }}>
+              <div
+                style={{
+                  position: 'absolute',
+                  left: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: 'var(--text-muted)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  pointerEvents: 'none',
+                }}
+              >
+                <Lock size={16} />
+              </div>
+              <input
+                required
+                type={showConfirmPassword ? 'text' : 'password'}
+                className="ed-input"
+                style={{
+                  width: '100%',
+                  paddingLeft: '38px',
+                  paddingRight: '40px',
+                  height: '44px',
+                  borderRadius: '10px',
+                  fontSize: '0.90rem',
+                }}
+                placeholder="Confirm your new password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                autoComplete="new-password"
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                style={{
+                  position: 'absolute',
+                  right: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+          </div>
+
+          {/* PASSWORD CHECKLIST */}
+          <div
+            style={{
+              padding: '12px 14px',
+              backgroundColor: 'var(--bg-subtle, #f0f3ee)',
+              borderRadius: '10px',
+              border: '1px solid var(--border-default, #e2e6e0)',
+              fontSize: '0.76rem',
+            }}
+          >
+            <div
+              style={{
+                fontWeight: 700,
+                color: 'var(--text-primary)',
+                marginBottom: '6px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.03em',
+              }}
+            >
+              Security Criteria:
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
+              <span style={{ color: hasMinLength ? '#16a34a' : 'var(--text-muted)', fontWeight: 600 }}>
+                {hasMinLength ? '✓' : '○'} 8+ Characters
+              </span>
+              <span style={{ color: hasUppercase ? '#16a34a' : 'var(--text-muted)', fontWeight: 600 }}>
+                {hasUppercase ? '✓' : '○'} Uppercase Letter
+              </span>
+              <span style={{ color: hasLowercase ? '#16a34a' : 'var(--text-muted)', fontWeight: 600 }}>
+                {hasLowercase ? '✓' : '○'} Lowercase Letter
+              </span>
+              <span style={{ color: hasNumber ? '#16a34a' : 'var(--text-muted)', fontWeight: 600 }}>
+                {hasNumber ? '✓' : '○'} Numeric Digit (0-9)
+              </span>
+              <span style={{ color: hasSpecial ? '#16a34a' : 'var(--text-muted)', fontWeight: 600 }}>
+                {hasSpecial ? '✓' : '○'} Special Symbol (!@#$)
+              </span>
+              <span style={{ color: passwordsMatch ? '#16a34a' : 'var(--text-muted)', fontWeight: 600 }}>
+                {passwordsMatch ? '✓' : '○'} Passwords Match
+              </span>
+            </div>
+          </div>
+
+          {submitError && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '10px 14px',
+                backgroundColor: 'var(--danger-bg, #fee2e2)',
+                border: '1px solid var(--danger-border, #fca5a5)',
+                borderRadius: '8px',
+                color: 'var(--danger-text, #991b1b)',
+                fontSize: '0.82rem',
+              }}
+            >
+              <AlertCircle size={16} style={{ flexShrink: 0 }} />
+              <span>{submitError}</span>
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={!isFormValid || submitting}
+            className="ed-btn ed-btn-primary"
+            style={{
+              width: '100%',
+              height: '46px',
+              fontSize: '0.96rem',
+              fontWeight: 700,
+              borderRadius: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              backgroundColor: 'var(--color-primary, #244c3a)',
+              marginTop: '4px',
+            }}
+          >
+            {submitting ? 'Updating Password...' : 'Save New Password & Sign In'}
+            <ShieldCheck size={17} />
+          </button>
+        </form>
+      )}
+
+      <AuthFooter
+        links={[
+          {
+            label: 'Return to Login',
+            to: '/login',
+          },
+        ]}
+      />
+    </AuthLayout>
   );
 };
-
