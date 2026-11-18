@@ -58,7 +58,7 @@ export const RegisterPage: React.FC = () => {
       leftHeading="Bring Your School Together."
       leftTagline="A unified, AI-powered ERP platform designed to seamlessly connect administration, faculty, students, and parents into one cohesive academic ecosystem."
       leftFeatures={leftFeatures}
-      cardMaxWidth="620px"
+      cardMaxWidth="640px"
     >
       <AuthHeader
         title="School Tenant Registration"
@@ -189,7 +189,7 @@ export const RegisterPage: React.FC = () => {
           </div>
 
           {/* CODE & BOARD (2 Columns) */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          <div className="ed-auth-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <div>
               <label
                 style={{
@@ -272,7 +272,7 @@ export const RegisterPage: React.FC = () => {
           </div>
 
           {/* ADMIN NAME & PHONE (2 Columns) */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          <div className="ed-auth-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <div>
               <label
                 style={{
@@ -416,7 +416,7 @@ export const RegisterPage: React.FC = () => {
           </div>
 
           {/* CITY & STATE (2 Columns) */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          <div className="ed-auth-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <div>
               <label
                 style={{

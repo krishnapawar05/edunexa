@@ -1,5 +1,4 @@
 import React from 'react';
-import { LucideIcon } from 'lucide-react';
 import { AuthBrandingPanel, AuthFeatureItem } from './AuthBrandingPanel.js';
 import { AuthCard } from './AuthCard.js';
 import { ThemeSwitcher } from '../../../components/ThemeSwitcher.js';
@@ -18,178 +17,250 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({
   leftHeading,
   leftTagline,
   leftFeatures,
-  imageSrc,
-  cardMaxWidth = '480px',
+  imageSrc = '/images/school/auth_campus_bg.jpg',
+  cardMaxWidth = '490px',
   children,
 }) => {
   const { branding } = useSchoolBranding();
 
   return (
-    <div
-      className="ed-auth-split-layout"
-      style={{
-        minHeight: '100vh',
-        width: '100%',
-        display: 'flex',
-        backgroundColor: 'var(--bg-app, #f7f5ef)',
-        color: 'var(--text-primary, #242c27)',
-        position: 'relative',
-        overflowX: 'hidden',
-      }}
-    >
-      {/* Floating Theme Switcher at Top-Right */}
+    <div className="ed-auth-page-root">
+      {/* 1. CONTINUOUS FULL-VIEWPORT BACKGROUND IMAGE LAYER (100vw x 100vh) */}
       <div
+        className="ed-auth-bg-layer"
+        aria-hidden="true"
         style={{
-          position: 'fixed',
-          top: '16px',
-          right: '18px',
-          zIndex: 40,
+          backgroundImage: `url("${imageSrc}")`,
         }}
-      >
+      />
+
+      {/* 2. INSTITUTIONAL FOREST GREEN OVERLAY LAYER */}
+      <div
+        className="ed-auth-overlay-layer"
+        aria-hidden="true"
+      />
+
+      {/* 3. FLOATING THEME SWITCHER AT TOP-RIGHT */}
+      <div className="ed-auth-theme-toggle">
         <ThemeSwitcher compact={false} />
       </div>
 
-      {/* LEFT SECTION: HIGH-RESOLUTION CAMPUS BRANDING PANEL (Desktop & Tablet) */}
-      <AuthBrandingPanel
-        heading={leftHeading}
-        tagline={leftTagline}
-        features={leftFeatures}
-        imageSrc={imageSrc}
-      />
+      {/* 4. FOREGROUND WORKSPACE & CONTENT CONTAINER */}
+      <div className="ed-auth-content">
+        <div className="ed-auth-container">
+          {/* LEFT SECTION: BRANDING & HIGHLIGHTS (Over campus background) */}
+          <div className="ed-auth-left-col">
+            <AuthBrandingPanel
+              heading={leftHeading}
+              tagline={leftTagline}
+              features={leftFeatures}
+            />
+          </div>
 
-      {/* RIGHT SECTION: FORM WORKSPACE & AUTH CARD */}
-      <div
-        className="ed-auth-form-panel"
-        style={{
-          flex: '1 1 48%',
-          minHeight: '100vh',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '36px 24px',
-          position: 'relative',
-          overflowY: 'auto',
-          backgroundColor: 'var(--bg-app, #f7f5ef)',
-        }}
-      >
-        {/* Soft Background Decorative Waves (Matches reference School ERP design aesthetic) */}
-        <div
-          aria-hidden="true"
-          style={{
-            position: 'absolute',
-            inset: 0,
-            pointerEvents: 'none',
-            overflow: 'hidden',
-            zIndex: 0,
-          }}
-        >
-          <svg
-            viewBox="0 0 1000 1000"
-            preserveAspectRatio="none"
-            style={{
-              position: 'absolute',
-              top: 0,
-              right: 0,
-              width: '100%',
-              height: '100%',
-              opacity: 0.45,
-            }}
-          >
-            <path
-              d="M300 0 C 450 200 650 350 1000 300 L 1000 0 Z"
-              fill="var(--primary-100, rgba(36, 76, 58, 0.05))"
-            />
-            <path
-              d="M100 0 C 350 300 550 500 1000 450 L 1000 0 Z"
-              fill="var(--brand-gold-50, rgba(196, 164, 107, 0.04))"
-            />
-            <path
-              d="M0 700 C 350 600 650 850 1000 750 L 1000 1000 L 0 1000 Z"
-              fill="var(--primary-50, rgba(36, 76, 58, 0.04))"
-            />
-            <path
-              d="M0 850 C 400 780 700 950 1000 880 L 1000 1000 L 0 1000 Z"
-              fill="var(--brand-gold-100, rgba(196, 164, 107, 0.03))"
-            />
-          </svg>
-        </div>
+          {/* RIGHT SECTION: AUTHENTICATION CARD POSITIONED ON RIGHT */}
+          <div className="ed-auth-right-col">
+            {/* Mobile / Tablet Brand Pill (Visible on small screens where left panel is hidden) */}
+            <div className="ed-auth-mobile-header">
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  padding: '7px 18px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.16)',
+                  backdropFilter: 'blur(12px)',
+                  border: '1px solid rgba(255, 255, 255, 0.30)',
+                  borderRadius: '24px',
+                  boxShadow: '0 4px 14px rgba(0, 0, 0, 0.2)',
+                  marginBottom: '16px',
+                }}
+              >
+                <div
+                  style={{
+                    width: '8px',
+                    height: '8px',
+                    borderRadius: '50%',
+                    backgroundColor: '#c4a46b',
+                    boxShadow: '0 0 8px rgba(196, 164, 107, 0.8)',
+                  }}
+                />
+                <span
+                  style={{
+                    fontSize: '0.85rem',
+                    fontWeight: 700,
+                    color: '#ffffff',
+                    letterSpacing: '0.01em',
+                  }}
+                >
+                  {branding.shortName || 'EduNexa'} School ERP
+                </span>
+              </div>
+            </div>
 
-        {/* Mobile / Compact Top Brand Banner (visible only on smaller viewports where left panel is hidden) */}
-        <div
-          className="ed-auth-mobile-header"
-          style={{
-            display: 'none',
-            width: '100%',
-            maxWidth: cardMaxWidth,
-            textAlign: 'center',
-            marginBottom: '16px',
-            position: 'relative',
-            zIndex: 5,
-          }}
-        >
-          <div
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '10px',
-              padding: '6px 14px',
-              backgroundColor: 'var(--primary-50, rgba(36, 76, 58, 0.08))',
-              border: '1px solid var(--primary-100, rgba(36, 76, 58, 0.16))',
-              borderRadius: '24px',
-              marginBottom: '8px',
-            }}
-          >
-            <div
-              style={{
-                width: '10px',
-                height: '10px',
-                borderRadius: '50%',
-                backgroundColor: '#c4a46b',
-              }}
-            />
-            <span style={{ fontSize: '0.80rem', fontWeight: 700, color: 'var(--color-primary, #244c3a)' }}>
-              {branding.shortName || 'EduNexa'} School ERP
-            </span>
+            {/* Elevated Auth Card */}
+            <AuthCard maxWidth={cardMaxWidth}>
+              {children}
+            </AuthCard>
           </div>
         </div>
-
-        {/* Reusable Authentication Card */}
-        <AuthCard maxWidth={cardMaxWidth}>
-          {children}
-        </AuthCard>
       </div>
 
-      {/* Embedded Responsive Media Queries */}
+      {/* EMBEDDED STYLES FOR FULL-SCREEN BACKGROUND & RESPONSIVE LAYOUT */}
       <style>{`
-        @media (max-width: 960px) {
-          .ed-auth-branding-panel {
+        /* ROOT PAGE CONTAINER */
+        .ed-auth-page-root {
+          position: relative;
+          min-height: 100vh;
+          width: 100%;
+          overflow-x: hidden;
+          display: flex;
+          flex-direction: column;
+        }
+
+        /* 100vw x 100vh CONTINUOUS FULL-VIEWPORT CAMPUS BACKGROUND */
+        .ed-auth-bg-layer {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          width: 100vw;
+          height: 100vh;
+          background-size: cover;
+          background-position: center center;
+          background-repeat: no-repeat;
+          z-index: 0;
+          pointer-events: none;
+        }
+
+        /* FULL-SCREEN SUBTLE DARK FOREST GREEN OVERLAY */
+        .ed-auth-overlay-layer {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          width: 100vw;
+          height: 100vh;
+          background: linear-gradient(
+            135deg,
+            rgba(12, 39, 29, 0.65) 0%,
+            rgba(18, 50, 38, 0.52) 50%,
+            rgba(9, 28, 20, 0.70) 100%
+          );
+          backdrop-filter: blur(1.5px);
+          z-index: 1;
+          pointer-events: none;
+        }
+
+        [data-theme='dark'] .ed-auth-overlay-layer,
+        .dark .ed-auth-overlay-layer {
+          background: linear-gradient(
+            135deg,
+            rgba(8, 24, 18, 0.78) 0%,
+            rgba(12, 32, 24, 0.68) 50%,
+            rgba(6, 18, 13, 0.84) 100%
+          );
+        }
+
+        /* FLOATING THEME TOGGLE */
+        .ed-auth-theme-toggle {
+          position: fixed;
+          top: 18px;
+          right: 20px;
+          z-index: 50;
+        }
+
+        /* FOREGROUND CONTENT WORKSPACE */
+        .ed-auth-content {
+          position: relative;
+          z-index: 2;
+          width: 100%;
+          min-height: 100vh;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 44px 36px;
+          box-sizing: border-box;
+        }
+
+        /* RESPONSIVE CONTAINER WITH DESKTOP 2-COLUMN ALIGNMENT */
+        .ed-auth-container {
+          width: 100%;
+          max-width: 1380px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 52px;
+          margin: auto 0;
+        }
+
+        /* LEFT COLUMN: BRANDING AND HIGHLIGHTS */
+        .ed-auth-left-col {
+          flex: 1 1 50%;
+          max-width: 620px;
+          display: flex;
+          flex-direction: column;
+        }
+
+        /* RIGHT COLUMN: FOREGROUND AUTH CARD POSITIONED ON RIGHT */
+        .ed-auth-right-col {
+          flex: 1 1 50%;
+          display: flex;
+          flex-direction: column;
+          align-items: flex-end;
+          justify-content: center;
+        }
+
+        .ed-auth-mobile-header {
+          display: none;
+          width: 100%;
+          text-align: center;
+        }
+
+        /* RESPONSIVE BREAKPOINTS */
+        @media (max-width: 1140px) {
+          .ed-auth-container {
+            gap: 32px;
+          }
+          .ed-auth-left-col h1 {
+            font-size: 2.2rem !important;
+          }
+        }
+
+        @media (max-width: 980px) {
+          .ed-auth-content {
+            padding: 56px 20px 36px !important;
+            align-items: flex-start !important;
+          }
+          .ed-auth-container {
+            flex-direction: column !important;
+            justify-content: center !important;
+            gap: 0 !important;
+          }
+          .ed-auth-left-col {
             display: none !important;
           }
-          .ed-auth-split-layout {
-            flex-direction: column !important;
-          }
-          .ed-auth-form-panel {
+          .ed-auth-right-col {
             flex: 1 1 100% !important;
-            padding: 48px 16px 28px !important;
+            width: 100% !important;
+            align-items: center !important;
           }
           .ed-auth-mobile-header {
             display: block !important;
           }
+        }
+
+        @media (max-width: 540px) {
+          .ed-auth-content {
+            padding: 48px 14px 24px !important;
+          }
           .ed-auth-card {
-            padding: 26px 20px !important;
+            padding: 24px 18px !important;
             border-radius: 16px !important;
           }
-        }
-        @media (min-width: 961px) and (max-width: 1200px) {
-          .ed-auth-branding-panel {
-            padding: 36px 32px !important;
-          }
-          .ed-auth-branding-panel h1 {
-            font-size: 2.1rem !important;
-          }
-          .ed-auth-form-panel {
-            padding: 24px 16px !important;
+          .ed-auth-grid-2col {
+            grid-template-columns: 1fr !important;
           }
         }
       `}</style>

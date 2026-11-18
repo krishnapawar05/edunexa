@@ -21,12 +21,14 @@ export const AuthCard: React.FC<AuthCardProps> = ({
         maxWidth,
         backgroundColor: 'var(--bg-surface, #ffffff)',
         borderRadius: '20px',
-        border: '1px solid var(--border-default, #e2e6e0)',
-        boxShadow: '0 16px 40px -10px rgba(0, 0, 0, 0.08), 0 2px 10px rgba(0, 0, 0, 0.04)',
+        border: '1px solid var(--border-default, rgba(36, 76, 58, 0.14))',
+        boxShadow:
+          '0 24px 50px -12px rgba(0, 0, 0, 0.38), 0 6px 20px rgba(0, 0, 0, 0.14)',
         padding: '36px 36px',
         position: 'relative',
         zIndex: 5,
         transition: 'background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease',
+        boxSizing: 'border-box',
         ...style,
       }}
     >
