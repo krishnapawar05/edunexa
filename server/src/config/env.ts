@@ -27,16 +27,12 @@ const envSchema = z.object({
   DATABASE_URL: z.string().optional().transform((val) => {
     if (val && val.trim()) return val.trim();
     return (
-      process.env.DATABASE_URL_POOLED ||
-      process.env.POSTGRES_URL ||
-      process.env.PRISMA_DATABASE_URL ||
       process.env.DATABASE_URL ||
+      process.env.POSTGRES_URL ||
       process.env.DATABASE_PUBLIC_URL ||
       'postgresql://postgres:root@localhost:5432/edunexa_dev?schema=public'
     );
   }),
-  DIRECT_URL: z.string().optional().transform((val) => (val && val.trim() ? val.trim() : process.env.DATABASE_URL || '')),
-  BLOB_READ_WRITE_TOKEN: z.string().optional().transform((val) => (val ? val.trim() : '')),
   JWT_ACCESS_SECRET: z.string().optional().transform((val) => {
     if (val && val.trim() && val.trim().length >= 32) return val.trim();
     return 'edunexa_production_grade_access_secret_1234567890_secure_key';
@@ -77,8 +73,6 @@ export interface AppConfig {
   port: number;
   clientOrigin: string;
   databaseUrl: string;
-  directUrl: string;
-  blobReadWriteToken: string;
   jwtAccessSecret: string;
   jwtRefreshSecret: string;
   aiProviderApiKey: string;
@@ -95,8 +89,6 @@ export const env: AppConfig = {
   port: parsedEnv.data.PORT,
   clientOrigin: parsedEnv.data.CLIENT_ORIGIN,
   databaseUrl: parsedEnv.data.DATABASE_URL,
-  directUrl: parsedEnv.data.DIRECT_URL,
-  blobReadWriteToken: parsedEnv.data.BLOB_READ_WRITE_TOKEN,
   jwtAccessSecret: parsedEnv.data.JWT_ACCESS_SECRET,
   jwtRefreshSecret: parsedEnv.data.JWT_REFRESH_SECRET,
   aiProviderApiKey: parsedEnv.data.AI_PROVIDER_API_KEY,

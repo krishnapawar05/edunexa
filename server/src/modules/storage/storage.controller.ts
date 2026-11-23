@@ -35,12 +35,7 @@ export class StorageController {
   async getFile(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
-      const { record, absolutePath, blobUrl } = (await storageService.getFileForStream(id, req.user)) as any;
-
-      if (blobUrl) {
-        // Redirect to signed / public Vercel Blob URL after authenticating access
-        return res.redirect(blobUrl);
-      }
+      const { record, absolutePath } = await storageService.getFileForStream(id, req.user);
 
       // Security headers against MIME-sniffing and clickjacking
       res.setHeader('Content-Type', record.mimeType);
@@ -53,11 +48,7 @@ export class StorageController {
         res.setHeader('Content-Disposition', `inline; filename="${record.originalName}"`);
       }
 
-      if (absolutePath) {
-        res.sendFile(absolutePath);
-      } else {
-        throw new AppError('File storage path resolution error.', 404, 'STORAGE_PATH_ERROR');
-      }
+      res.sendFile(absolutePath);
     } catch (err) {
       next(err);
     }
@@ -112,7 +103,7 @@ export class StorageController {
       res.status(200).json({
         success: true,
         data: result,
-        message: 'File record and storage purged successfully.',
+        message: 'File record and physical storage purged successfully.',
       });
     } catch (err) {
       next(err);
@@ -121,3 +112,4 @@ export class StorageController {
 }
 
 export const storageController = new StorageController();
+

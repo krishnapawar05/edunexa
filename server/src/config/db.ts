@@ -5,14 +5,13 @@ declare global {
   var prisma: PrismaClient | undefined;
 }
 
-// Reuse PrismaClient across serverless invocations to prevent connection pool exhaustion
-export const prisma: PrismaClient =
-  globalThis.prisma ||
-  new PrismaClient({
-    log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
-  });
+export const prisma = global.prisma || new PrismaClient({
+  log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
+});
 
-globalThis.prisma = prisma;
+if (process.env.NODE_ENV !== 'production') {
+  global.prisma = prisma;
+}
 
 let lastCheck: { connected: boolean; timestamp: number; latencyMs?: number; error?: string } | null = null;
 const CACHE_TTL_MS = 5000; // Cache connection status for 5 seconds to prevent stalling requests

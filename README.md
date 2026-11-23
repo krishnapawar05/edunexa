@@ -197,14 +197,13 @@ flowchart TD
 ```
 EduNexa/
 ├── .env.example                      # Root environment variable template
-├── vercel.json                       # Vercel serverless functions & SPA routing definition
+├── nixpacks.toml                     # Railway full-stack production build definition
 ├── package.json                      # Monorepo root workspace configuration
 ├── README.md                         # This source-code verified documentation
 ├── docs/                             # Engineering specifications & audit reports
 │   ├── demo-data-and-quality-audit.md # Bloat audit, clean counts & PDF verification
 │   ├── PRD_COMPLIANCE_AUDIT.md       # Complete requirements traceability audit
-│   ├── VERCEL_MIGRATION.md           # Railway to Vercel migration overview
-│   └── VERCEL_DEPLOYMENT.md          # Step-by-step Vercel + Prisma Postgres deployment guide
+│   └── RAILWAY_DEPLOYMENT.md         # Step-by-step Railway cloud deployment guide
 ├── shared/                           # Shared library workspace (@edunexa/shared)
 │   ├── package.json
 │   ├── tsconfig.json
@@ -858,19 +857,19 @@ npm test --workspace=server -- --run
 
 ## 🚢 Production Deployment Architecture
 
-EduNexa is configured for unified full-stack serverless deployment on **Vercel** with **Prisma Postgres** and **Vercel Blob** using `vercel.json`:
+EduNexa is configured for single-service full-stack deployment on **Railway** (or Docker/Kubernetes) using `nixpacks.toml`:
 
 ```
-                       Vercel Global Edge Network
+                       Railway Container Runtime
 ┌────────────────────────────────────────────────────────────────────────┐
 │                                                                        │
-│  vercel.json: Unified Full-Stack Configuration                         │
-│  1. Build: npm run build (Shared + Server + Client Vite SPA)           │
-│  2. Output: client/dist (Edge CDN Static Hosting)                      │
-│  3. Functions: api/index.ts (Express REST Serverless Functions)        │
+│  nixpacks.toml: nodejs_20 + openssl                                    │
+│  1. Setup & Install: npm install --include=dev                         │
+│  2. Build: npm run build (Shared + Server + Client Vite)               │
+│  3. Start: npm run start:migrate (prisma migrate deploy + node dist)   │
 │                                                                        │
 │   ┌──────────────────────────────────────────────────────────────┐     │
-│   │               Express Serverless Function (/api/*)           │     │
+│   │               Express Monolithic Gateway (:5000)             │     │
 │   │                                                              │     │
 │   │  /api/v1/*        ───► Express REST Controllers (Prisma)     │     │
 │   │  /* (SPA Routes)  ───► express.static('client/dist')         │     │
@@ -879,24 +878,24 @@ EduNexa is configured for unified full-stack serverless deployment on **Vercel**
 └───────────────────────────────────┼────────────────────────────────────┘
                                     │
                                     ▼
-                 Managed Prisma Postgres & Vercel Blob
+                     Managed PostgreSQL Service
 ```
 
-### Step-by-Step Vercel Deployment:
-1. Connect your GitHub repository to [Vercel](https://vercel.com).
-2. Provision a **Prisma Postgres** database integration.
-3. Configure Environment Variables in the Vercel project:
+### Step-by-Step Railway Deployment:
+1. Connect your GitHub repository to [Railway](https://railway.app).
+2. Provision a **PostgreSQL Database** plugin in the Railway project.
+3. Configure Environment Variables in the web service:
    - `NODE_ENV=production`
-   - `DATABASE_URL=<pooled-prisma-postgres-url>`
-   - `DIRECT_URL=<unpooled-direct-postgres-url>`
-   - `BLOB_READ_WRITE_TOKEN=<vercel-blob-token>`
    - `JWT_ACCESS_SECRET=<random-32-character-secret>`
    - `JWT_REFRESH_SECRET=<random-32-character-secret>`
-   - `CLIENT_ORIGIN=https://<your-project>.vercel.app`
-4. Deploy migrations to Prisma Postgres: `npm run db:deploy`.
-5. Vercel automatically builds the client SPA, bundles serverless Express endpoints, and deploys globally.
+   - `RESEND_API_KEY=<optional-resend-api-key>`
+   - `EMAIL_FROM=EduNexa Access <onboarding@resend.dev>`
+   - `CLIENT_ORIGIN=https://<your-railway-domain>.up.railway.app`
+   - `AI_PROVIDER_API_KEY=<optional-gemini-key>`
+   - `AI_PROVIDER_MODEL=gemini-3.8-flash`
+4. Railway automatically detects `nixpacks.toml`, builds the client and server, runs `prisma migrate deploy`, and exposes the unified application.
 
-Detailed instructions are available in [docs/VERCEL_DEPLOYMENT.md](docs/VERCEL_DEPLOYMENT.md).
+Detailed instructions are available in [docs/RAILWAY_DEPLOYMENT.md](docs/RAILWAY_DEPLOYMENT.md).
 
 ---
 

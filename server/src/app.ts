@@ -54,7 +54,6 @@ export function createApp(): express.Application {
 
       if (
         allowed.includes(requestOrigin) ||
-        requestOrigin.endsWith('.vercel.app') ||
         requestOrigin.endsWith('.railway.app') ||
         requestOrigin.endsWith('.up.railway.app') ||
         env.clientOrigin === '*'

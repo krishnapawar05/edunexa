@@ -1,7 +1,6 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
-import { put, del } from '@vercel/blob';
 import { prisma } from '../../config/db.js';
 import { AppError } from '../../middleware/errorHandler.js';
 import { SecureFileUploadDTO, PlatformRole } from '@edunexa/shared';
@@ -26,22 +25,14 @@ const ALLOWED_MIME_TYPES: Record<string, string[]> = {
 
 export class StorageService {
   constructor() {
-    // Only attempt local directory creation in non-serverless or local fallback mode
-    if (!process.env.VERCEL && !process.env.BLOB_READ_WRITE_TOKEN) {
-      this.ensureDirectoryExists(UPLOAD_ROOT_DIR);
-      this.ensureDirectoryExists(path.join(UPLOAD_ROOT_DIR, 'public'));
-      this.ensureDirectoryExists(path.join(UPLOAD_ROOT_DIR, 'secure'));
-    }
+    this.ensureDirectoryExists(UPLOAD_ROOT_DIR);
+    this.ensureDirectoryExists(path.join(UPLOAD_ROOT_DIR, 'public'));
+    this.ensureDirectoryExists(path.join(UPLOAD_ROOT_DIR, 'secure'));
   }
 
   private ensureDirectoryExists(dirPath: string) {
-    try {
-      if (!fs.existsSync(dirPath)) {
-        fs.mkdirSync(dirPath, { recursive: true });
-      }
-    } catch (err) {
-      // In serverless readonly environments, ignore directory creation warnings
-      console.warn(`[StorageService] Notice creating directory ${dirPath}:`, err);
+    if (!fs.existsSync(dirPath)) {
+      fs.mkdirSync(dirPath, { recursive: true });
     }
   }
 
@@ -50,6 +41,7 @@ export class StorageService {
    */
   sanitizeFilename(rawFilename: string): string {
     const base = path.basename(rawFilename);
+    // Strip dangerous characters, keep only alphanumerics, dots, dashes, underscores
     return base.replace(/[^a-zA-Z0-9._-]/g, '_').toLowerCase();
   }
 
@@ -91,9 +83,7 @@ export class StorageService {
   }
 
   /**
-   * Uploads and secures a file payload with SHA-256 verification and path isolation.
-   * Automatically uses Vercel Blob when BLOB_READ_WRITE_TOKEN is configured,
-   * with graceful local disk fallback for offline development.
+   * Uploads and secures a file payload with SHA-256 verification and path isolation
    */
   async uploadFile(
     schoolId: string,
@@ -103,6 +93,7 @@ export class StorageService {
     // 1. Decode base64 buffer
     let fileBuffer: Buffer;
     try {
+      // Strip base64 data prefix if present (e.g. data:image/png;base64,...)
       const cleanBase64 = dto.base64Data.replace(/^data:[a-zA-Z0-9/+-]+;base64,/, '');
       fileBuffer = Buffer.from(cleanBase64, 'base64');
     } catch {
@@ -115,46 +106,25 @@ export class StorageService {
 
     // 3. Generate SHA-256 Checksum
     const checksum = crypto.createHash('sha256').update(fileBuffer).digest('hex');
+
+    // 4. Partition storage (public vs secure tenant directory)
+    const partition = dto.isPublic ? 'public' : path.join('secure', schoolId);
+    const targetFolder = path.resolve(UPLOAD_ROOT_DIR, partition, dto.category.toLowerCase());
+    this.ensureDirectoryExists(targetFolder);
+
     const uniqueId = crypto.randomUUID();
+    const diskFileName = `${uniqueId}_${sanitizedName}`;
+    const destinationPath = path.resolve(targetFolder, diskFileName);
 
-    let storagePath: string;
-    let publicUrl: string | null = null;
-
-    // 4. Persistence: Vercel Blob (Cloud) vs Local Disk (Fallback)
-    const blobToken = process.env.BLOB_READ_WRITE_TOKEN?.trim();
-
-    if (blobToken) {
-      const partition = dto.isPublic ? 'public' : `secure/${schoolId}`;
-      const blobPathname = `${partition}/${dto.category.toLowerCase()}/${uniqueId}_${sanitizedName}`;
-
-      const blobResult = await put(blobPathname, fileBuffer, {
-        access: 'public',
-        token: blobToken,
-        contentType: dto.mimeType,
-      });
-
-      storagePath = blobResult.url;
-      publicUrl = dto.isPublic ? blobResult.url : null;
-    } else {
-      // Local Disk Storage Fallback
-      const partition = dto.isPublic ? 'public' : path.join('secure', schoolId);
-      const targetFolder = path.resolve(UPLOAD_ROOT_DIR, partition, dto.category.toLowerCase());
-      this.ensureDirectoryExists(targetFolder);
-
-      const diskFileName = `${uniqueId}_${sanitizedName}`;
-      const destinationPath = path.resolve(targetFolder, diskFileName);
-
-      if (!destinationPath.startsWith(UPLOAD_ROOT_DIR)) {
-        throw new AppError('Path traversal detected in destination filename.', 403, 'PATH_TRAVERSAL_DETECTED');
-      }
-
-      fs.writeFileSync(destinationPath, fileBuffer);
-
-      storagePath = path.relative(UPLOAD_ROOT_DIR, destinationPath).replace(/\\/g, '/');
-      publicUrl = dto.isPublic ? `/uploads/${storagePath}` : null;
+    // Path traversal verification: ensure final path starts with UPLOAD_ROOT_DIR
+    if (!destinationPath.startsWith(UPLOAD_ROOT_DIR)) {
+      throw new AppError('Path traversal detected in destination filename.', 403, 'PATH_TRAVERSAL_DETECTED');
     }
 
-    // 5. Verify uploader exists in database before linking foreign key
+    // 5. Write to disk
+    fs.writeFileSync(destinationPath, fileBuffer);
+
+    // 6. Verify uploader exists in database before linking foreign key
     let verifiedUploaderId = null;
     if (uploaderId) {
       try {
@@ -165,25 +135,25 @@ export class StorageService {
       }
     }
 
-    // 6. Record metadata in PostgreSQL SecureFile table
+    // 7. Record metadata in PostgreSQL
+    const relativeStoragePath = path.relative(UPLOAD_ROOT_DIR, destinationPath).replace(/\\/g, '/');
+
     const secureRecord = await prisma.secureFile.create({
       data: {
+        id: uniqueId,
         schoolId,
         uploaderId: verifiedUploaderId,
         originalName: dto.originalName,
         sanitizedName,
+        storagePath: relativeStoragePath,
         mimeType: dto.mimeType,
         fileSizeBytes: fileBuffer.length,
+        isPublic: dto.isPublic ?? false,
         category: dto.category,
-        isPublic: dto.isPublic,
-        storagePath,
         checksum,
+        metadata: dto.metadata || {},
       },
     });
-
-    const downloadUrl = dto.isPublic
-      ? (publicUrl || storagePath)
-      : `/api/v1/storage/files/${secureRecord.id}`;
 
     return {
       fileId: secureRecord.id,
@@ -193,13 +163,15 @@ export class StorageService {
       isPublic: secureRecord.isPublic,
       category: secureRecord.category,
       checksum: secureRecord.checksum,
-      downloadUrl,
+      downloadUrl: secureRecord.isPublic
+        ? `/uploads/${relativeStoragePath}`
+        : `/api/v1/storage/files/${secureRecord.id}`,
       createdAt: secureRecord.createdAt,
     };
   }
 
   /**
-   * Retrieves a file for streaming or redirect with tenant and RBAC verification
+   * Retrieves a file for streaming with tenant and RBAC verification
    */
   async getFileForStream(fileId: string, user?: { userId: string; schoolId?: string; role: string }) {
     const record = await prisma.secureFile.findUnique({
@@ -220,26 +192,14 @@ export class StorageService {
       if (user.role !== PlatformRole.SUPER_ADMIN) {
         // Enforce strict tenant isolation
         if (!user.schoolId || user.schoolId !== record.schoolId) {
-          throw new AppError(
-            'Access forbidden: You cannot access private files belonging to another school tenant.',
-            403,
-            'CROSS_TENANT_ACCESS_DENIED'
-          );
+          throw new AppError('Access forbidden: You cannot access private files belonging to another school tenant.', 403, 'CROSS_TENANT_ACCESS_DENIED');
         }
       }
     }
 
-    // If stored on Vercel Blob (HTTP/HTTPS URL)
-    if (record.storagePath.startsWith('http://') || record.storagePath.startsWith('https://')) {
-      return {
-        record,
-        blobUrl: record.storagePath,
-      };
-    }
-
-    // Local Disk Path Fallback
     const absolutePath = path.resolve(UPLOAD_ROOT_DIR, record.storagePath);
 
+    // Path traversal check
     if (!absolutePath.startsWith(UPLOAD_ROOT_DIR) || !fs.existsSync(absolutePath)) {
       throw new AppError('File content is missing or path traversal error occurred.', 404, 'FILE_ON_DISK_MISSING');
     }
@@ -290,7 +250,7 @@ export class StorageService {
       items: items.map((f) => ({
         ...f,
         downloadUrl: f.isPublic
-          ? (f.storagePath.startsWith('http') ? f.storagePath : `/uploads/${f.storagePath}`)
+          ? `/uploads/${f.storagePath}`
           : `/api/v1/storage/files/${f.id}`,
       })),
       total,
@@ -301,7 +261,7 @@ export class StorageService {
   }
 
   /**
-   * Deletes a file with Vercel Blob or physical filesystem cleanup and authorization check
+   * Deletes a file with physical filesystem cleanup and authorization check
    */
   async deleteFile(fileId: string, user: { userId: string; schoolId?: string; role: string }) {
     const record = await prisma.secureFile.findUnique({
@@ -312,6 +272,7 @@ export class StorageService {
       throw new AppError(`File record with ID '${fileId}' not found.`, 404, 'FILE_NOT_FOUND');
     }
 
+    // Role check: Only Super Admin, School Admin, or the uploader can delete
     const isOwner = record.uploaderId === user.userId;
     const isAdmin = [PlatformRole.SUPER_ADMIN, PlatformRole.SCHOOL_ADMIN, PlatformRole.PRINCIPAL].includes(user.role as any);
 
@@ -323,25 +284,13 @@ export class StorageService {
       throw new AppError('Cross-tenant file deletion is forbidden.', 403, 'CROSS_TENANT_ACCESS_DENIED');
     }
 
-    // If stored on Vercel Blob
-    if (record.storagePath.startsWith('http://') || record.storagePath.startsWith('https://')) {
-      const blobToken = process.env.BLOB_READ_WRITE_TOKEN?.trim();
-      if (blobToken) {
-        try {
-          await del(record.storagePath, { token: blobToken });
-        } catch (err) {
-          console.warn(`[StorageService] Notice deleting Vercel Blob (${record.storagePath}):`, err);
-        }
-      }
-    } else {
-      // Local disk file unlink
-      const absolutePath = path.resolve(UPLOAD_ROOT_DIR, record.storagePath);
-      if (fs.existsSync(absolutePath)) {
-        try {
-          fs.unlinkSync(absolutePath);
-        } catch (err) {
-          console.warn(`[StorageService] Failed to unlink file on disk (${absolutePath}):`, err);
-        }
+    // Remove file on disk if exists
+    const absolutePath = path.resolve(UPLOAD_ROOT_DIR, record.storagePath);
+    if (fs.existsSync(absolutePath)) {
+      try {
+        fs.unlinkSync(absolutePath);
+      } catch (err) {
+        console.warn(`[StorageService] Failed to unlink file on disk (${absolutePath}):`, err);
       }
     }
 
