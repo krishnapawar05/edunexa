@@ -77,12 +77,27 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGoToPubl
   const [forgotDevToken, setForgotDevToken] = useState<string | null>(null);
   const [forgotError, setForgotError] = useState<string | null>(null);
 
-  // Development environment check: Strictly display demo credentials only in dev mode
-  const isDev = Boolean(
-    (import.meta as any).env?.DEV ||
-    (import.meta as any).env?.MODE === 'development' ||
-    typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  // Demo credentials visibility check:
+  // 1. Explicit environment variable check (VITE_ENABLE_DEMO_CREDENTIALS):
+  //    Allows staging or private Railway deployments to display demo accounts when enabled.
+  // 2. Default fallback when the env var is not specified:
+  //    - Enabled on local development environments (localhost, 127.0.0.1, or vite dev server).
+  //    - Strictly disabled in production/deployed environments by default for security.
+  const rawDemoEnv = (import.meta as any).env?.VITE_ENABLE_DEMO_CREDENTIALS;
+  const isExplicitlyEnabled = rawDemoEnv === 'true' || rawDemoEnv === true || rawDemoEnv === '1';
+  const isExplicitlyDisabled = rawDemoEnv === 'false' || rawDemoEnv === false || rawDemoEnv === '0';
+
+  const isLocalHost = typeof window !== 'undefined' && (
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1' ||
+    window.location.hostname === '[::1]'
   );
+  const isViteDev = Boolean(
+    (import.meta as any).env?.DEV ||
+    (import.meta as any).env?.MODE === 'development'
+  );
+
+  const showDemoCredentials = isExplicitlyEnabled || (!isExplicitlyDisabled && (isLocalHost || isViteDev));
 
   const roleToRouteMap: Record<string, string> = {
     SUPER_ADMIN: '/superadmin',
@@ -118,8 +133,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGoToPubl
 
   const handleQuickRoleSelect = (category: 'STUDENT' | 'TEACHER' | 'ADMIN') => {
     setSelectedQuickRole(category);
-    // Find representative demo account if in dev mode
-    if (isDev) {
+    // Find representative demo account if demo credentials are enabled
+    if (showDemoCredentials) {
       let match = DEMO_ROLES.find((r) => r.category === category);
       if (category === 'ADMIN') match = DEMO_ROLES.find((r) => r.roleKey === 'SCHOOL_ADMIN');
       if (match) {
@@ -539,8 +554,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGoToPubl
         </button>
       </form>
 
-      {/* DEMO CREDENTIALS: STRICTLY DEVELOPMENT MODE ONLY */}
-      {isDev && (
+      {/* DEMO CREDENTIALS: DISPLAYED LOCALLY OR WHEN VITE_ENABLE_DEMO_CREDENTIALS IS TRUE */}
+      {showDemoCredentials && (
         <div
           style={{
             marginTop: '22px',

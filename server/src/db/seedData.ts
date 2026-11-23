@@ -167,7 +167,9 @@ export async function seedInstitutionalData(customPrisma?: PrismaClient) {
   for (const u of usersData) {
     const user = await prisma.user.upsert({
       where: { email: u.email },
-      update: {},
+      update: {
+        passwordHash,
+      },
       create: {
         email: u.email,
         passwordHash,
