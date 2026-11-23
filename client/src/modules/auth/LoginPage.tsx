@@ -78,26 +78,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGoToPubl
   const [forgotError, setForgotError] = useState<string | null>(null);
 
   // Demo credentials visibility check:
-  // 1. Explicit environment variable check (VITE_ENABLE_DEMO_CREDENTIALS):
-  //    Allows staging or private Railway deployments to display demo accounts when enabled.
-  // 2. Default fallback when the env var is not specified:
-  //    - Enabled on local development environments (localhost, 127.0.0.1, or vite dev server).
-  //    - Strictly disabled in production/deployed environments by default for security.
+  // Visible by default on both localhost and deployed Railway environments (.railway.app).
+  // Can be explicitly disabled by setting VITE_ENABLE_DEMO_CREDENTIALS="false" or "0".
   const rawDemoEnv = (import.meta as any).env?.VITE_ENABLE_DEMO_CREDENTIALS;
-  const isExplicitlyEnabled = rawDemoEnv === 'true' || rawDemoEnv === true || rawDemoEnv === '1';
   const isExplicitlyDisabled = rawDemoEnv === 'false' || rawDemoEnv === false || rawDemoEnv === '0';
-
-  const isLocalHost = typeof window !== 'undefined' && (
-    window.location.hostname === 'localhost' ||
-    window.location.hostname === '127.0.0.1' ||
-    window.location.hostname === '[::1]'
-  );
-  const isViteDev = Boolean(
-    (import.meta as any).env?.DEV ||
-    (import.meta as any).env?.MODE === 'development'
-  );
-
-  const showDemoCredentials = isExplicitlyEnabled || (!isExplicitlyDisabled && (isLocalHost || isViteDev));
+  const showDemoCredentials = !isExplicitlyDisabled;
 
   const roleToRouteMap: Record<string, string> = {
     SUPER_ADMIN: '/superadmin',

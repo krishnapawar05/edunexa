@@ -9,7 +9,11 @@ export default defineConfig(({ mode }) => {
   const clientEnv = loadEnv(mode, __dirname, '');
   const mergedEnv = { ...rootEnv, ...clientEnv, ...process.env };
 
-  const enableDemo = mergedEnv.VITE_ENABLE_DEMO_CREDENTIALS;
+  // Default to 'true' so deployed Railway environments display demo credentials out-of-the-box
+  // unless explicitly disabled via VITE_ENABLE_DEMO_CREDENTIALS="false"
+  const enableDemo = mergedEnv.VITE_ENABLE_DEMO_CREDENTIALS !== undefined
+    ? String(mergedEnv.VITE_ENABLE_DEMO_CREDENTIALS).trim()
+    : 'true';
 
   return {
     plugins: [react()],
