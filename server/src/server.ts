@@ -7,19 +7,11 @@ import { initSocketIO } from './socket.js';
 const HOST = '0.0.0.0';
 
 async function bootstrap() {
-  // Check if database needs initial seeding
+  // Ensure institutional records and demo accounts are up-to-date
   try {
-    const superAdmin = await prisma.user.findUnique({
-      where: { email: 'superadmin@edunexa.org' },
-    });
-
-    if (!superAdmin) {
-      console.log('[EduNexa Bootstrap] Fresh or unseeded database detected. Auto-seeding demo accounts and institutional records...');
-      await seedInstitutionalData(prisma);
-      console.log('[EduNexa Bootstrap] Institutional seeding completed successfully.');
-    } else {
-      console.log('[EduNexa Bootstrap] Database verified with existing institutional accounts.');
-    }
+    console.log('[EduNexa Bootstrap] Verifying institutional database records and demo accounts...');
+    await seedInstitutionalData(prisma);
+    console.log('[EduNexa Bootstrap] Institutional verification and seeding completed successfully.');
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     console.warn(`[EduNexa Bootstrap] Auto-seed check notice: ${message}. Continuing server startup.`);

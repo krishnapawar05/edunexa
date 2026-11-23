@@ -298,6 +298,35 @@ async function main() {
 
   console.log(`✓ Classes, Sections, and Subjects seeded.`);
 
+  // Ensure Default Institutional ID Card Template exists
+  let defaultTemplate = await prisma.idCardTemplate.findFirst({
+    where: { schoolId: school.id, isDefault: true },
+  });
+  if (!defaultTemplate) {
+    defaultTemplate = await prisma.idCardTemplate.create({
+      data: {
+        schoolId: school.id,
+        name: 'Official Institutional Classic (CR80)',
+        description: 'Standard institutional double-sided credential template with deep navy and academic gold palette.',
+        targetRole: 'ALL',
+        isDefault: true,
+        isActive: true,
+        primaryColor: '#1e3a8a',
+        secondaryColor: '#d97706',
+        headerTextColor: '#ffffff',
+        cardOrientation: 'LANDSCAPE',
+        showBloodGroup: true,
+        showParentContact: true,
+        showEmergencyPhone: true,
+        showPrincipalSign: true,
+        showSchoolSeal: true,
+        showBarcode: false,
+        customTermsText:
+          'This card is the property of the institution. If found, please return to the school administration desk. Unauthorized use or reproduction is strictly prohibited.',
+      },
+    });
+  }
+
   // Helper functions for idempotent Virtual ID Card upsert
   async function upsertStaffCard(staffProfileId: string, cardNumber: string, verificationToken: string) {
     const existing = await prisma.virtualIdCard.findFirst({
@@ -309,9 +338,11 @@ async function main() {
       return prisma.virtualIdCard.update({
         where: { id: existing.id },
         data: {
+          schoolId: school.id,
           staffProfileId,
           cardNumber,
           verificationToken,
+          templateId: existing.templateId || defaultTemplate?.id,
           status: CardStatus.ACTIVE,
           expiresAt: new Date('2028-06-30'),
         },
@@ -319,9 +350,11 @@ async function main() {
     }
     return prisma.virtualIdCard.create({
       data: {
+        schoolId: school.id,
         staffProfileId,
         cardNumber,
         verificationToken,
+        templateId: defaultTemplate?.id,
         status: CardStatus.ACTIVE,
         expiresAt: new Date('2028-06-30'),
       },
@@ -338,9 +371,11 @@ async function main() {
       return prisma.virtualIdCard.update({
         where: { id: existing.id },
         data: {
+          schoolId: school.id,
           studentProfileId,
           cardNumber,
           verificationToken,
+          templateId: existing.templateId || defaultTemplate?.id,
           status: CardStatus.ACTIVE,
           expiresAt: new Date('2027-03-31'),
         },
@@ -348,9 +383,11 @@ async function main() {
     }
     return prisma.virtualIdCard.create({
       data: {
+        schoolId: school.id,
         studentProfileId,
         cardNumber,
         verificationToken,
+        templateId: defaultTemplate?.id,
         status: CardStatus.ACTIVE,
         expiresAt: new Date('2027-03-31'),
       },
@@ -533,6 +570,36 @@ async function main() {
 
     // ID Card for Aarav
     await upsertStudentCard(aaravProfile.id, 'CR80-2026-0042', 'v-tok-8f2c-49a1-9b7e-e214');
+
+    // Published Examination Admit Card for Aarav
+    if (session) {
+      await prisma.admitCard.upsert({
+        where: { admitCardNumber: 'AC-2026-ADM-0042' },
+        update: {
+          status: 'PUBLISHED',
+          clearanceStatus: 'CLEARED',
+        },
+        create: {
+          id: 'ac-mid-aarav-2026',
+          schoolId: school.id,
+          studentProfileId: aaravProfile.id,
+          academicSessionId: session.id,
+          examTitle: 'Mid-Term Examination 2026',
+          examType: 'MID_TERM',
+          admitCardNumber: 'AC-2026-ADM-0042',
+          rollNumber: '1',
+          className: 'Grade 10',
+          sectionName: 'A',
+          centerName: 'Main Campus Examination Center',
+          roomNumber: 'Examination Hall A',
+          status: 'PUBLISHED',
+          clearanceStatus: 'CLEARED',
+          qrToken: 'qr-ac-aarav-2026-token',
+          publishedAt: new Date('2026-09-01T00:00:00Z'),
+          issuedAt: new Date('2026-09-01T00:00:00Z'),
+        },
+      });
+    }
 
     // Parent link: Vikram Sharma -> Aarav
     const parentMembership = userMap['vikram.sharma@gmail.com']?.membership;

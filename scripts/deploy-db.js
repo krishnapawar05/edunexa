@@ -1,5 +1,10 @@
 const { execSync } = require('child_process');
 
+try {
+  require('dotenv').config();
+  require('dotenv').config({ path: 'server/.env' });
+} catch (e) {}
+
 console.log('[Database Deploy] Starting database migration & schema check...');
 
 // Auto-detect and resolve DATABASE_URL if empty or missing
@@ -38,9 +43,8 @@ try {
   run('npm run prisma:deploy --workspace=server');
   console.log('[Database Deploy] Migrations deployed or verified successfully.');
 } catch (deployError) {
-  console.warn('[Database Deploy] prisma migrate deploy notice:', deployError.message);
+  console.warn('[Database Deploy] prisma migrate deploy notice (proceeding to schema push):', deployError.message);
   try {
-    console.log('[Database Deploy] Resolving any failed migration state for 20261018000000_init_edunexa_core...');
     run('npx prisma migrate resolve --rolled-back 20261018000000_init_edunexa_core --schema=server/prisma/schema.prisma');
   } catch (resolveErr) {
     // Proceed to schema push
@@ -50,10 +54,16 @@ try {
 // Step 2: ALWAYS synchronize the complete Prisma schema to ensure all models and columns exist
 try {
   console.log('[Database Deploy] Step 2: Synchronizing complete schema definitions via prisma db push...');
-  run('npx prisma db push --schema=server/prisma/schema.prisma --skip-generate --accept-data-loss');
+  run('npm run prisma:push --workspace=server -- --skip-generate --accept-data-loss');
   console.log('[Database Deploy] Database schema synchronized successfully via prisma db push.');
 } catch (pushError) {
-  console.error('[Database Deploy] Schema synchronization error:', pushError.message);
+  console.warn('[Database Deploy] Workspace prisma push notice, trying fallback via npx...');
+  try {
+    run('npx prisma db push --schema=server/prisma/schema.prisma --skip-generate --accept-data-loss');
+    console.log('[Database Deploy] Fallback schema push succeeded.');
+  } catch (fallbackErr) {
+    console.error('[Database Deploy] Schema synchronization error:', fallbackErr.message);
+  }
 }
 
 // Step 3: Seed initial institutional records and demo accounts
