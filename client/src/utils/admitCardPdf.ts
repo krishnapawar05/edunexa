@@ -87,7 +87,7 @@ export async function prepareAdmitCardPdfData(data: AdmitCardPdfData): Promise<A
       const verificationUrl =
         typeof window !== 'undefined'
           ? `${window.location.origin}/verify-admit-card/${encodeURIComponent(cloned.qrToken)}`
-          : `https://edunexa.up.railway.app/verify-admit-card/${encodeURIComponent(cloned.qrToken)}`;
+          : `${(import.meta as any).env?.VITE_APP_URL || 'https://edunexa.vercel.app'}/verify-admit-card/${encodeURIComponent(cloned.qrToken)}`;
       cloned.qrDataUrl = await QRCode.toDataURL(verificationUrl, {
         width: 300,
         margin: 1,

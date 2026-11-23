@@ -324,7 +324,8 @@ export function drawCardBack(
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(4.0);
   doc.setTextColor(100, 116, 139);
-  doc.text(`Token: ${data.verificationToken}  |  Web: edunexa.up.railway.app/verify-id`, x + w / 2, y + h - 1.8, {
+  const verifyHost = typeof window !== 'undefined' ? `${window.location.host}/verify-id` : 'edunexa.vercel.app/verify-id';
+  doc.text(`Token: ${data.verificationToken}  |  Web: ${verifyHost}`, x + w / 2, y + h - 1.8, {
     align: 'center',
   });
 }
@@ -400,7 +401,7 @@ export async function downloadIndividualIdCardPdf(
       const verificationUrl =
         typeof window !== 'undefined'
           ? `${window.location.origin}/verify-id/${encodeURIComponent(cloned.verificationToken)}`
-          : `https://edunexa.up.railway.app/verify-id/${encodeURIComponent(cloned.verificationToken)}`;
+          : `${(import.meta as any).env?.VITE_APP_URL || 'https://edunexa.vercel.app'}/verify-id/${encodeURIComponent(cloned.verificationToken)}`;
       cloned.qrDataUrl = await QRCode.toDataURL(verificationUrl, {
         width: 320,
         margin: 1,
@@ -496,7 +497,7 @@ export async function downloadBulkIdCardsPdf(
           const verificationUrl =
             typeof window !== 'undefined'
               ? `${window.location.origin}/verify-id/${encodeURIComponent(cloned.verificationToken)}`
-              : `https://edunexa.up.railway.app/verify-id/${encodeURIComponent(cloned.verificationToken)}`;
+              : `${(import.meta as any).env?.VITE_APP_URL || 'https://edunexa.vercel.app'}/verify-id/${encodeURIComponent(cloned.verificationToken)}`;
           cloned.qrDataUrl = await QRCode.toDataURL(verificationUrl, {
             width: 240,
             margin: 1,

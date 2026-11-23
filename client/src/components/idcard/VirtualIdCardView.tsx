@@ -57,7 +57,7 @@ export const VirtualIdCardView: React.FC<VirtualIdCardViewProps> = ({
   const verificationUrl =
     typeof window !== 'undefined'
       ? `${window.location.origin}/verify-id/${encodeURIComponent(data.verificationToken || '')}`
-      : `https://edunexa.up.railway.app/verify-id/${encodeURIComponent(data.verificationToken || '')}`;
+      : `${(import.meta as any).env?.VITE_APP_URL || 'https://edunexa.vercel.app'}/verify-id/${encodeURIComponent(data.verificationToken || '')}`;
 
   useEffect(() => {
     let isMounted = true;
@@ -655,7 +655,7 @@ export const VirtualIdCardView: React.FC<VirtualIdCardViewProps> = ({
               }}
             >
               <span>Token: <strong style={{ fontFamily: 'monospace' }}>{data.verificationToken || 'v-tok-live'}</strong></span>
-              <span>Web: <strong>edunexa.up.railway.app/verify-id</strong></span>
+              <span>Web: <strong>{typeof window !== 'undefined' ? `${window.location.host}/verify-id` : 'edunexa.vercel.app/verify-id'}</strong></span>
             </div>
           </div>
         </>
