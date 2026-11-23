@@ -68,10 +68,13 @@ export function errorHandler(
     err.message?.includes('database') ||
     err.message?.includes('column') ||
     err.message?.includes('relation') ||
-    err.message?.includes('Connection');
+    err.message?.includes('Connection') ||
+    err.message?.includes('Environment variable not found: DATABASE_URL');
 
   let sanitizedMessage = isDev ? err.message : 'An unexpected internal server error occurred.';
-  if (isDbError && !isDev) {
+  if (err.message?.includes('Environment variable not found: DATABASE_URL')) {
+    sanitizedMessage = 'Database service is initializing or DATABASE_URL is not set. In Railway, ensure DATABASE_URL is linked to Postgres.';
+  } else if (isDbError && !isDev) {
     sanitizedMessage = 'Database service synchronizing. Please retry in a few moments.';
   }
 

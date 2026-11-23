@@ -25,13 +25,23 @@ const envSchema = z.object({
   }),
   CLIENT_ORIGIN: z.string().optional().transform((val) => (!val || !val.trim() ? '*' : val.trim())),
   DATABASE_URL: z.string().optional().transform((val) => {
-    if (val && val.trim()) return val.trim();
-    return (
-      process.env.DATABASE_URL ||
-      process.env.POSTGRES_URL ||
-      process.env.DATABASE_PUBLIC_URL ||
-      'postgresql://postgres:root@localhost:5432/edunexa_dev?schema=public'
-    );
+    if (val && val.trim()) {
+      process.env.DATABASE_URL = val.trim();
+      return val.trim();
+    }
+    let url = (process.env.DATABASE_URL && process.env.DATABASE_URL.trim()) || '';
+    if (!url) {
+      url =
+        (process.env.DATABASE_PRIVATE_URL && process.env.DATABASE_PRIVATE_URL.trim()) ||
+        (process.env.POSTGRES_URL && process.env.POSTGRES_URL.trim()) ||
+        (process.env.DATABASE_PUBLIC_URL && process.env.DATABASE_PUBLIC_URL.trim()) ||
+        (process.env.POSTGRESQL_URL && process.env.POSTGRESQL_URL.trim()) ||
+        (process.env.PGHOST &&
+          `postgresql://${process.env.PGUSER || 'postgres'}:${encodeURIComponent(process.env.PGPASSWORD || '')}@${process.env.PGHOST}:${process.env.PGPORT || 5432}/${process.env.PGDATABASE || 'railway'}`) ||
+        'postgresql://postgres:root@localhost:5432/edunexa_dev?schema=public';
+    }
+    process.env.DATABASE_URL = url;
+    return url;
   }),
   JWT_ACCESS_SECRET: z.string().optional().transform((val) => {
     if (val && val.trim() && val.trim().length >= 32) return val.trim();

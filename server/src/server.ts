@@ -1,6 +1,6 @@
 import { app } from './app.js';
 import { env } from './config/env.js';
-import { prisma } from './config/db.js';
+import { prisma, checkDatabaseConnection } from './config/db.js';
 import { seedInstitutionalData } from './db/seedData.js';
 import { initSocketIO } from './socket.js';
 
@@ -9,9 +9,14 @@ const HOST = '0.0.0.0';
 async function bootstrap() {
   // Ensure institutional records and demo accounts are up-to-date
   try {
-    console.log('[EduNexa Bootstrap] Verifying institutional database records and demo accounts...');
-    await seedInstitutionalData(prisma);
-    console.log('[EduNexa Bootstrap] Institutional verification and seeding completed successfully.');
+    const dbCheck = await checkDatabaseConnection();
+    if (dbCheck.connected) {
+      console.log('[EduNexa Bootstrap] Database connected. Verifying institutional database records and demo accounts...');
+      await seedInstitutionalData(prisma);
+      console.log('[EduNexa Bootstrap] Institutional verification and seeding completed successfully.');
+    } else {
+      console.warn(`[EduNexa Bootstrap] Database notice: ${dbCheck.error}. Operating in synthetic resilience mode.`);
+    }
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     console.warn(`[EduNexa Bootstrap] Auto-seed check notice: ${message}. Continuing server startup.`);
