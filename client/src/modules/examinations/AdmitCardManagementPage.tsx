@@ -1513,18 +1513,24 @@ export const AdmitCardManagementPage: React.FC = () => {
             </div>
 
             {/* Signatures */}
-            <div className="grid grid-cols-3 gap-6 pt-4 text-center text-xs">
-              <div>
-                <div className="border-b border-slate-400 mb-1 h-6"></div>
-                <span className="text-[10px] uppercase font-bold text-slate-500">Candidate Signature</span>
+            <div className="grid grid-cols-3 gap-6 pt-5 text-center text-xs">
+              <div className="flex flex-col items-center">
+                <div className="w-4/5 border-b border-slate-400 mb-1.5 h-6"></div>
+                <span className="text-[10px] font-bold text-slate-800 leading-tight">Signature of the Candidate</span>
+                <span className="text-[8.5px] text-slate-500 mt-0.5">(To be signed in presence of Invigilator)</span>
               </div>
-              <div>
-                <div className="border-b border-slate-400 mb-1 h-6"></div>
-                <span className="text-[10px] uppercase font-bold text-slate-500">Invigilator Verification</span>
+              <div className="flex flex-col items-center">
+                <div className="w-4/5 border-b border-slate-400 mb-1.5 h-6"></div>
+                <span className="text-[10px] font-bold text-slate-800 leading-tight">Room Invigilator Verification</span>
+                <span className="text-[8.5px] text-slate-500 mt-0.5">Verified Identity & Seating Allocation</span>
               </div>
-              <div>
-                <div className="border-b border-slate-400 mb-1 h-6"></div>
-                <span className="text-[10px] uppercase font-bold text-slate-500">Controller of Examinations</span>
+              <div className="flex flex-col items-center">
+                <div className="w-4/5 border-b border-slate-400 mb-1.5 h-6"></div>
+                <span className="text-[10px] font-bold text-slate-800 leading-tight">Principal & Controller of Examinations</span>
+                <span className="text-[8.5px] text-slate-500 mt-0.5 max-w-full truncate">
+                  {previewCard.schoolName || 'Apex Academy of Sciences & Arts'}
+                </span>
+                <span className="text-[8px] text-amber-700 font-semibold">Certified Digitally</span>
               </div>
             </div>
           </div>

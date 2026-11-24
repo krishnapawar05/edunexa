@@ -654,40 +654,74 @@ export function drawAdmitCardOnDoc(doc: jsPDF, data: AdmitCardPdfData): void {
 
   curY += instBoxH + 6;
 
-  // 8. Signatures Area
-  const signColW = tableW / 3;
-  const sigLineY = curY + 11;
+  // 8. Symmetrical 3-Column Signatures Area
+  const contentLeftX = margin + 4; // 16 mm (strictly aligns with timetable & instructions box left edge)
+  const sigAreaWidth = tableW; // 178 mm (strictly aligns with timetable & instructions box width)
+  const colGap = 8; // 8 mm horizontal gap between columns
+  const colWidth = (sigAreaWidth - colGap * 2) / 3; // (178 - 16) / 3 = 54 mm
+  const lineWidth = 45; // mm (uniform crisp vector line centered in each column)
 
-  // Candidate Signature
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7);
-  doc.setTextColor(71, 85, 105);
-  doc.text('__________________________________', margin + 4 + signColW * 0.1, sigLineY);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Signature of the Candidate', margin + 4 + signColW * 0.1, sigLineY + 4.5);
-  doc.setFontSize(6);
-  doc.setFont('helvetica', 'normal');
-  doc.text('(To be signed in presence of Invigilator)', margin + 4 + signColW * 0.1, sigLineY + 8);
+  // Baseline Y: Leave clean vertical signing space (14 mm) below instructions box
+  const sigLineY = curY + 14;
 
-  // Invigilator Signature
-  const col2X = margin + 4 + signColW;
-  doc.text('__________________________________', col2X + signColW * 0.1, sigLineY);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7);
-  doc.text('Room Invigilator Verification', col2X + signColW * 0.1, sigLineY + 4.5);
-  doc.setFontSize(6);
-  doc.setFont('helvetica', 'normal');
-  doc.text('Verified Identity & Seating Allocation', col2X + signColW * 0.1, sigLineY + 8);
+  // Set line styling for crisp vector line
+  doc.setDrawColor(100, 116, 139); // Slate-500
+  doc.setLineWidth(0.35);
 
-  // Controller / Principal Signature
-  const col3X = margin + 4 + signColW * 2;
-  doc.text('__________________________________', col3X + signColW * 0.1, sigLineY);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7);
-  doc.text('Principal & Controller of Examinations', col3X + signColW * 0.1, sigLineY + 4.5);
-  doc.setFontSize(6);
-  doc.setFont('helvetica', 'normal');
-  doc.text(`${schoolName} Certified Digitally`, col3X + signColW * 0.1, sigLineY + 8);
+  const signatureColumns = [
+    {
+      title: 'Signature of the Candidate',
+      subtitle: '(To be signed in presence of Invigilator)',
+      isMultiLineSchool: false,
+    },
+    {
+      title: 'Room Invigilator Verification',
+      subtitle: 'Verified Identity & Seating Allocation',
+      isMultiLineSchool: false,
+    },
+    {
+      title: 'Principal & Controller of Examinations',
+      subtitle: 'Certified Digitally',
+      isMultiLineSchool: true,
+    },
+  ];
+
+  signatureColumns.forEach((col, i) => {
+    const colLeftX = contentLeftX + i * (colWidth + colGap);
+    const colCenterX = colLeftX + colWidth / 2;
+
+    // 1. Draw horizontal signature baseline vector line (centered on colCenterX)
+    const lineStartX = colCenterX - lineWidth / 2;
+    const lineEndX = colCenterX + lineWidth / 2;
+    doc.line(lineStartX, sigLineY, lineEndX, sigLineY);
+
+    // 2. Primary Title Label (Centered directly beneath signature line)
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7);
+    doc.setTextColor(15, 23, 42);
+    const titleY = sigLineY + 4.5;
+    doc.text(col.title, colCenterX, titleY, { align: 'center', maxWidth: colWidth });
+
+    // 3. Secondary Subtitle Label (Centered & overflow-safe within colWidth)
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(5.8);
+    doc.setTextColor(71, 85, 105);
+    const subY = titleY + 3.8;
+
+    if (!col.isMultiLineSchool) {
+      doc.text(col.subtitle, colCenterX, subY, { align: 'center', maxWidth: colWidth });
+    } else {
+      // Split school name cleanly to ensure it never overflows past colWidth or the gold border
+      const schoolTitle = data.schoolName || 'Apex Academy of Sciences & Arts';
+      const schoolLines = doc.splitTextToSize(schoolTitle, colWidth);
+      let textCursorY = subY;
+      schoolLines.forEach((sLine: string) => {
+        doc.text(sLine, colCenterX, textCursorY, { align: 'center', maxWidth: colWidth });
+        textCursorY += 2.8;
+      });
+      doc.text(col.subtitle, colCenterX, textCursorY, { align: 'center', maxWidth: colWidth });
+    }
+  });
 
   // 9. Bottom Security Verification Bar (Dynamic QR Code + Registry Info)
   const footerBoxY = pageHeight - margin - 20;

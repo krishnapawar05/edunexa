@@ -331,6 +331,26 @@ export const StudentAdmitCardsPage: React.FC = () => {
                   </tbody>
                 </table>
               </div>
+
+              {/* Signatures Footer */}
+              <div className="grid grid-cols-3 gap-4 pt-4 text-center border-t border-slate-200 mt-2">
+                <div className="flex flex-col items-center">
+                  <div className="w-4/5 border-b border-slate-400 mb-1.5 h-6"></div>
+                  <span className="text-[10px] font-bold text-slate-800 leading-tight">Signature of Candidate</span>
+                  <span className="text-[8px] text-slate-500 mt-0.5">(Sign in presence of Invigilator)</span>
+                </div>
+                <div className="flex flex-col items-center">
+                  <div className="w-4/5 border-b border-slate-400 mb-1.5 h-6"></div>
+                  <span className="text-[10px] font-bold text-slate-800 leading-tight">Invigilator Verification</span>
+                  <span className="text-[8px] text-slate-500 mt-0.5">Identity & Seating Verified</span>
+                </div>
+                <div className="flex flex-col items-center">
+                  <div className="w-4/5 border-b border-slate-400 mb-1.5 h-6"></div>
+                  <span className="text-[10px] font-bold text-slate-800 leading-tight">Controller of Exams</span>
+                  <span className="text-[8px] text-slate-500 mt-0.5 max-w-full truncate">{branding.schoolName}</span>
+                  <span className="text-[8px] text-amber-700 font-semibold">Certified Digitally</span>
+                </div>
+              </div>
             </div>
           </div>
         </Modal>
