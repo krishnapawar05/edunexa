@@ -79,11 +79,17 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGoToPubl
 
   // Demo credentials showcase visibility:
   // Enabled by default on both local development and deployed showcase environments.
-  // Can be explicitly disabled in live commercial school production by setting VITE_SHOW_DEMO_CREDENTIALS=false
+  // Can be explicitly disabled in live commercial school production by setting VITE_ENABLE_DEMO_CREDENTIALS=false or VITE_SHOW_DEMO_CREDENTIALS=false
+  const envShowFlag = (import.meta as any).env?.VITE_SHOW_DEMO_CREDENTIALS;
+  const envEnableFlag = (import.meta as any).env?.VITE_ENABLE_DEMO_CREDENTIALS;
+
   const showDemoCredentials =
-    (import.meta as any).env?.VITE_SHOW_DEMO_CREDENTIALS !== 'false' &&
-    (import.meta as any).env?.VITE_SHOW_DEMO_CREDENTIALS !== false &&
-    (import.meta as any).env?.VITE_SHOW_DEMO_CREDENTIALS !== '0';
+    envShowFlag !== 'false' &&
+    envShowFlag !== false &&
+    envShowFlag !== '0' &&
+    envEnableFlag !== 'false' &&
+    envEnableFlag !== false &&
+    envEnableFlag !== '0';
 
   const roleToRouteMap: Record<string, string> = {
     SUPER_ADMIN: '/superadmin',

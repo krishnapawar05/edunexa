@@ -2,14 +2,76 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { z } from 'zod';
 
-// Load environment variables from process.cwd(), server directory, or relative server directory
-dotenv.config({ path: path.resolve(process.cwd(), '.env') });
-dotenv.config({ path: path.resolve(process.cwd(), 'server/.env') });
-dotenv.config({ path: path.resolve(__dirname, '../../.env') });
-dotenv.config();
+// Detect whether running in Railway cloud container environment
+export const isRailway = Boolean(
+  process.env.RAILWAY_ENVIRONMENT ||
+  process.env.RAILWAY_PUBLIC_DOMAIN ||
+  process.env.RAILWAY_STATIC_URL ||
+  process.env.RAILWAY_PROJECT_ID
+);
+
+// Helper to safely redact database credentials for logging
+export function sanitizeDatabaseUrl(url?: string): string {
+  if (!url) return 'none (unconfigured)';
+  try {
+    const parsed = new URL(url);
+    const host = parsed.host || 'unknown-host';
+    const db = parsed.pathname.replace(/^\//, '') || 'default';
+    return `${parsed.protocol}//***:***@${host}/${db}`;
+  } catch {
+    return 'configured (redacted)';
+  }
+}
+
+// Environment Loading Strategy:
+// In local development: Load local .env files without overriding existing environment variables
+// In Railway / Cloud: NEVER load local server/.env (which contains local development defaults)
+if (!isRailway) {
+  dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+  dotenv.config({ path: path.resolve(process.cwd(), 'server/.env') });
+  dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+  dotenv.config();
+} else {
+  // In cloud containers, only read root .env if provisioned, never overriding platform env
+  dotenv.config();
+}
+
+// Auto-detect and resolve DATABASE_URL from Railway's PostgreSQL service variables
+let resolvedDbUrl = (process.env.DATABASE_URL && process.env.DATABASE_URL.trim()) || '';
+
+if (!resolvedDbUrl || resolvedDbUrl.includes('localhost') || resolvedDbUrl.includes('127.0.0.1')) {
+  const cloudUrl =
+    (process.env.DATABASE_PRIVATE_URL && process.env.DATABASE_PRIVATE_URL.trim()) ||
+    (process.env.POSTGRES_URL && process.env.POSTGRES_URL.trim()) ||
+    (process.env.DATABASE_PUBLIC_URL && process.env.DATABASE_PUBLIC_URL.trim()) ||
+    (process.env.POSTGRESQL_URL && process.env.POSTGRESQL_URL.trim()) ||
+    (process.env.PGHOST &&
+      `postgresql://${process.env.PGUSER || 'postgres'}:${encodeURIComponent(process.env.PGPASSWORD || '')}@${process.env.PGHOST}:${process.env.PGPORT || 5432}/${process.env.PGDATABASE || 'railway'}`);
+  
+  if (cloudUrl) {
+    resolvedDbUrl = cloudUrl;
+  }
+}
+
+// In Railway, if database URL is missing or points to localhost, log actionable instructions
+if (isRailway && (!resolvedDbUrl || resolvedDbUrl.includes('localhost') || resolvedDbUrl.includes('127.0.0.1'))) {
+  console.error('\n⚠️ [DATABASE CONFIG ERROR]: Running on Railway but DATABASE_URL is missing or points to localhost/127.0.0.1.');
+  console.error('👉 Action required: Open Railway Canvas -> click "edunexa" -> "Variables" -> add variable:');
+  console.error('   DATABASE_URL = ${{Postgres.DATABASE_URL}} (or ${{Postgres-fteJ.DATABASE_URL}})\n');
+}
+
+if (!resolvedDbUrl && !isRailway) {
+  resolvedDbUrl = 'postgresql://postgres:root@localhost:5432/edunexa_dev?schema=public';
+}
+
+// Explicitly set process.env.DATABASE_URL for PrismaClient runtime engine
+if (resolvedDbUrl) {
+  process.env.DATABASE_URL = resolvedDbUrl;
+}
 
 const envSchema = z.object({
   NODE_ENV: z.string().optional().transform((val) => {
+    if (isRailway) return 'production';
     if (!val || !val.trim()) return 'production';
     const lower = val.trim().toLowerCase();
     if (lower === 'development' || lower === 'production' || lower === 'test') {
@@ -19,20 +81,24 @@ const envSchema = z.object({
   }),
   PORT: z.union([z.string(), z.number()]).optional().transform((val) => {
     if (typeof val === 'number') return val;
-    if (!val || !val.trim()) return 5000;
-    const parsed = parseInt(val, 10);
-    return isNaN(parsed) ? 5000 : parsed;
+    const directEnv = process.env.PORT || process.env.SERVER_PORT;
+    if (directEnv && !isNaN(parseInt(String(directEnv), 10))) {
+      return parseInt(String(directEnv), 10);
+    }
+    if (val && !isNaN(parseInt(String(val), 10))) {
+      return parseInt(String(val), 10);
+    }
+    return 5000;
   }),
-  CLIENT_ORIGIN: z.string().optional().transform((val) => (!val || !val.trim() ? '*' : val.trim())),
-  DATABASE_URL: z.string().optional().transform((val) => {
-    if (val && val.trim()) return val.trim();
-    return (
-      process.env.DATABASE_URL ||
-      process.env.POSTGRES_URL ||
-      process.env.DATABASE_PUBLIC_URL ||
-      'postgresql://postgres:root@localhost:5432/edunexa_dev?schema=public'
-    );
+  CLIENT_ORIGIN: z.string().optional().transform((val) => {
+    if (val && val.trim() && val.trim() !== 'http://localhost:5173') return val.trim();
+    if (process.env.RAILWAY_PUBLIC_DOMAIN) {
+      return `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`;
+    }
+    if (isRailway) return '*';
+    return val && val.trim() ? val.trim() : 'http://localhost:5173';
   }),
+  DATABASE_URL: z.string().optional().transform(() => resolvedDbUrl),
   JWT_ACCESS_SECRET: z.string().optional().transform((val) => {
     if (val && val.trim() && val.trim().length >= 32) return val.trim();
     return 'edunexa_production_grade_access_secret_1234567890_secure_key';
@@ -42,7 +108,7 @@ const envSchema = z.object({
     return 'edunexa_production_grade_refresh_secret_1234567890_secure_key';
   }),
   AI_PROVIDER_API_KEY: z.string().optional().transform((val) => (val ? val.trim() : '')),
-  AI_PROVIDER_MODEL: z.string().optional().transform((val) => (val && val.trim() ? val.trim() : 'gemini-3.8-flash')),
+  AI_PROVIDER_MODEL: z.string().optional().transform((val) => (val && val.trim() ? val.trim() : 'gemini-2.0-flash')),
   LOG_LEVEL: z.string().optional().transform((val) => {
     if (!val || !val.trim()) return 'info';
     const lower = val.trim().toLowerCase();

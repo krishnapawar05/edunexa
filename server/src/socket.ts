@@ -16,9 +16,22 @@ export interface AuthenticatedSocket extends Socket {
 let io: SocketIOServer | null = null;
 
 export function initSocketIO(httpServer: HTTPServer): SocketIOServer {
+  const allowedOrigins: (string | RegExp)[] = [
+    env.clientOrigin,
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+    'http://localhost:5000',
+    'http://127.0.0.1:5000',
+    /\.railway\.app$/,
+    /\.up\.railway\.app$/,
+  ];
+  if (process.env.RAILWAY_PUBLIC_DOMAIN) {
+    allowedOrigins.push(`https://${process.env.RAILWAY_PUBLIC_DOMAIN}`);
+  }
+
   io = new SocketIOServer(httpServer, {
     cors: {
-      origin: env.clientOrigin,
+      origin: allowedOrigins,
       credentials: true,
     },
     pingTimeout: 30000,

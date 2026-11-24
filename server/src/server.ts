@@ -1,36 +1,20 @@
 import { app } from './app.js';
-import { env } from './config/env.js';
-import { prisma } from './config/db.js';
+import { env, sanitizeDatabaseUrl } from './config/env.js';
+import { prisma, checkDatabaseConnection } from './config/db.js';
 import { seedInstitutionalData } from './db/seedData.js';
 import { initSocketIO } from './socket.js';
 
 const HOST = '0.0.0.0';
 
 async function bootstrap() {
-  // Check if database needs initial seeding
-  try {
-    const superAdmin = await prisma.user.findUnique({
-      where: { email: 'superadmin@edunexa.org' },
-    });
-
-    if (!superAdmin) {
-      console.log('[EduNexa Bootstrap] Fresh or unseeded database detected. Auto-seeding demo accounts and institutional records...');
-      await seedInstitutionalData(prisma);
-      console.log('[EduNexa Bootstrap] Institutional seeding completed successfully.');
-    } else {
-      console.log('[EduNexa Bootstrap] Database verified with existing institutional accounts.');
-    }
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.warn(`[EduNexa Bootstrap] Auto-seed check notice: ${message}. Continuing server startup.`);
-  }
-
+  // Bind and start the HTTP server IMMEDIATELY so Railway detects open port within milliseconds
   const server = app.listen(env.port, HOST, () => {
     console.log(`====================================================`);
     console.log(`EduNexa ERP Core Engine running on http://${HOST}:${env.port}`);
     console.log(`Environment: ${env.nodeEnv}`);
     console.log(`Health endpoint: http://${HOST}:${env.port}/api/health`);
     console.log(`Allowed client origin: ${env.clientOrigin}`);
+    console.log(`Database target: ${sanitizeDatabaseUrl(env.databaseUrl)}`);
     console.log(`====================================================`);
   });
 
@@ -47,6 +31,31 @@ async function bootstrap() {
       process.exit(1);
     }
   });
+
+  // Background non-blocking verification and idempotent seeding
+  (async () => {
+    try {
+      const dbCheck = await checkDatabaseConnection();
+      if (dbCheck.connected) {
+        const superAdmin = await prisma.user.findUnique({
+          where: { email: 'superadmin@edunexa.org' },
+        });
+
+        if (!superAdmin) {
+          console.log('[EduNexa Bootstrap] Fresh or unseeded database detected. Auto-seeding demo accounts and institutional records...');
+          await seedInstitutionalData(prisma);
+          console.log('[EduNexa Bootstrap] Institutional seeding completed successfully.');
+        } else {
+          console.log('[EduNexa Bootstrap] Database verified with existing institutional accounts.');
+        }
+      } else {
+        console.warn(`[EduNexa Bootstrap] Database not immediately ready (${dbCheck.error || 'initializing'}). Continuing resilient operation.`);
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(`[EduNexa Bootstrap] Background verification notice: ${message}. Continuing server operation.`);
+    }
+  })();
 
   // Graceful shutdown
   const shutdown = (signal: string) => {
@@ -65,4 +74,3 @@ bootstrap().catch((err) => {
   console.error('[EduNexa Bootstrap Fatal]:', err);
   process.exit(1);
 });
-

@@ -19,4 +19,4 @@ cmds = [
 cmds = ["npm run build"]
 
 [start]
-cmd = "npm run start:migrate"
+cmd = "node scripts/deploy-db.js && node server/dist/server.js"

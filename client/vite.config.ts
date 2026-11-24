@@ -5,11 +5,16 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   define: {
-    // Expose VITE_SHOW_DEMO_CREDENTIALS with default 'true' for showcase & dev deployments
+    // Expose VITE_ENABLE_DEMO_CREDENTIALS and VITE_SHOW_DEMO_CREDENTIALS with default 'true' for showcase & dev deployments
     'import.meta.env.VITE_SHOW_DEMO_CREDENTIALS': JSON.stringify(
       process.env.VITE_SHOW_DEMO_CREDENTIALS !== undefined
         ? process.env.VITE_SHOW_DEMO_CREDENTIALS
         : 'true'
+    ),
+    'import.meta.env.VITE_ENABLE_DEMO_CREDENTIALS': JSON.stringify(
+      process.env.VITE_ENABLE_DEMO_CREDENTIALS !== undefined
+        ? process.env.VITE_ENABLE_DEMO_CREDENTIALS
+        : (process.env.VITE_SHOW_DEMO_CREDENTIALS !== undefined ? process.env.VITE_SHOW_DEMO_CREDENTIALS : 'true')
     ),
   },
   server: {

@@ -2,14 +2,27 @@ const { execSync } = require('child_process');
 
 console.log('[Database Deploy] Starting database migration & schema check...');
 
+function sanitizeDatabaseUrl(url) {
+  if (!url) return 'none';
+  try {
+    const parsed = new URL(url);
+    const host = parsed.host || 'unknown-host';
+    const db = parsed.pathname.replace(/^\//, '') || 'default';
+    return `${parsed.protocol}//***:***@${host}/${db}`;
+  } catch {
+    return 'configured (redacted)';
+  }
+}
+
 // Auto-detect and resolve DATABASE_URL if empty or missing
 let resolvedDbUrl = (process.env.DATABASE_URL && process.env.DATABASE_URL.trim()) || '';
 
-if (!resolvedDbUrl) {
+if (!resolvedDbUrl || resolvedDbUrl.includes('localhost') || resolvedDbUrl.includes('127.0.0.1')) {
   resolvedDbUrl =
     (process.env.DATABASE_PRIVATE_URL && process.env.DATABASE_PRIVATE_URL.trim()) ||
     (process.env.POSTGRES_URL && process.env.POSTGRES_URL.trim()) ||
     (process.env.DATABASE_PUBLIC_URL && process.env.DATABASE_PUBLIC_URL.trim()) ||
+    (process.env.POSTGRESQL_URL && process.env.POSTGRESQL_URL.trim()) ||
     (process.env.PGHOST &&
       `postgresql://${process.env.PGUSER || 'postgres'}:${encodeURIComponent(process.env.PGPASSWORD || '')}@${process.env.PGHOST}:${process.env.PGPORT || 5432}/${process.env.PGDATABASE || 'railway'}`) ||
     '';
@@ -23,6 +36,7 @@ if (!resolvedDbUrl) {
 }
 
 process.env.DATABASE_URL = resolvedDbUrl;
+console.log('[Database Deploy] Target database:', sanitizeDatabaseUrl(resolvedDbUrl));
 
 // Ensure Nix and global binaries are always reachable in PATH
 const nixPaths = '/root/.nix-profile/bin:/nix/var/nix/profiles/default/bin';
@@ -47,16 +61,16 @@ try {
   }
 }
 
-// Step 2: ALWAYS synchronize the complete Prisma schema to ensure all models and columns exist
+// Step 2: ALWAYS synchronize the complete Prisma schema to ensure all models and columns exist safely
 try {
-  console.log('[Database Deploy] Step 2: Synchronizing complete schema definitions via prisma db push...');
-  run('npx prisma db push --schema=server/prisma/schema.prisma --skip-generate --accept-data-loss');
+  console.log('[Database Deploy] Step 2: Synchronizing complete schema definitions via prisma db push (safe mode)...');
+  run('npx prisma db push --schema=server/prisma/schema.prisma --skip-generate');
   console.log('[Database Deploy] Database schema synchronized successfully via prisma db push.');
 } catch (pushError) {
   console.error('[Database Deploy] Schema synchronization error:', pushError.message);
 }
 
-// Step 3: Seed initial institutional records and demo accounts
+// Step 3: Seed initial institutional records and demo accounts idempotently
 console.log('[Database Deploy] Step 3: Seeding initial institutional records and demo accounts...');
 try {
   run('npm run db:seed');

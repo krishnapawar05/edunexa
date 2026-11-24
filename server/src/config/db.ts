@@ -1,15 +1,19 @@
 import { PrismaClient } from '@prisma/client';
+import { env } from './env.js';
 
 declare global {
   // eslint-disable-next-line no-var
   var prisma: PrismaClient | undefined;
 }
 
-export const prisma = global.prisma || new PrismaClient({
-  log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
-});
+export const prisma =
+  global.prisma ||
+  new PrismaClient({
+    datasources: env.databaseUrl ? { db: { url: env.databaseUrl } } : undefined,
+    log: env.nodeEnv === 'development' ? ['error', 'warn'] : ['error'],
+  });
 
-if (process.env.NODE_ENV !== 'production') {
+if (env.nodeEnv !== 'production') {
   global.prisma = prisma;
 }
 
@@ -24,9 +28,9 @@ export async function checkDatabaseConnection(): Promise<{ connected: boolean; l
 
   const start = Date.now();
   try {
-    // 4000ms timeout for reliable connections across cloud containers and cold starts
+    // 3500ms timeout for reliable connections across cloud containers and cold starts
     const timeoutPromise = new Promise<{ connected: false; error: string }>((_, reject) =>
-      setTimeout(() => reject(new Error('Database connection check timed out (4000ms)')), 4000)
+      setTimeout(() => reject(new Error('Database connection check timed out (3500ms)')), 3500)
     );
 
     await Promise.race([

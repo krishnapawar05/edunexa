@@ -52,6 +52,13 @@ export function createApp(): express.Application {
         'http://localhost:3000',
       ];
 
+      if (process.env.RAILWAY_PUBLIC_DOMAIN) {
+        allowed.push(`https://${process.env.RAILWAY_PUBLIC_DOMAIN}`);
+      }
+      if (process.env.RAILWAY_STATIC_URL) {
+        allowed.push(`https://${process.env.RAILWAY_STATIC_URL}`);
+      }
+
       if (
         allowed.includes(requestOrigin) ||
         requestOrigin.endsWith('.railway.app') ||
@@ -123,7 +130,11 @@ export function createApp(): express.Application {
   if (activeDistPath) {
     app.use(express.static(activeDistPath));
     app.get('*', (req, res, next) => {
-      if (req.originalUrl.startsWith('/api')) {
+      if (
+        req.originalUrl.startsWith('/api') ||
+        req.originalUrl.startsWith('/socket.io') ||
+        req.originalUrl.startsWith('/uploads')
+      ) {
         return next();
       }
       res.sendFile(path.join(activeDistPath, 'index.html'));
