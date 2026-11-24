@@ -33,9 +33,8 @@ router.get('/', async (req: Request, res: Response) => {
     },
   };
 
-  // If DB is disconnected in production, return 503, otherwise 200 in dev with degraded status
-  const httpStatus = status === 'healthy' ? 200 : 200;
-  res.status(httpStatus).json(response);
+  // Always return 200 so Railway container healthcheck passes while database connects or initializes
+  res.status(200).json(response);
 });
 
 export default router;

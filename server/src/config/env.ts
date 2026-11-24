@@ -36,37 +36,172 @@ if (!isRailway) {
   dotenv.config();
 }
 
-// Auto-detect and resolve DATABASE_URL from Railway's PostgreSQL service variables
-let resolvedDbUrl = (process.env.DATABASE_URL && process.env.DATABASE_URL.trim()) || '';
+export interface DatabaseResolutionResult {
+  url: string;
+  source: string;
+  isValid: boolean;
+  diagnosticReason: 'valid' | 'missing' | 'empty' | 'unexpanded_template' | 'localhost';
+  rawCandidate?: string;
+}
 
-if (!resolvedDbUrl || resolvedDbUrl.includes('localhost') || resolvedDbUrl.includes('127.0.0.1')) {
-  const cloudUrl =
-    (process.env.DATABASE_PRIVATE_URL && process.env.DATABASE_PRIVATE_URL.trim()) ||
-    (process.env.POSTGRES_URL && process.env.POSTGRES_URL.trim()) ||
-    (process.env.DATABASE_PUBLIC_URL && process.env.DATABASE_PUBLIC_URL.trim()) ||
-    (process.env.POSTGRESQL_URL && process.env.POSTGRESQL_URL.trim()) ||
-    (process.env.PGHOST &&
-      `postgresql://${process.env.PGUSER || 'postgres'}:${encodeURIComponent(process.env.PGPASSWORD || '')}@${process.env.PGHOST}:${process.env.PGPORT || 5432}/${process.env.PGDATABASE || 'railway'}`);
-  
-  if (cloudUrl) {
-    resolvedDbUrl = cloudUrl;
+/**
+ * Robust PostgreSQL Connection String Resolver for Railway and Local Environments
+ */
+export function resolveDatabaseUrl(envVars: Record<string, string | undefined> = process.env): DatabaseResolutionResult {
+  const isCloud = Boolean(
+    envVars.RAILWAY_ENVIRONMENT ||
+    envVars.RAILWAY_PROJECT_ID ||
+    envVars.RAILWAY_PUBLIC_DOMAIN ||
+    envVars.RAILWAY_STATIC_URL
+  );
+
+  // Check candidate variables in strict priority order
+  const candidates: { key: string; val: string | undefined }[] = [
+    { key: 'DATABASE_URL', val: envVars.DATABASE_URL },
+    { key: 'DATABASE_PRIVATE_URL', val: envVars.DATABASE_PRIVATE_URL },
+    { key: 'DATABASE_PUBLIC_URL', val: envVars.DATABASE_PUBLIC_URL },
+    { key: 'POSTGRES_URL', val: envVars.POSTGRES_URL },
+    { key: 'POSTGRESQL_URL', val: envVars.POSTGRESQL_URL },
+  ];
+
+  // Also check if any key ends with DATABASE_URL or POSTGRES_URL (e.g. POSTGRES_FTEJ_DATABASE_URL)
+  for (const [k, v] of Object.entries(envVars)) {
+    if (
+      (k.endsWith('_DATABASE_URL') || k.endsWith('_DATABASE_PRIVATE_URL') || k.endsWith('_POSTGRES_URL')) &&
+      !candidates.some(c => c.key === k)
+    ) {
+      candidates.push({ key: k, val: v });
+    }
   }
+
+  // Construct from PG* variables if available
+  if (envVars.PGHOST && envVars.PGUSER && envVars.PGDATABASE) {
+    const pass = envVars.PGPASSWORD ? encodeURIComponent(envVars.PGPASSWORD) : '';
+    const auth = envVars.PGUSER + (pass ? `:${pass}` : '');
+    const port = envVars.PGPORT || '5432';
+    candidates.push({
+      key: 'PG* variables',
+      val: `postgresql://${auth}@${envVars.PGHOST}:${port}/${envVars.PGDATABASE}`,
+    });
+  }
+
+  let unexpandedCandidate: string | undefined;
+  let localhostCandidate: string | undefined;
+
+  for (const { key, val } of candidates) {
+    if (!val || typeof val !== 'string') continue;
+    let clean = val.trim();
+    // Strip wrapping quotes e.g. "..." or '...'
+    if ((clean.startsWith('"') && clean.endsWith('"')) || (clean.startsWith("'") && clean.endsWith("'"))) {
+      clean = clean.slice(1, -1).trim();
+    }
+    if (!clean) continue;
+
+    // Check if unexpanded Railway template syntax: ${{...}}
+    if (clean.includes('${{') || clean.startsWith('${')) {
+      unexpandedCandidate = clean;
+      continue;
+    }
+
+    // Check if points to localhost / 127.0.0.1
+    const isLocal = clean.includes('localhost') || clean.includes('127.0.0.1');
+    if (isLocal) {
+      localhostCandidate = clean;
+      if (isCloud) {
+        // In cloud, skip localhost unless no cloud URL exists
+        continue;
+      }
+    }
+
+    // Must start with postgresql:// or postgres://
+    if (clean.startsWith('postgresql://') || clean.startsWith('postgres://')) {
+      return {
+        url: clean,
+        source: key,
+        isValid: true,
+        diagnosticReason: 'valid',
+      };
+    }
+  }
+
+  // If in local development and found a localhost URL:
+  if (!isCloud && localhostCandidate) {
+    return {
+      url: localhostCandidate,
+      source: 'localhost_env',
+      isValid: true,
+      diagnosticReason: 'localhost',
+    };
+  }
+
+  // In local development with no DB URL at all, default to local dev DB
+  if (!isCloud) {
+    return {
+      url: 'postgresql://postgres:root@localhost:5432/edunexa_dev?schema=public',
+      source: 'local_default_fallback',
+      isValid: true,
+      diagnosticReason: 'localhost',
+    };
+  }
+
+  // Cloud failure diagnostic reasons
+  let diagnosticReason: 'missing' | 'empty' | 'unexpanded_template' | 'localhost' = 'missing';
+  let rawCandidate = '';
+
+  if (unexpandedCandidate) {
+    diagnosticReason = 'unexpanded_template';
+    rawCandidate = unexpandedCandidate;
+  } else if (localhostCandidate) {
+    diagnosticReason = 'localhost';
+    rawCandidate = localhostCandidate;
+  } else if (envVars.DATABASE_URL !== undefined && envVars.DATABASE_URL.trim() === '') {
+    diagnosticReason = 'empty';
+    rawCandidate = '""';
+  }
+
+  return {
+    url: '',
+    source: 'none',
+    isValid: false,
+    diagnosticReason,
+    rawCandidate,
+  };
 }
 
-// In Railway, if database URL is missing or points to localhost, log actionable instructions
-if (isRailway && (!resolvedDbUrl || resolvedDbUrl.includes('localhost') || resolvedDbUrl.includes('127.0.0.1'))) {
-  console.error('\n⚠️ [DATABASE CONFIG ERROR]: Running on Railway but DATABASE_URL is missing or points to localhost/127.0.0.1.');
-  console.error('👉 Action required: Open Railway Canvas -> click "edunexa" -> "Variables" -> add variable:');
-  console.error('   DATABASE_URL = ${{Postgres.DATABASE_URL}} (or ${{Postgres-fteJ.DATABASE_URL}})\n');
+export const dbResolution = resolveDatabaseUrl(process.env);
+
+// Prominent diagnostics when running on Railway with database configuration issues
+if (isRailway && !dbResolution.isValid) {
+  console.error('\n======================================================================');
+  console.error('❌ [DATABASE CONFIGURATION ERROR ON RAILWAY]');
+  if (dbResolution.diagnosticReason === 'unexpanded_template') {
+    console.error(`Reason: DATABASE_URL is an UNEXPANDED Railway template: "${dbResolution.rawCandidate}"`);
+    console.error('This happens if the service name in ${{...}} does not match your PostgreSQL service name (e.g. Postgres-fteJ).');
+  } else if (dbResolution.diagnosticReason === 'localhost') {
+    console.error('Reason: DATABASE_URL points to "localhost:5432", which cannot be reached inside a cloud container.');
+  } else if (dbResolution.diagnosticReason === 'empty') {
+    console.error('Reason: DATABASE_URL is set as an EMPTY string in Railway Variables.');
+  } else {
+    console.error('Reason: DATABASE_URL is MISSING from Railway service variables.');
+  }
+  console.error('');
+  console.error('👉 HOW TO FIX IN RAILWAY (Takes 30 seconds):');
+  console.error('   1. In Railway Canvas, click the "edunexa" service box.');
+  console.error('   2. Click the "Variables" tab.');
+  console.error('   3. If DATABASE_URL exists, click Edit (or delete it).');
+  console.error('   4. Click "+ New Variable" -> Click "Add Reference".');
+  console.error('   5. Select your Postgres service (e.g. "Postgres-fteJ") -> Select "DATABASE_URL".');
+  console.error('      (It will look like: ${{Postgres-fteJ.DATABASE_URL}})');
+  console.error('   6. Click Deploy/Save.');
+  console.error('======================================================================\n');
 }
 
-if (!resolvedDbUrl && !isRailway) {
-  resolvedDbUrl = 'postgresql://postgres:root@localhost:5432/edunexa_dev?schema=public';
-}
-
-// Explicitly set process.env.DATABASE_URL for PrismaClient runtime engine
-if (resolvedDbUrl) {
-  process.env.DATABASE_URL = resolvedDbUrl;
+// Explicitly set process.env.DATABASE_URL for PrismaClient runtime engine if valid
+if (dbResolution.isValid) {
+  process.env.DATABASE_URL = dbResolution.url;
+} else if (isRailway) {
+  // Clear process.env.DATABASE_URL on Railway if invalid so Prisma does not default to localhost:5432
+  process.env.DATABASE_URL = '';
 }
 
 const envSchema = z.object({
@@ -98,7 +233,7 @@ const envSchema = z.object({
     if (isRailway) return '*';
     return val && val.trim() ? val.trim() : 'http://localhost:5173';
   }),
-  DATABASE_URL: z.string().optional().transform(() => resolvedDbUrl),
+  DATABASE_URL: z.string().optional().transform(() => dbResolution.url),
   JWT_ACCESS_SECRET: z.string().optional().transform((val) => {
     if (val && val.trim() && val.trim().length >= 32) return val.trim();
     return 'edunexa_production_grade_access_secret_1234567890_secure_key';

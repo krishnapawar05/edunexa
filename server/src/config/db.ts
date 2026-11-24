@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { env } from './env.js';
+import { env, isRailway } from './env.js';
 
 declare global {
   // eslint-disable-next-line no-var
@@ -18,9 +18,19 @@ if (env.nodeEnv !== 'production') {
 }
 
 let lastCheck: { connected: boolean; timestamp: number; latencyMs?: number; error?: string } | null = null;
-const CACHE_TTL_MS = 5000; // Cache connection status for 5 seconds to prevent stalling requests
+let lastLogTimestamp = 0;
+const CACHE_TTL_MS = 10000; // Cache connection status for 10 seconds to prevent query spam
+const LOG_RATE_LIMIT_MS = 60000; // Rate limit disconnect log to once every 60 seconds
 
 export async function checkDatabaseConnection(): Promise<{ connected: boolean; latencyMs?: number; error?: string }> {
+  // If no database URL is configured, or running on Railway with a localhost address, return immediately without querying!
+  if (!env.databaseUrl || (isRailway && (env.databaseUrl.includes('localhost') || env.databaseUrl.includes('127.0.0.1')))) {
+    return {
+      connected: false,
+      error: 'PostgreSQL database not configured in Railway service variables',
+    };
+  }
+
   const now = Date.now();
   if (lastCheck && now - lastCheck.timestamp < CACHE_TTL_MS) {
     return { connected: lastCheck.connected, latencyMs: lastCheck.latencyMs, error: lastCheck.error };
@@ -28,9 +38,8 @@ export async function checkDatabaseConnection(): Promise<{ connected: boolean; l
 
   const start = Date.now();
   try {
-    // 3500ms timeout for reliable connections across cloud containers and cold starts
     const timeoutPromise = new Promise<{ connected: false; error: string }>((_, reject) =>
-      setTimeout(() => reject(new Error('Database connection check timed out (3500ms)')), 3500)
+      setTimeout(() => reject(new Error('Database connection check timed out (3000ms)')), 3000)
     );
 
     await Promise.race([
@@ -42,9 +51,18 @@ export async function checkDatabaseConnection(): Promise<{ connected: boolean; l
     lastCheck = { ...result, timestamp: now };
     return result;
   } catch (err: unknown) {
-    const errorMsg = err instanceof Error ? err.message : 'Unknown database error';
+    const rawError = err instanceof Error ? err.message : 'Database connection error';
+    // Clean single-line summary without stack trace
+    const errorMsg = rawError.split('\n')[0].replace(/Invalid\s+`.*?`\s+invocation:?/, '').trim() || 'Database connection error';
     const result = { connected: false, error: errorMsg };
     lastCheck = { ...result, timestamp: now };
+
+    // Rate-limit console warnings to at most once per minute
+    if (now - lastLogTimestamp > LOG_RATE_LIMIT_MS) {
+      lastLogTimestamp = now;
+      console.warn(`[Database Health Check]: Database disconnected (${errorMsg}). Rate-limiting notice to 1/min.`);
+    }
+
     return result;
   }
 }

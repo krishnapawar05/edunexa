@@ -3,7 +3,7 @@ const { execSync } = require('child_process');
 console.log('[Database Deploy] Starting database migration & schema check...');
 
 function sanitizeDatabaseUrl(url) {
-  if (!url) return 'none';
+  if (!url) return 'none (unconfigured)';
   try {
     const parsed = new URL(url);
     const host = parsed.host || 'unknown-host';
@@ -14,24 +14,98 @@ function sanitizeDatabaseUrl(url) {
   }
 }
 
-// Auto-detect and resolve DATABASE_URL if empty or missing
-let resolvedDbUrl = (process.env.DATABASE_URL && process.env.DATABASE_URL.trim()) || '';
+const isRailway = Boolean(
+  process.env.RAILWAY_ENVIRONMENT ||
+  process.env.RAILWAY_PROJECT_ID ||
+  process.env.RAILWAY_PUBLIC_DOMAIN ||
+  process.env.RAILWAY_STATIC_URL
+);
 
-if (!resolvedDbUrl || resolvedDbUrl.includes('localhost') || resolvedDbUrl.includes('127.0.0.1')) {
-  resolvedDbUrl =
-    (process.env.DATABASE_PRIVATE_URL && process.env.DATABASE_PRIVATE_URL.trim()) ||
-    (process.env.POSTGRES_URL && process.env.POSTGRES_URL.trim()) ||
-    (process.env.DATABASE_PUBLIC_URL && process.env.DATABASE_PUBLIC_URL.trim()) ||
-    (process.env.POSTGRESQL_URL && process.env.POSTGRESQL_URL.trim()) ||
-    (process.env.PGHOST &&
-      `postgresql://${process.env.PGUSER || 'postgres'}:${encodeURIComponent(process.env.PGPASSWORD || '')}@${process.env.PGHOST}:${process.env.PGPORT || 5432}/${process.env.PGDATABASE || 'railway'}`) ||
-    '';
+// Collect candidates in strict priority order
+const candidates = [
+  { key: 'DATABASE_URL', val: process.env.DATABASE_URL },
+  { key: 'DATABASE_PRIVATE_URL', val: process.env.DATABASE_PRIVATE_URL },
+  { key: 'DATABASE_PUBLIC_URL', val: process.env.DATABASE_PUBLIC_URL },
+  { key: 'POSTGRES_URL', val: process.env.POSTGRES_URL },
+  { key: 'POSTGRESQL_URL', val: process.env.POSTGRESQL_URL },
+];
+
+for (const [k, v] of Object.entries(process.env)) {
+  if (
+    (k.endsWith('_DATABASE_URL') || k.endsWith('_DATABASE_PRIVATE_URL') || k.endsWith('_POSTGRES_URL')) &&
+    !candidates.some(c => c.key === k)
+  ) {
+    candidates.push({ key: k, val: v });
+  }
+}
+
+if (process.env.PGHOST && process.env.PGUSER && process.env.PGDATABASE) {
+  const pass = process.env.PGPASSWORD ? encodeURIComponent(process.env.PGPASSWORD) : '';
+  const auth = process.env.PGUSER + (pass ? `:${pass}` : '');
+  const port = process.env.PGPORT || '5432';
+  candidates.push({
+    key: 'PG* variables',
+    val: `postgresql://${auth}@${process.env.PGHOST}:${port}/${process.env.PGDATABASE}`,
+  });
+}
+
+let resolvedDbUrl = '';
+let unexpandedCandidate = '';
+let localhostCandidate = '';
+
+for (const { key, val } of candidates) {
+  if (!val || typeof val !== 'string') continue;
+  let clean = val.trim();
+  if ((clean.startsWith('"') && clean.endsWith('"')) || (clean.startsWith("'") && clean.endsWith("'"))) {
+    clean = clean.slice(1, -1).trim();
+  }
+  if (!clean) continue;
+
+  if (clean.includes('${{') || clean.startsWith('${')) {
+    unexpandedCandidate = clean;
+    continue;
+  }
+
+  const isLocal = clean.includes('localhost') || clean.includes('127.0.0.1');
+  if (isLocal) {
+    localhostCandidate = clean;
+    if (isRailway) {
+      continue;
+    }
+  }
+
+  if (clean.startsWith('postgresql://') || clean.startsWith('postgres://')) {
+    resolvedDbUrl = clean;
+    break;
+  }
+}
+
+if (!resolvedDbUrl && !isRailway) {
+  resolvedDbUrl = localhostCandidate || 'postgresql://postgres:root@localhost:5432/edunexa_dev?schema=public';
 }
 
 if (!resolvedDbUrl) {
-  console.warn('⚠️ [Database Deploy Warning]: DATABASE_URL is empty or not set in Railway service variables.');
-  console.warn('⚠️ Please add DATABASE_URL in the edunexa Variables tab (e.g. ${{Postgres.DATABASE_URL}}).');
-  console.warn('⚠️ Skipping pre-boot migrations to prevent fatal container restart loop.');
+  console.warn('\n======================================================================');
+  console.warn('⚠️ [Database Deploy Warning]: PostgreSQL connection string could not be resolved on Railway.');
+  if (unexpandedCandidate) {
+    console.warn(`Reason: DATABASE_URL contains an UNEXPANDED Railway template: "${unexpandedCandidate}"`);
+    console.warn('The service name in ${{...}} likely does not match your PostgreSQL service (e.g. Postgres-fteJ).');
+  } else if (localhostCandidate) {
+    console.warn('Reason: DATABASE_URL points to "localhost:5432", which is unreachable inside cloud containers.');
+  } else {
+    console.warn('Reason: DATABASE_URL is missing or empty in Railway service variables.');
+  }
+  console.warn('');
+  console.warn('👉 HOW TO FIX IN RAILWAY (Takes 30 seconds):');
+  console.warn('   1. In Railway Canvas, click the "edunexa" service box.');
+  console.warn('   2. Click the "Variables" tab.');
+  console.warn('   3. If DATABASE_URL exists, click Edit (or delete it).');
+  console.warn('   4. Click "+ New Variable" -> Click "Add Reference".');
+  console.warn('   5. Select your Postgres service (e.g. "Postgres-fteJ") -> Select "DATABASE_URL".');
+  console.warn('      (Reference will look like: ${{Postgres-fteJ.DATABASE_URL}})');
+  console.warn('   6. Click Deploy/Save.');
+  console.warn('⚠️ Skipping pre-boot migrations to allow HTTP server to boot and serve application.');
+  console.warn('======================================================================\n');
   process.exit(0);
 }
 
@@ -42,8 +116,11 @@ console.log('[Database Deploy] Target database:', sanitizeDatabaseUrl(resolvedDb
 const nixPaths = '/root/.nix-profile/bin:/nix/var/nix/profiles/default/bin';
 process.env.PATH = process.env.PATH ? `${nixPaths}:${process.env.PATH}` : nixPaths;
 
-function run(cmd) {
-  return execSync(cmd, { stdio: 'inherit', env: process.env });
+function run(cmd, extraEnv = {}) {
+  return execSync(cmd, {
+    stdio: 'inherit',
+    env: { ...process.env, DATABASE_URL: resolvedDbUrl, ...extraEnv },
+  });
 }
 
 // Step 1: Attempt to apply any committed migrations
