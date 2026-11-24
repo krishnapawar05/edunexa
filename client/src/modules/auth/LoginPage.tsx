@@ -77,12 +77,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGoToPubl
   const [forgotDevToken, setForgotDevToken] = useState<string | null>(null);
   const [forgotError, setForgotError] = useState<string | null>(null);
 
-  // Development environment check: Strictly display demo credentials only in dev mode
-  const isDev = Boolean(
-    (import.meta as any).env?.DEV ||
-    (import.meta as any).env?.MODE === 'development' ||
-    typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-  );
+  // Demo credentials showcase visibility:
+  // Enabled by default on both local development and deployed showcase environments.
+  // Can be explicitly disabled in live commercial school production by setting VITE_SHOW_DEMO_CREDENTIALS=false
+  const showDemoCredentials =
+    (import.meta as any).env?.VITE_SHOW_DEMO_CREDENTIALS !== 'false' &&
+    (import.meta as any).env?.VITE_SHOW_DEMO_CREDENTIALS !== false &&
+    (import.meta as any).env?.VITE_SHOW_DEMO_CREDENTIALS !== '0';
 
   const roleToRouteMap: Record<string, string> = {
     SUPER_ADMIN: '/superadmin',
@@ -118,8 +119,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGoToPubl
 
   const handleQuickRoleSelect = (category: 'STUDENT' | 'TEACHER' | 'ADMIN') => {
     setSelectedQuickRole(category);
-    // Find representative demo account if in dev mode
-    if (isDev) {
+    // Find representative demo account if showcase / demo mode is enabled
+    if (showDemoCredentials) {
       let match = DEMO_ROLES.find((r) => r.category === category);
       if (category === 'ADMIN') match = DEMO_ROLES.find((r) => r.roleKey === 'SCHOOL_ADMIN');
       if (match) {
@@ -539,12 +540,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGoToPubl
         </button>
       </form>
 
-      {/* DEMO CREDENTIALS: STRICTLY DEVELOPMENT MODE ONLY */}
-      {isDev && (
+      {/* DEMO CREDENTIALS: SHOWCASE & RAPID EVALUATION (ENABLED BY DEFAULT) */}
+      {showDemoCredentials && (
         <div
           style={{
-            marginTop: '22px',
-            paddingTop: '16px',
+            marginTop: '16px',
+            paddingTop: '14px',
             borderTop: '1px dashed var(--border-default, #e2e6e0)',
           }}
         >

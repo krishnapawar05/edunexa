@@ -177,10 +177,12 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({
           z-index: 2;
           width: 100%;
           min-height: 100vh;
+          min-height: 100dvh;
           display: flex;
+          flex-direction: column;
           align-items: center;
           justify-content: center;
-          padding: 44px 36px;
+          padding: 24px 24px;
           box-sizing: border-box;
         }
 
@@ -191,8 +193,9 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 52px;
-          margin: auto 0;
+          gap: 48px;
+          margin-top: auto;
+          margin-bottom: auto;
         }
 
         /* LEFT COLUMN: BRANDING AND HIGHLIGHTS */

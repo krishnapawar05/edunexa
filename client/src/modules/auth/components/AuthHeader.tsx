@@ -21,10 +21,10 @@ export const AuthHeader: React.FC<AuthHeaderProps> = ({
   const displayPortalName = portalName || branding.schoolName || 'School ERP';
 
   return (
-    <div style={{ textAlign: 'center', marginBottom: '22px' }}>
+    <div style={{ textAlign: 'center', marginBottom: '16px' }}>
       {showCrest && (
-        <div style={{ marginBottom: '12px', display: 'flex', justifyContent: 'center' }}>
-          <AuthCrest size={76} />
+        <div style={{ marginBottom: '8px', display: 'flex', justifyContent: 'center' }}>
+          <AuthCrest size={68} />
         </div>
       )}
 
