@@ -1,21 +1,24 @@
 import { app } from './app.js';
 import { env } from './config/env.js';
-import { prisma, checkDatabaseConnection } from './config/db.js';
+import { prisma } from './config/db.js';
 import { seedInstitutionalData } from './db/seedData.js';
 import { initSocketIO } from './socket.js';
 
 const HOST = '0.0.0.0';
 
 async function bootstrap() {
-  // Ensure institutional records and demo accounts are up-to-date
+  // Check if database needs initial seeding
   try {
-    const dbCheck = await checkDatabaseConnection();
-    if (dbCheck.connected) {
-      console.log('[EduNexa Bootstrap] Database connected. Verifying institutional database records and demo accounts...');
+    const superAdmin = await prisma.user.findUnique({
+      where: { email: 'superadmin@edunexa.org' },
+    });
+
+    if (!superAdmin) {
+      console.log('[EduNexa Bootstrap] Fresh or unseeded database detected. Auto-seeding demo accounts and institutional records...');
       await seedInstitutionalData(prisma);
-      console.log('[EduNexa Bootstrap] Institutional verification and seeding completed successfully.');
+      console.log('[EduNexa Bootstrap] Institutional seeding completed successfully.');
     } else {
-      console.warn(`[EduNexa Bootstrap] Database notice: ${dbCheck.error}. Operating in synthetic resilience mode.`);
+      console.log('[EduNexa Bootstrap] Database verified with existing institutional accounts.');
     }
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);

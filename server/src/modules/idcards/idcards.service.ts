@@ -1,4 +1,4 @@
-import { prisma, checkDatabaseConnection } from '../../config/db.js';
+import { prisma } from '../../config/db.js';
 import { AppError } from '../../middleware/errorHandler.js';
 import { CardStatus, PlatformRole } from '@prisma/client';
 import { randomUUID, createHash } from 'crypto';
@@ -780,148 +780,46 @@ export class IdCardsService {
   // 7. SELF-SERVICE ID CARD (STUDENT & TEACHER/STAFF)
   // ==========================================================================
 
-  getSyntheticSelfServiceCard(userId: string, schoolId: string, role: string) {
-    const isTeacher = role === PlatformRole.TEACHER || role === 'TEACHER';
-    const school = {
-      id: schoolId || '92318ca5-473c-4436-a7cd-6b6eaadac413',
-      name: 'Apex Academy of Sciences & Arts',
-      code: 'APEX-2026',
-      logoUrl: null,
-      address: 'Plot 42, Institutional Area, Knowledge Park III',
-      phone: '+91 11 2659 1000',
-      email: 'admin@apexacademy.edu',
-    };
-
-    const template = {
-      id: 'tpl-default-cr80',
-      schoolId: school.id,
-      name: 'Official Institutional Classic (CR80)',
-      description: 'Standard institutional double-sided credential template with deep navy and academic gold palette.',
-      targetRole: 'ALL',
-      isDefault: true,
-      isActive: true,
-      primaryColor: '#1e3a8a',
-      secondaryColor: '#d97706',
-      headerTextColor: '#ffffff',
-      cardOrientation: 'LANDSCAPE',
-      showBloodGroup: true,
-      showParentContact: true,
-      showEmergencyPhone: true,
-      showPrincipalSign: true,
-      showSchoolSeal: true,
-      showBarcode: false,
-      customTermsText:
-        'This card is the property of the institution. If found, please return to the school administration desk. Unauthorized use or reproduction is strictly prohibited.',
-    };
-
-    if (isTeacher) {
-      const profileData = {
-        id: 'staff-thorne-01',
-        fullName: 'Julian Thorne',
-        firstName: 'Julian',
-        lastName: 'Thorne',
-        email: 'julian.thorne@apexacademy.edu',
-        employeeId: 'EMP-2026-0012',
-        designation: 'Senior Faculty & Dept Head',
-        department: 'Science & Physics',
-        joiningDate: '2019-07-01',
-        employmentStatus: 'Active Permanent',
-        bloodGroup: 'B+',
-        phone: '+91 98111 22334',
-        emergencyPhone: '+91 98111 99887',
-        address: 'Faculty Enclave, Sector 62, Noida',
-        avatarUrl: '/images/avatars/dr_thorne_passport.jpg',
-        role: 'TEACHER',
-      };
-
-      const cardData = {
-        id: 'card-thorne-01',
-        cardNumber: 'CR80-2026-0012',
-        verificationToken: 'v-tok-7a1b-3c4d-5e6f-9912',
-        status: 'ACTIVE',
-        issuedAt: new Date('2026-07-01T00:00:00.000Z').toISOString(),
-        expiresAt: new Date('2028-06-30T00:00:00.000Z').toISOString(),
-        template,
-      };
-
-      return {
-        holderType: 'TEACHER',
-        ...profileData,
-        profile: profileData,
-        school,
-        idCard: cardData,
-        card: cardData,
-        template,
-      };
-    }
-
-    const profileData = {
-      id: 'stu-aarav-01',
-      fullName: 'Aarav Sharma',
-      firstName: 'Aarav',
-      lastName: 'Sharma',
-      email: 'aarav.sharma@apexacademy.edu',
-      admissionNumber: 'ADM-2026-0042',
-      rollNumber: 1,
-      className: 'Grade 10',
-      sectionName: 'A',
-      academicSession: 'Academic Year 2026–2027',
-      dateOfBirth: '2010-04-12',
-      bloodGroup: 'O+',
-      emergencyPhone: '+91 98100 23456',
-      address: 'Sector 14, Institutional Area, New Delhi',
-      avatarUrl: '/images/avatars/aarav_sharma_passport.jpg',
-      role: 'STUDENT',
-    };
-
-    const cardData = {
-      id: 'card-aarav-01',
-      cardNumber: 'CR80-2026-0042',
-      verificationToken: 'v-tok-8f2c-49a1-9b7e-e214',
-      status: 'ACTIVE',
-      issuedAt: new Date('2026-08-01T00:00:00.000Z').toISOString(),
-      expiresAt: new Date('2027-03-31T00:00:00.000Z').toISOString(),
-      template,
-    };
-
-    return {
-      holderType: 'STUDENT',
-      ...profileData,
-      profile: profileData,
-      school,
-      idCard: cardData,
-      card: cardData,
-      template,
-    };
-  }
-
   async getSelfServiceCard(userId: string, schoolId: string, role: string) {
-    const dbCheck = await checkDatabaseConnection();
-    if (!dbCheck.connected) {
-      return this.getSyntheticSelfServiceCard(userId, schoolId, role);
+    const school = await prisma.school.findUnique({
+      where: { id: schoolId },
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        logoUrl: true,
+        address: true,
+        phone: true,
+        email: true,
+      },
+    });
+
+    if (!school) {
+      throw new AppError('School tenant not found.', 404, 'NOT_FOUND');
     }
 
-    try {
-      const school = await prisma.school.findUnique({
-        where: { id: schoolId },
-        select: {
-          id: true,
-          name: true,
-          code: true,
-          logoUrl: true,
-          address: true,
-          phone: true,
-          email: true,
+    if (role === PlatformRole.STUDENT) {
+      let student = await prisma.studentProfile.findFirst({
+        where: { membership: { userId, schoolId } },
+        include: {
+          membership: { include: { user: true } },
+          enrollments: {
+            include: { class: true, section: true, academicSession: true },
+            take: 1,
+          },
+          virtualIdCard: { include: { template: true } },
         },
       });
 
-      if (!school) {
-        return this.getSyntheticSelfServiceCard(userId, schoolId, role);
+      if (!student) {
+        throw new AppError('Student profile record not found for this user account.', 404, 'NOT_FOUND');
       }
 
-      if (role === PlatformRole.STUDENT) {
-        let student = await prisma.studentProfile.findFirst({
-          where: { membership: { userId, schoolId } },
+      // If no card exists yet, auto-provision an active ID card
+      if (!student.virtualIdCard) {
+        await this.generateIndividualIdCard(schoolId, 'STUDENT', student.id);
+        student = await prisma.studentProfile.findFirst({
+          where: { id: student.id },
           include: {
             membership: { include: { user: true } },
             enrollments: {
@@ -931,166 +829,115 @@ export class IdCardsService {
             virtualIdCard: { include: { template: true } },
           },
         });
+      }
 
-        if (!student) {
-          return this.getSyntheticSelfServiceCard(userId, schoolId, role);
-        }
+      const u = student!.membership.user;
+      const enrollment = student!.enrollments[0];
+      const card = student!.virtualIdCard!;
 
-        // If no card exists yet, auto-provision an active ID card
-        if (!student.virtualIdCard) {
-          try {
-            await this.generateIndividualIdCard(schoolId, 'STUDENT', student.id);
-            student = await prisma.studentProfile.findFirst({
-              where: { id: student.id },
-              include: {
-                membership: { include: { user: true } },
-                enrollments: {
-                  include: { class: true, section: true, academicSession: true },
-                  take: 1,
-                },
-                virtualIdCard: { include: { template: true } },
-              },
-            });
-          } catch (genErr) {
-            console.warn('[IdCardsService] Auto-generation notice:', genErr);
-          }
-        }
+      const cardData = {
+        id: card.id,
+        cardNumber: card.cardNumber,
+        verificationToken: card.verificationToken,
+        status: card.status,
+        issuedAt: card.issuedAt.toISOString(),
+        expiresAt: card.expiresAt?.toISOString() || null,
+        template: card.template,
+      };
 
-        const u = student!.membership.user;
-        const enrollment = student!.enrollments[0];
-        const card = student!.virtualIdCard;
+      const profileData = {
+        id: student!.id,
+        fullName: `${u.firstName} ${u.lastName}`,
+        firstName: u.firstName,
+        lastName: u.lastName,
+        email: u.email,
+        admissionNumber: student!.admissionNumber,
+        rollNumber: enrollment?.rollNumber || null,
+        className: enrollment?.class?.name || 'Class —',
+        sectionName: enrollment?.section?.name || '—',
+        academicSession: enrollment?.academicSession?.name || '2026–2027',
+        dateOfBirth: student!.dateOfBirth?.toISOString().split('T')[0] || null,
+        bloodGroup: student!.bloodGroup,
+        emergencyPhone: student!.emergencyPhone,
+        address: student!.address,
+        avatarUrl: student!.photoUrl || u.avatarUrl,
+        role: 'STUDENT',
+      };
 
-        const cardData = card
-          ? {
-              id: card.id,
-              cardNumber: card.cardNumber,
-              verificationToken: card.verificationToken,
-              status: card.status,
-              issuedAt: card.issuedAt ? card.issuedAt.toISOString() : new Date().toISOString(),
-              expiresAt: card.expiresAt?.toISOString() || null,
-              template: card.template,
-            }
-          : {
-              id: 'card-default',
-              cardNumber: 'CR80-2026-0042',
-              verificationToken: 'v-tok-8f2c-49a1-9b7e-e214',
-              status: 'ACTIVE',
-              issuedAt: new Date().toISOString(),
-              expiresAt: null,
-              template: null,
-            };
+      return {
+        holderType: 'STUDENT',
+        ...profileData,
+        profile: profileData,
+        school,
+        idCard: cardData,
+        card: cardData,
+        template: card.template,
+      };
+    } else {
+      // Teacher or Staff
+      let staff = await prisma.staffProfile.findFirst({
+        where: { membership: { userId, schoolId } },
+        include: {
+          membership: { include: { user: true } },
+          department: true,
+          virtualIdCard: { include: { template: true } },
+        },
+      });
 
-        const profileData = {
-          id: student!.id,
-          fullName: `${u.firstName} ${u.lastName}`,
-          firstName: u.firstName,
-          lastName: u.lastName,
-          email: u.email,
-          admissionNumber: student!.admissionNumber,
-          rollNumber: enrollment?.rollNumber || null,
-          className: enrollment?.class?.name || 'Grade 10',
-          sectionName: enrollment?.section?.name || 'A',
-          academicSession: enrollment?.academicSession?.name || '2026–2027',
-          dateOfBirth: student!.dateOfBirth?.toISOString().split('T')[0] || null,
-          bloodGroup: student!.bloodGroup,
-          emergencyPhone: student!.emergencyPhone,
-          address: student!.address,
-          avatarUrl: student!.photoUrl || u.avatarUrl,
-          role: 'STUDENT',
-        };
+      if (!staff) {
+        throw new AppError('Employee profile record not found for this user account.', 404, 'NOT_FOUND');
+      }
 
-        return {
-          holderType: 'STUDENT',
-          ...profileData,
-          profile: profileData,
-          school,
-          idCard: cardData,
-          card: cardData,
-          template: cardData.template,
-        };
-      } else {
-        // Teacher or Staff
-        let staff = await prisma.staffProfile.findFirst({
-          where: { membership: { userId, schoolId } },
+      if (!staff.virtualIdCard) {
+        const holderCat = staff.membership.role === PlatformRole.TEACHER ? 'TEACHER' : 'STAFF';
+        await this.generateIndividualIdCard(schoolId, holderCat, staff.id);
+        staff = await prisma.staffProfile.findFirst({
+          where: { id: staff.id },
           include: {
             membership: { include: { user: true } },
             department: true,
             virtualIdCard: { include: { template: true } },
           },
         });
-
-        if (!staff) {
-          return this.getSyntheticSelfServiceCard(userId, schoolId, role);
-        }
-
-        if (!staff.virtualIdCard) {
-          try {
-            const holderCat = staff.membership.role === PlatformRole.TEACHER ? 'TEACHER' : 'STAFF';
-            await this.generateIndividualIdCard(schoolId, holderCat, staff.id);
-            staff = await prisma.staffProfile.findFirst({
-              where: { id: staff.id },
-              include: {
-                membership: { include: { user: true } },
-                department: true,
-                virtualIdCard: { include: { template: true } },
-              },
-            });
-          } catch (genErr) {
-            console.warn('[IdCardsService] Auto-generation notice:', genErr);
-          }
-        }
-
-        const u = staff!.membership.user;
-        const card = staff!.virtualIdCard;
-
-        const cardData = card
-          ? {
-              id: card.id,
-              cardNumber: card.cardNumber,
-              verificationToken: card.verificationToken,
-              status: card.status,
-              issuedAt: card.issuedAt ? card.issuedAt.toISOString() : new Date().toISOString(),
-              expiresAt: card.expiresAt?.toISOString() || null,
-              template: card.template,
-            }
-          : {
-              id: 'card-default-staff',
-              cardNumber: 'CR80-2026-0012',
-              verificationToken: 'v-tok-7a1b-3c4d-5e6f-9912',
-              status: 'ACTIVE',
-              issuedAt: new Date().toISOString(),
-              expiresAt: null,
-              template: null,
-            };
-
-        const profileData = {
-          id: staff!.id,
-          fullName: `${u.firstName} ${u.lastName}`,
-          firstName: u.firstName,
-          lastName: u.lastName,
-          email: u.email,
-          employeeId: staff!.employeeId,
-          designation: staff!.designation,
-          department: staff!.department?.name || 'Faculty',
-          joiningDate: staff!.joiningDate?.toISOString().split('T')[0] || null,
-          emergencyPhone: u.phone,
-          avatarUrl: staff!.photoUrl || u.avatarUrl,
-          role: staff!.membership.role,
-        };
-
-        return {
-          holderType: staff!.membership.role === PlatformRole.TEACHER ? 'TEACHER' : 'STAFF',
-          ...profileData,
-          profile: profileData,
-          school,
-          idCard: cardData,
-          card: cardData,
-          template: cardData.template,
-        };
       }
-    } catch (err) {
-      console.warn('[IdCardsService.getSelfServiceCard] Database query notice, using synthetic store:', err);
-      return this.getSyntheticSelfServiceCard(userId, schoolId, role);
+
+      const u = staff!.membership.user;
+      const card = staff!.virtualIdCard!;
+
+      const cardData = {
+        id: card.id,
+        cardNumber: card.cardNumber,
+        verificationToken: card.verificationToken,
+        status: card.status,
+        issuedAt: card.issuedAt.toISOString(),
+        expiresAt: card.expiresAt?.toISOString() || null,
+        template: card.template,
+      };
+
+      const profileData = {
+        id: staff!.id,
+        fullName: `${u.firstName} ${u.lastName}`,
+        firstName: u.firstName,
+        lastName: u.lastName,
+        email: u.email,
+        employeeId: staff!.employeeId,
+        designation: staff!.designation,
+        department: staff!.department?.name || 'Faculty',
+        joiningDate: staff!.joiningDate?.toISOString().split('T')[0] || null,
+        emergencyPhone: u.phone,
+        avatarUrl: staff!.photoUrl || u.avatarUrl,
+        role: staff!.membership.role,
+      };
+
+      return {
+        holderType: staff!.membership.role === PlatformRole.TEACHER ? 'TEACHER' : 'STAFF',
+        ...profileData,
+        profile: profileData,
+        school,
+        idCard: cardData,
+        card: cardData,
+        template: card.template,
+      };
     }
   }
 

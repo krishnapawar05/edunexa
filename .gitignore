@@ -34,11 +34,6 @@ logs/
 # Uploads
 uploads/
 
-# Database backups & SQL dumps
-server/prisma/backups/
-*.sql
-*.sql.gz
-
 # Documentation & Reports
 *.pdf
 Advanced School Management Website & AI-Powered ERP System.pdf

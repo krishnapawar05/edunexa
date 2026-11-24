@@ -1,10 +1,5 @@
 const { execSync } = require('child_process');
 
-try {
-  require('dotenv').config();
-  require('dotenv').config({ path: 'server/.env' });
-} catch (e) {}
-
 console.log('[Database Deploy] Starting database migration & schema check...');
 
 // Auto-detect and resolve DATABASE_URL if empty or missing
@@ -15,9 +10,6 @@ if (!resolvedDbUrl) {
     (process.env.DATABASE_PRIVATE_URL && process.env.DATABASE_PRIVATE_URL.trim()) ||
     (process.env.POSTGRES_URL && process.env.POSTGRES_URL.trim()) ||
     (process.env.DATABASE_PUBLIC_URL && process.env.DATABASE_PUBLIC_URL.trim()) ||
-    (process.env.POSTGRESQL_URL && process.env.POSTGRESQL_URL.trim()) ||
-    (process.env.POSTGRES_PRISMA_URL && process.env.POSTGRES_PRISMA_URL.trim()) ||
-    (process.env.POSTGRES_URL_NON_POOLING && process.env.POSTGRES_URL_NON_POOLING.trim()) ||
     (process.env.PGHOST &&
       `postgresql://${process.env.PGUSER || 'postgres'}:${encodeURIComponent(process.env.PGPASSWORD || '')}@${process.env.PGHOST}:${process.env.PGPORT || 5432}/${process.env.PGDATABASE || 'railway'}`) ||
     '';
@@ -46,8 +38,9 @@ try {
   run('npm run prisma:deploy --workspace=server');
   console.log('[Database Deploy] Migrations deployed or verified successfully.');
 } catch (deployError) {
-  console.warn('[Database Deploy] prisma migrate deploy notice (proceeding to schema push):', deployError.message);
+  console.warn('[Database Deploy] prisma migrate deploy notice:', deployError.message);
   try {
+    console.log('[Database Deploy] Resolving any failed migration state for 20261018000000_init_edunexa_core...');
     run('npx prisma migrate resolve --rolled-back 20261018000000_init_edunexa_core --schema=server/prisma/schema.prisma');
   } catch (resolveErr) {
     // Proceed to schema push
@@ -57,16 +50,10 @@ try {
 // Step 2: ALWAYS synchronize the complete Prisma schema to ensure all models and columns exist
 try {
   console.log('[Database Deploy] Step 2: Synchronizing complete schema definitions via prisma db push...');
-  run('npm run prisma:push --workspace=server -- --skip-generate --accept-data-loss');
+  run('npx prisma db push --schema=server/prisma/schema.prisma --skip-generate --accept-data-loss');
   console.log('[Database Deploy] Database schema synchronized successfully via prisma db push.');
 } catch (pushError) {
-  console.warn('[Database Deploy] Workspace prisma push notice, trying fallback via npx...');
-  try {
-    run('npx prisma db push --schema=server/prisma/schema.prisma --skip-generate --accept-data-loss');
-    console.log('[Database Deploy] Fallback schema push succeeded.');
-  } catch (fallbackErr) {
-    console.error('[Database Deploy] Schema synchronization error:', fallbackErr.message);
-  }
+  console.error('[Database Deploy] Schema synchronization error:', pushError.message);
 }
 
 // Step 3: Seed initial institutional records and demo accounts

@@ -77,12 +77,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGoToPubl
   const [forgotDevToken, setForgotDevToken] = useState<string | null>(null);
   const [forgotError, setForgotError] = useState<string | null>(null);
 
-  // Demo credentials visibility check:
-  // Visible by default on both localhost and deployed Railway environments (.railway.app).
-  // Can be explicitly disabled by setting VITE_ENABLE_DEMO_CREDENTIALS="false" or "0".
-  const rawDemoEnv = (import.meta as any).env?.VITE_ENABLE_DEMO_CREDENTIALS;
-  const isExplicitlyDisabled = rawDemoEnv === 'false' || rawDemoEnv === false || rawDemoEnv === '0';
-  const showDemoCredentials = !isExplicitlyDisabled;
+  // Development environment check: Strictly display demo credentials only in dev mode
+  const isDev = Boolean(
+    (import.meta as any).env?.DEV ||
+    (import.meta as any).env?.MODE === 'development' ||
+    typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  );
 
   const roleToRouteMap: Record<string, string> = {
     SUPER_ADMIN: '/superadmin',
@@ -118,8 +118,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGoToPubl
 
   const handleQuickRoleSelect = (category: 'STUDENT' | 'TEACHER' | 'ADMIN') => {
     setSelectedQuickRole(category);
-    // Find representative demo account if demo credentials are enabled
-    if (showDemoCredentials) {
+    // Find representative demo account if in dev mode
+    if (isDev) {
       let match = DEMO_ROLES.find((r) => r.category === category);
       if (category === 'ADMIN') match = DEMO_ROLES.find((r) => r.roleKey === 'SCHOOL_ADMIN');
       if (match) {
@@ -539,8 +539,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGoToPubl
         </button>
       </form>
 
-      {/* DEMO CREDENTIALS: DISPLAYED LOCALLY OR WHEN VITE_ENABLE_DEMO_CREDENTIALS IS TRUE */}
-      {showDemoCredentials && (
+      {/* DEMO CREDENTIALS: STRICTLY DEVELOPMENT MODE ONLY */}
+      {isDev && (
         <div
           style={{
             marginTop: '22px',
